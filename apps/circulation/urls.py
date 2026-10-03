@@ -44,4 +44,20 @@ urlpatterns = [
         views.handover_confirm_view,
         name="handover_confirm",
     ),
+    path("pengembalian/", views.return_view, name="return"),
+    path(
+        "pengembalian/konfirmasi/",
+        views.return_confirm_view,
+        name="return_confirm",
+    ),
+    path(
+        "pengembalian/riwayat/",
+        views.return_history_view,
+        name="return_history",
+    ),
+    path(
+        "identitas/<int:pk>/",
+        views.copy_identity_qr_view,
+        name="copy_identity_qr",
+    ),
 ]

@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.core.paginator import Paginator
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -9,13 +10,14 @@ from apps.accounts.authorization import (
     role_required,
 )
 
-from .models import Loan
+from .models import Loan, LoanItem
 from .services import (
     LOAN_APPROVED,
     LOAN_PENDING,
     ApprovalError,
     LoanRequestError,
     PickupTokenError,
+    ReturnError,
     activate_handover,
     available_substitutes,
     approve_loan,
@@ -24,7 +26,10 @@ from .services import (
     cart_copies,
     cart_remove,
     get_cart_ids,
+    lookup_return,
     make_pickup_qr_png,
+    make_qr_png,
+    process_return,
     reject_loan,
     request_loan,
     verify_pickup_token,
@@ -260,3 +265,63 @@ def handover_confirm_view(request):
         messages.error(request, str(exc))
         return redirect("circulation:handover")
     return render(request, "circulation/handover_success.html", {"loan": loan})
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def copy_identity_qr_view(request, pk):
+    """PNG QR Identitas eksemplar (payload = copy_code).
+
+    BERBEDA dari QR Pickup: identitas eksemplar, bukan token transaksi.
+    """
+    from apps.catalog.models import BookCopy
+
+    copy = get_object_or_404(BookCopy, pk=pk)
+    return HttpResponse(
+        make_qr_png(copy.copy_code), content_type="image/png"
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def return_view(request):
+    """Halaman pengembalian: lookup QR Identitas -> info peminjam (FR-30 – FR-40)."""
+    context = {"code": "", "found": None, "error": ""}
+    if request.method == "POST":
+        code = (request.POST.get("code") or "").strip()
+        context["code"] = code
+        try:
+            copy, item, loan = lookup_return(code)
+        except ReturnError as exc:
+            context["error"] = str(exc)
+        else:
+            context["found"] = {"copy": copy, "item": item, "loan": loan}
+    return render(request, "circulation/return.html", context)
+
+
+@role_required(User.Role.PUSTAKAWAN)
+@require_POST
+def return_confirm_view(request):
+    """Konfirmasi pengembalian + denda (FR-41 – FR-49)."""
+    code = (request.POST.get("code") or "").strip()
+    condition = (request.POST.get("condition") or "BAIK").strip()
+    lost = request.POST.get("lost") == "on"
+    try:
+        item = process_return(code, request.user, condition, lost)
+    except ReturnError as exc:
+        messages.error(request, str(exc))
+        return redirect("circulation:return")
+    return render(request, "circulation/return_success.html", {"item": item})
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def return_history_view(request):
+    """Riwayat pengembalian untuk administrasi (FR-47, FR-80)."""
+    items = (
+        LoanItem.objects.filter(returned_at__isnull=False)
+        .select_related("loan__user", "book_copy__book", "processed_by")
+        .order_by("-returned_at")
+    )
+    paginator = Paginator(items, 15)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(
+        request, "circulation/return_history.html", {"page_obj": page_obj}
+    )

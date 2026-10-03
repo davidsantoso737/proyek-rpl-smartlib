@@ -79,20 +79,37 @@
         <div class="rounded-xl border border-slate-200 overflow-hidden">
             <table class="w-full text-sm">
                 <thead>
-                    <tr class="bg-slate-50 text-left text-slate-500">
-                        <th class="px-4 py-2.5 font-medium">Kode</th>
-                        <th class="px-4 py-2.5 font-medium">Judul</th>
-                        <th class="px-4 py-2.5 font-medium">Lokasi</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    {% for item in loan.items.all %}
-                        <tr>
-                            <td class="px-4 py-2.5 font-medium">{{ item.book_copy.copy_code }}</td>
-                            <td class="px-4 py-2.5">{{ item.book_copy.book.title }}</td>
-                            <td class="px-4 py-2.5 text-slate-600">{{ item.book_copy.location }}</td>
+                        <tr class="bg-slate-50 text-left text-slate-500">
+                            <th class="px-4 py-2.5 font-medium">Kode</th>
+                            <th class="px-4 py-2.5 font-medium">Judul</th>
+                            <th class="px-4 py-2.5 font-medium">Lokasi</th>
+                            <th class="px-4 py-2.5 font-medium">Status</th>
                         </tr>
-                    {% endfor %}
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for item in loan.items.all %}
+                            <tr>
+                                <td class="px-4 py-2.5 font-medium">{{ item.book_copy.copy_code }}</td>
+                                <td class="px-4 py-2.5">{{ item.book_copy.book.title }}</td>
+                                <td class="px-4 py-2.5 text-slate-600">{{ item.book_copy.location }}</td>
+                                <td class="px-4 py-2.5 text-xs">
+                                    {% if item.returned_at %}
+                                        {% if item.return_status == "HILANG" %}
+                                            <span class="px-2 py-0.5 rounded-full font-semibold bg-red-100 text-red-700">Hilang</span>
+                                        {% else %}
+                                            <span class="px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-700">Kembali {{ item.returned_at|date:"d M Y" }}</span>
+                                        {% endif %}
+                                        {% if item.fine_amount %}
+                                            <span class="block mt-1 text-amber-700 font-medium">Denda Rp{{ item.fine_amount }} ({{ item.fine_status }})</span>
+                                        {% endif %}
+                                    {% elif item.borrowed_at %}
+                                        <span class="px-2 py-0.5 rounded-full font-semibold bg-blue-100 text-blue-700">Dipinjam</span>
+                                    {% else %}
+                                        <span class="px-2 py-0.5 rounded-full font-semibold bg-slate-100 text-slate-600">Diajukan</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
                 </tbody>
             </table>
         </div>

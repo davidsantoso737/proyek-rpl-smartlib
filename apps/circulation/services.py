@@ -469,12 +469,180 @@ def activate_handover(token, librarian):
     return loan
 
 
-def make_pickup_qr_png(token):
-    """Render QR Pickup (payload = token opaque, tanpa data sensitif)."""
+def make_qr_png(data):
+    """Render QR dari data string (payload opaque, tanpa data sensitif)."""
     qr = qrcode.QRCode(box_size=8, border=2)
-    qr.add_data(token)
+    qr.add_data(data)
     qr.make(fit=True)
     image = qr.make_image(fill_color="black", back_color="white")
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
     return buffer.getvalue()
+
+
+def make_pickup_qr_png(token):
+    """Render QR Pickup (payload = token opaque, tanpa data sensitif)."""
+    return make_qr_png(token)
+
+
+# --- Pengembalian (FR-30 – FR-49, BR-26 – BR-34, BR-43 – BR-49) ---
+
+LOAN_COMPLETED = "COMPLETED"
+
+ITEM_RETURNED = "KEMBALI"
+ITEM_LOST = "HILANG"
+REPLACEMENT_PENDING = "BELUM_DIGANTI"
+FINE_PAID = "LUNAS"
+
+# Status eksemplar hilang: tidak tersedia sampai ada kebijakan
+# penggantian (BR-32; tanpa workflow replacement baru).
+COPY_LOST = "HILANG"
+
+
+class ReturnError(LoanRequestError):
+    """Kegagalan lookup/validasi pengembalian."""
+
+
+def _find_active_item(copy_code):
+    """Cari (copy, item, loan) untuk kode identitas; tanpa lock."""
+    code = (copy_code or "").strip()
+    if not code:
+        raise ReturnError(
+            "Pindai QR Identitas atau ketik kode eksemplar."
+        )
+    try:
+        copy = BookCopy.objects.select_related("book").get(copy_code=code)
+    except BookCopy.DoesNotExist:
+        raise ReturnError(
+            f"Kode {code} tidak terdaftar pada sistem."
+        )
+    item = (
+        LoanItem.objects.filter(
+            book_copy=copy,
+            loan__status=LOAN_ACTIVE,
+            returned_at__isnull=True,
+        )
+        .select_related("loan__user", "book_copy__book")
+        .first()
+    )
+    if item is None:
+        raise ReturnError(
+            f"Eksemplar {copy.copy_code} tidak memiliki "
+            "peminjaman aktif."
+        )
+    return copy, item, item.loan
+
+
+def lookup_return(code):
+    """Lookup QR Identitas -> peminjaman aktif (BR-33, BR-34, FR-39, FR-40)."""
+    return _find_active_item(code)
+
+
+def calculate_fine(item, returned_at):
+    """Denda = tarif snapshot item x hari terlambat (BR-26 – BR-29, FR-42 – FR-45).
+
+    Tarif memakai fine_rate_per_day milik item (konsisten riwayat,
+    NFR-22), bukan konfigurasi saat ini.
+    """
+    due_at = item.due_at or item.loan.due_at
+    if due_at is None:
+        return 0, item.fine_rate_per_day * 0
+    late_day = max(0, (returned_at.date() - due_at.date()).days)
+    return late_day, item.fine_rate_per_day * late_day
+
+
+def process_return(code, librarian, condition="BAIK", lost=False):
+    """Catat pengembalian satu eksemplar secara atomik (FR-41 – FR-49).
+
+    Satu batas transaksi: item + copy + (bila lunas semua) loan.
+    Copy menjadi TERSEDIA hanya setelah return tercatat; yang hilang
+    menjadi HILANG dan tetap tidak tersedia (BR-31, BR-32).
+    """
+    code = (code or "").strip()
+    condition = (condition or "BAIK").strip().upper() or "BAIK"
+    with transaction.atomic():
+        try:
+            copy = BookCopy.objects.select_for_update().get(copy_code=code)
+        except (BookCopy.DoesNotExist, ValueError):
+            raise ReturnError(f"Kode {code} tidak terdaftar pada sistem.")
+        item = (
+            LoanItem.objects.select_for_update()
+            .filter(
+                book_copy=copy,
+                loan__status=LOAN_ACTIVE,
+                returned_at__isnull=True,
+            )
+            .select_related("loan__user", "book_copy__book")
+            .first()
+        )
+        if item is None:
+            raise ReturnError(
+                f"Eksemplar {copy.copy_code} tidak memiliki "
+                "peminjaman aktif."
+            )
+        loan = Loan.objects.select_for_update().get(pk=item.loan_id)
+
+        now = timezone.now()
+        late_day, fine_amount = calculate_fine(item, now)
+        item.returned_at = now
+        item.processed_by = librarian
+        item.late_day = late_day
+        item.fine_amount = fine_amount
+        if lost:
+            item.return_status = ITEM_LOST
+            item.return_condition = COPY_LOST
+            item.replacement_status = REPLACEMENT_PENDING
+        else:
+            item.return_status = ITEM_RETURNED
+            item.return_condition = condition
+            item.replacement_status = None
+        item.fine_status = FINE_UNPAID if fine_amount > 0 else FINE_PAID
+        item.save(
+            update_fields=[
+                "returned_at",
+                "processed_by",
+                "late_day",
+                "fine_amount",
+                "return_status",
+                "return_condition",
+                "replacement_status",
+                "fine_status",
+                "updated_at",
+            ]
+        )
+
+        copy.status = COPY_LOST if lost else STATUS_TERSEDIA
+        copy.save(update_fields=["status", "updated_at"])
+
+        remaining = LoanItem.objects.filter(
+            loan=loan, returned_at__isnull=True
+        ).exists()
+        if not remaining:
+            loan.status = LOAN_COMPLETED
+            loan.completed_at = now
+            loan.save(
+                update_fields=["status", "completed_at", "updated_at"]
+            )
+
+        if lost:
+            _notify(
+                loan.user,
+                "LOAN_RETURNED",
+                "Buku hilang tercatat",
+                f"Eksemplar {copy.copy_code} ({copy.book.title}) "
+                f"tercatat hilang. Status penggantian: {REPLACEMENT_PENDING}.",
+                loan,
+            )
+        else:
+            message = (
+                f"Eksemplar {copy.copy_code} ({copy.book.title}) "
+                "telah dikembalikan."
+            )
+            if fine_amount > 0:
+                message += (
+                    f" Terlambat {late_day} hari, denda Rp{fine_amount} "
+                    f"({FINE_UNPAID})."
+                )
+            _notify(loan.user, "LOAN_RETURNED", "Buku dikembalikan", message, loan)
+    item.copy_refreshed_status = copy.status
+    return item

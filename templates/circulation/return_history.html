@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Riwayat Pengembalian - Digital Library{% endblock %}
+
+{% block content %}
+
+<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
+    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
+        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+            Riwayat Pengembalian
+        </h1>
+        <p class="text-slate-500 text-sm mt-1">
+            Seluruh eksemplar yang telah kembali, termasuk denda dan statusnya.
+        </p>
+    </div>
+
+    <div class="p-6 sm:p-8">
+        {% if page_obj.object_list %}
+            <div class="rounded-xl border border-slate-200 overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="bg-slate-50 text-left text-slate-500">
+                            <th class="px-4 py-2.5 font-medium">Kembali</th>
+                            <th class="px-4 py-2.5 font-medium">Kode</th>
+                            <th class="px-4 py-2.5 font-medium">Peminjam</th>
+                            <th class="px-4 py-2.5 font-medium">Terlambat</th>
+                            <th class="px-4 py-2.5 font-medium">Denda</th>
+                            <th class="px-4 py-2.5 font-medium">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for item in page_obj.object_list %}
+                            <tr class="hover:bg-slate-50/60">
+                                <td class="px-4 py-2.5 whitespace-nowrap">{{ item.returned_at|date:"d M Y H:i" }}</td>
+                                <td class="px-4 py-2.5 font-medium">{{ item.book_copy.copy_code }}</td>
+                                <td class="px-4 py-2.5">{{ item.loan.user.full_name }}</td>
+                                <td class="px-4 py-2.5">{{ item.late_day }} hari</td>
+                                <td class="px-4 py-2.5">Rp{{ item.fine_amount }}</td>
+                                <td class="px-4 py-2.5">
+                                    {% if item.return_status == "HILANG" %}
+                                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">Hilang</span>
+                                    {% else %}
+                                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Kembali</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if page_obj.has_other_pages %}
+                <div class="flex items-center justify-center gap-2 mt-6 text-sm">
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}"
+                           class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-medium transition">Sebelumnya</a>
+                    {% endif %}
+                    <span class="px-3 py-2 text-slate-500">
+                        Halaman {{ page_obj.number }} dari {{ page_obj.paginator.num_pages }}
+                    </span>
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}"
+                           class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-medium transition">Berikutnya</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-12">
+                <p class="text-slate-900 font-semibold mb-1">Belum ada pengembalian tercatat.</p>
+                <p class="text-slate-500 text-sm">Catat pengembalian pertama melalui halaman pengembalian.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
