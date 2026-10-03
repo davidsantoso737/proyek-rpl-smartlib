@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Persetujuan Peminjaman - Digital Library{% endblock %}
+
+{% block content %}
+
+<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
+    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
+        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+            Persetujuan Peminjaman
+        </h1>
+        <p class="text-slate-500 text-sm mt-1">
+            Pengajuan PENDING_APPROVAL dari Siswa dan Guru, urut dari yang paling awal.
+        </p>
+    </div>
+
+    <div class="p-6 sm:p-8">
+        {% if loans %}
+            <div class="space-y-3">
+                {% for loan in loans %}
+                    <a href="{% url 'circulation:approval_detail' loan.pk %}"
+                       class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4 hover:shadow-md transition">
+                        <div>
+                            <p class="font-semibold text-slate-900">
+                                Pengajuan #{{ loan.pk }} &middot; {{ loan.user.full_name }}
+                                ({{ loan.user.get_role_display }})
+                            </p>
+                            <p class="text-xs text-slate-500 mt-0.5">
+                                {{ loan.items.count }} eksemplar &middot;
+                                diajukan {{ loan.requested_at|date:"d M Y H:i" }}
+                            </p>
+                        </div>
+                        <span class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium">
+                            Periksa
+                        </span>
+                    </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-12">
+                <p class="text-slate-900 font-semibold mb-1">Tidak ada pengajuan menunggu.</p>
+                <p class="text-slate-500 text-sm">Semua pengajuan sudah diproses.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

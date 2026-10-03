@@ -1,27 +1,39 @@
-"""Layanan pengajuan peminjaman buku fisik (FR-13 – FR-16).
+"""Layanan peminjaman buku fisik: pengajuan + approval + QR Pickup.
 
-Critical rule: pengajuan BUKAN active loan sampai handover selesai.
-Konsekuensinya status eksemplar TIDAK diubah saat pengajuan; konflik
-dicegah dengan memeriksa item pada loan yang masih terbuka.
-Seluruh pembuatan Loan + LoanItem berjalan dalam satu transaksi
-atomik (NFR-13, NFR-16, NFR-19, NFR-23).
+Critical rule pengajuan (FR-13 – FR-16): pengajuan BUKAN active loan
+sampai handover selesai. Status eksemplar TIDAK diubah saat pengajuan
+maupun approval; konflik dicegah dengan memeriksa item pada loan yang
+masih terbuka (NFR-13, NFR-16, NFR-19, NFR-23).
+
+QR Pickup (BR-17 – BR-20, BR-37 – BR-42, NFR-05 – NFR-07, NFR-17):
+token opaque acak (tanpa data sensitif), berekspirasi dari konfigurasi
+pickup_qr_validity (menit), hanya valid pada state APPROVED, sekali
+pakai (pickup_used_at diisi saat handover oleh checkpoint berikutnya).
 """
 
+import io
+import secrets
+from datetime import timedelta
+
+import qrcode
 from django.db import transaction
 from django.utils import timezone
 
 from apps.catalog.availability import STATUS_TERSEDIA
 from apps.catalog.models import BookCopy
 from apps.core.models import LibrarySetting
+from apps.notifications.models import Notification
 
 from .models import Loan, LoanItem
 
 LOAN_PENDING = "PENDING_APPROVAL"
+LOAN_APPROVED = "APPROVED"
+LOAN_REJECTED = "REJECTED"
 
 # Status loan yang masih "membawa" eksemplar sehingga eksemplar di
-# dalamnya tidak boleh diminta lagi. Diperluas oleh checkpoint
-# approval/handover (mis. APPROVED, ACTIVE) tanpa mengubah service ini.
-OPEN_LOAN_STATUSES = (LOAN_PENDING,)
+# dalamnya tidak boleh diminta lagi. APPROVED ikut terbuka karena
+# eksemplar baru bebas setelah handover/return (checkpoint berikut).
+OPEN_LOAN_STATUSES = (LOAN_PENDING, LOAN_APPROVED)
 
 ITEM_RETURN_PENDING = "BELUM_KEMBALI"
 FINE_UNPAID = "BELUM_BAYAR"
@@ -31,6 +43,14 @@ CART_SESSION_KEY = "loan_cart"
 
 class LoanRequestError(Exception):
     """Kegagalan validasi/bisnis pengajuan (pesan siap tampil, NFR-33)."""
+
+
+class ApprovalError(LoanRequestError):
+    """Kegagalan approval/reject oleh pustakawan."""
+
+
+class PickupTokenError(LoanRequestError):
+    """Token QR Pickup tidak valid/kedaluarsa/sudah dipakai/salah state."""
 
 
 def get_cart_ids(session):
@@ -98,14 +118,18 @@ def cart_copies(session):
     return [by_id[pk] for pk in ids if pk in by_id]
 
 
-def _current_fine_rate():
+def _current_library_setting():
     setting = LibrarySetting.objects.order_by("-effective_from").first()
     if setting is None:
         raise LoanRequestError(
-            "Konfigurasi denda belum tersedia. "
+            "Konfigurasi perpustakaan belum tersedia. "
             "Hubungi pustakawan sebelum mengajukan peminjaman."
         )
-    return setting.fine_rate_per_day
+    return setting
+
+
+def _current_fine_rate():
+    return _current_library_setting().fine_rate_per_day
 
 
 def request_loan(user, copy_ids):
@@ -179,3 +203,192 @@ def request_loan(user, copy_ids):
             for copy_id in ids
         )
     return loan
+
+
+def _notify(user, notif_type, title, message, loan):
+    Notification.objects.create(
+        user=user,
+        type=notif_type,
+        title=title,
+        message=message,
+        reference_type="loan",
+        reference_id=loan.pk,
+    )
+
+
+def available_substitutes(book, exclude_loan_pk=None):
+    """Eksemplar TERSEDIA dari judul yang sama untuk substitusi approval."""
+    candidates = BookCopy.objects.filter(
+        book=book, status=STATUS_TERSEDIA
+    ).order_by("copy_code")
+    if exclude_loan_pk is None:
+        taken = LoanItem.objects.filter(
+            loan__status__in=OPEN_LOAN_STATUSES
+        ).values("book_copy_id")
+    else:
+        taken = LoanItem.objects.filter(
+            loan__status__in=OPEN_LOAN_STATUSES
+        ).exclude(loan_id=exclude_loan_pk).values("book_copy_id")
+    return candidates.exclude(pk__in=taken)
+
+
+def approve_loan(loan_id, approver, substitutions=None):
+    """Setujui pengajuan + hasilkan QR Pickup (FR-17 – FR-20, BR-17 – BR-20).
+
+    substitutions: {loan_item_id: book_copy_id} untuk menetapkan
+    eksemplar pengganti yang tersedia. Token unik, expiry dari
+    pickup_qr_validity (menit). Atomik + notifikasi peminjam.
+    """
+    substitutions = substitutions or {}
+    with transaction.atomic():
+        try:
+            loan = Loan.objects.select_for_update().get(pk=loan_id)
+        except (Loan.DoesNotExist, TypeError, ValueError):
+            raise ApprovalError("Pengajuan tidak ditemukan.")
+        if loan.status != LOAN_PENDING:
+            raise ApprovalError(
+                "Hanya pengajuan PENDING_APPROVAL yang dapat disetujui."
+            )
+        setting = _current_library_setting()
+        items = list(
+            LoanItem.objects.select_for_update()
+            .filter(loan=loan)
+            .select_related("book_copy__book")
+        )
+        if not items:
+            raise ApprovalError("Pengajuan tidak memiliki item.")
+        for item in items:
+            raw = substitutions.get(item.pk, item.book_copy_id)
+            try:
+                wanted_id = int(raw)
+            except (TypeError, ValueError):
+                raise ApprovalError("Pilihan eksemplar tidak valid.")
+            try:
+                copy = BookCopy.objects.select_for_update().get(
+                    pk=wanted_id
+                )
+            except BookCopy.DoesNotExist:
+                raise ApprovalError("Eksemplar pengganti tidak ditemukan.")
+            if copy.book_id != item.book_copy.book_id:
+                raise ApprovalError(
+                    "Eksemplar pengganti harus dari judul yang sama."
+                )
+            if copy.status != STATUS_TERSEDIA:
+                raise ApprovalError(
+                    f"Eksemplar {copy.copy_code} sedang tidak tersedia."
+                )
+            if (
+                LoanItem.objects.filter(
+                    book_copy=copy, loan__status__in=OPEN_LOAN_STATUSES
+                )
+                .exclude(loan=loan)
+                .exists()
+            ):
+                raise ApprovalError(
+                    f"Eksemplar {copy.copy_code} sudah terikat "
+                    "pengajuan aktif lain."
+                )
+            if copy.pk != item.book_copy_id:
+                item.book_copy = copy
+                item.save(update_fields=["book_copy"])
+
+        token = secrets.token_urlsafe(32)
+        while Loan.objects.filter(pickup_token=token).exists():
+            token = secrets.token_urlsafe(32)
+        now = timezone.now()
+        loan.status = LOAN_APPROVED
+        loan.approved_at = now
+        loan.approved_by = approver
+        loan.pickup_token = token
+        loan.pickup_exp_at = now + timedelta(
+            minutes=setting.pickup_qr_validity
+        )
+        loan.save(
+            update_fields=[
+                "status",
+                "approved_at",
+                "approved_by",
+                "pickup_token",
+                "pickup_exp_at",
+                "updated_at",
+            ]
+        )
+        _notify(
+            loan.user,
+            "LOAN_APPROVED",
+            "Pengajuan disetujui",
+            f"Pengajuan #{loan.pk} disetujui. Tunjukkan QR Pickup "
+            "saat mengambil buku di perpustakaan.",
+            loan,
+        )
+    return loan
+
+
+def reject_loan(loan_id, approver, reason):
+    """Tolak pengajuan dengan alasan wajib (FR-17)."""
+    reason = (reason or "").strip()
+    if not reason:
+        raise ApprovalError("Alasan penolakan wajib diisi.")
+    with transaction.atomic():
+        try:
+            loan = Loan.objects.select_for_update().get(pk=loan_id)
+        except (Loan.DoesNotExist, TypeError, ValueError):
+            raise ApprovalError("Pengajuan tidak ditemukan.")
+        if loan.status != LOAN_PENDING:
+            raise ApprovalError(
+                "Hanya pengajuan PENDING_APPROVAL yang dapat ditolak."
+            )
+        loan.status = LOAN_REJECTED
+        loan.rejected_at = timezone.now()
+        loan.rejection_reason = reason
+        loan.save(
+            update_fields=[
+                "status",
+                "rejected_at",
+                "rejection_reason",
+                "updated_at",
+            ]
+        )
+        _notify(
+            loan.user,
+            "LOAN_REJECTED",
+            "Pengajuan ditolak",
+            f"Pengajuan #{loan.pk} ditolak: {reason}",
+            loan,
+        )
+    return loan
+
+
+def verify_pickup_token(token):
+    """Validasi token QR Pickup untuk handover (BR-39 – BR-42, NFR-17).
+
+    Urutan penolakan: tidak dikenal -> salah state -> sudah dipakai ->
+    kedaluarsa. Dipakai checkpoint handover; diuji di sini.
+    """
+    if not token:
+        raise PickupTokenError("QR Pickup tidak dikenal.")
+    try:
+        loan = Loan.objects.select_related("user").get(pickup_token=token)
+    except (Loan.DoesNotExist, ValueError):
+        raise PickupTokenError("QR Pickup tidak dikenal.")
+    if loan.status != LOAN_APPROVED:
+        raise PickupTokenError(
+            "QR Pickup hanya berlaku pada pengajuan yang disetujui "
+            "dan belum diserahkan."
+        )
+    if loan.pickup_used_at is not None:
+        raise PickupTokenError("QR Pickup sudah digunakan.")
+    if loan.pickup_exp_at is None or loan.pickup_exp_at <= timezone.now():
+        raise PickupTokenError("QR Pickup sudah kedaluarsa.")
+    return loan
+
+
+def make_pickup_qr_png(token):
+    """Render QR Pickup (payload = token opaque, tanpa data sensitif)."""
+    qr = qrcode.QRCode(box_size=8, border=2)
+    qr.add_data(token)
+    qr.make(fit=True)
+    image = qr.make_image(fill_color="black", back_color="white")
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()

@@ -22,6 +22,10 @@
         </div>
         {% if loan.status == "PENDING_APPROVAL" %}
             <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Menunggu persetujuan</span>
+        {% elif loan.status == "APPROVED" %}
+            <span class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Disetujui</span>
+        {% elif loan.status == "REJECTED" %}
+            <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Ditolak</span>
         {% else %}
             <span class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">{{ loan.status }}</span>
         {% endif %}
@@ -31,6 +35,24 @@
         {% if loan.status == "PENDING_APPROVAL" %}
             <p class="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2.5 rounded-xl text-sm mb-5">
                 Pengajuan ini belum menjadi peminjaman aktif. Status berubah setelah pustakawan menyetujui dan buku diserahkan.
+            </p>
+        {% elif loan.status == "APPROVED" %}
+            <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-5 mb-5 flex flex-col sm:flex-row gap-5 items-center">
+                <img src="{% url 'circulation:pickup_qr' loan.pk %}" alt="QR Pickup pengajuan {{ loan.pk }}"
+                     class="w-40 h-40 bg-white p-2 rounded-xl border border-emerald-200">
+                <div class="text-sm">
+                    <p class="font-semibold text-emerald-900 mb-1">QR Pickup pengambilan buku</p>
+                    <p class="text-emerald-800">
+                        Tunjukkan QR ini kepada pustakawan saat mengambil buku di perpustakaan.
+                    </p>
+                    <p class="text-emerald-800 mt-1">
+                        Berlaku sampai {{ loan.pickup_exp_at|date:"d M Y H:i" }} dan hanya untuk sekali pengambilan.
+                    </p>
+                </div>
+            </div>
+        {% elif loan.status == "REJECTED" %}
+            <p class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm mb-5">
+                Pengajuan ditolak{% if loan.rejection_reason %}: {{ loan.rejection_reason }}{% endif %}
             </p>
         {% endif %}
 

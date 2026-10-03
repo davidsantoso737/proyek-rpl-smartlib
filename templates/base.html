@@ -49,6 +49,10 @@
                         Katalog
                     </a>
                     {% if user.role == "PUSTAKAWAN" %}
+                    <a href="{% url 'circulation:approval_list' %}"
+                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                        Persetujuan
+                    </a>
                     <a href="{% url 'accounts:user_list' %}"
                        class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Pengguna

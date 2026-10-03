@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -10,12 +11,19 @@ from apps.accounts.authorization import (
 
 from .models import Loan
 from .services import (
+    LOAN_APPROVED,
+    LOAN_PENDING,
+    ApprovalError,
     LoanRequestError,
+    available_substitutes,
+    approve_loan,
     cart_add,
     cart_clear,
     cart_copies,
     cart_remove,
     get_cart_ids,
+    make_pickup_qr_png,
+    reject_loan,
     request_loan,
 )
 
@@ -104,4 +112,108 @@ def loan_detail_view(request, pk):
     )
     return render(
         request, "circulation/loan_detail.html", {"loan": loan}
+    )
+
+
+def _approval_loan_or_404(pk):
+    return get_object_or_404(
+        Loan.objects.prefetch_related(
+            "items__book_copy__book"
+        ).select_related("user"),
+        pk=pk,
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def approval_list_view(request):
+    """Daftar pengajuan PENDING_APPROVAL (FR-17). Hanya Pustakawan."""
+    loans = (
+        Loan.objects.filter(status=LOAN_PENDING)
+        .select_related("user")
+        .prefetch_related("items__book_copy__book")
+        .order_by("requested_at")
+    )
+    return render(
+        request, "circulation/approval_list.html", {"loans": loans}
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def approval_detail_view(request, pk):
+    """Periksa pengajuan + tetapkan eksemplar (FR-17 – FR-18)."""
+    loan = _approval_loan_or_404(pk)
+    return _render_approval_detail(request, loan)
+
+
+def _render_approval_detail(request, loan, substitutions=None):
+    rows = []
+    for item in loan.items.all():
+        choices = list(available_substitutes(item.book_copy.book, exclude_loan_pk=loan.pk))
+        current = item.book_copy
+        if all(choice.pk != current.pk for choice in choices):
+            choices = [current, *choices]
+        selected = str(
+            (substitutions or {}).get(item.pk, current.pk)
+        )
+        rows.append(
+            {"item": item, "choices": choices, "selected": selected}
+        )
+    return render(
+        request,
+        "circulation/approval_detail.html",
+        {"loan": loan, "rows": rows},
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+@require_POST
+def approval_approve_view(request, pk):
+    """Setujui + hasilkan QR Pickup (FR-18 – FR-20)."""
+    loan = _approval_loan_or_404(pk)
+    substitutions = {
+        int(key.split("_", 1)[1]): value
+        for key, value in request.POST.items()
+        if key.startswith("copy_") and value
+    }
+    try:
+        approve_loan(loan.pk, request.user, substitutions)
+    except (ApprovalError, ValueError) as exc:
+        messages.error(request, str(exc))
+        return _render_approval_detail(request, loan, substitutions)
+    messages.success(
+        request,
+        f"Pengajuan #{loan.pk} disetujui. QR Pickup dibuat dan "
+        "dapat dilihat peminjam pada detail pengajuannya.",
+    )
+    return redirect("circulation:approval_detail", pk=loan.pk)
+
+
+@role_required(User.Role.PUSTAKAWAN)
+@require_POST
+def approval_reject_view(request, pk):
+    """Tolak pengajuan dengan alasan (FR-17)."""
+    loan = _approval_loan_or_404(pk)
+    try:
+        reject_loan(loan.pk, request.user, request.POST.get("reason"))
+    except ApprovalError as exc:
+        messages.error(request, str(exc))
+        return _render_approval_detail(request, loan)
+    messages.success(request, f"Pengajuan #{loan.pk} ditolak.")
+    return redirect("circulation:approval_list")
+
+
+@active_login_required
+def pickup_qr_image_view(request, pk):
+    """PNG QR Pickup untuk pemilik pengajuan / pustakawan (FR-20).
+
+    Hanya pada state APPROVED dengan token aktif; selain itu 404 agar
+    QR tidak bocor pada state yang salah.
+    """
+    loan = get_object_or_404(Loan, pk=pk, pickup_token__isnull=False)
+    if request.user.role != User.Role.PUSTAKAWAN and loan.user_id != request.user.pk:
+        raise Http404("Tidak ditemukan.")
+    if loan.status != LOAN_APPROVED or not loan.pickup_token:
+        raise Http404("Tidak ditemukan.")
+    return HttpResponse(
+        make_pickup_qr_png(loan.pickup_token), content_type="image/png"
     )

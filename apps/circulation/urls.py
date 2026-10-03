@@ -21,4 +21,21 @@ urlpatterns = [
     path(
         "riwayat/<int:pk>/", views.loan_detail_view, name="loan_detail"
     ),
+    path("qr/<int:pk>/", views.pickup_qr_image_view, name="pickup_qr"),
+    path("persetujuan/", views.approval_list_view, name="approval_list"),
+    path(
+        "persetujuan/<int:pk>/",
+        views.approval_detail_view,
+        name="approval_detail",
+    ),
+    path(
+        "persetujuan/<int:pk>/setujui/",
+        views.approval_approve_view,
+        name="approval_approve",
+    ),
+    path(
+        "persetujuan/<int:pk>/tolak/",
+        views.approval_reject_view,
+        name="approval_reject",
+    ),
 ]
