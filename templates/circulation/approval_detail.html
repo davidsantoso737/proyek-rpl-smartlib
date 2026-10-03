@@ -80,9 +80,13 @@
                 Disetujui {{ loan.approved_at|date:"d M Y H:i" }}. QR Pickup berlaku sampai
                 {{ loan.pickup_exp_at|date:"d M Y H:i" }}.
             </p>
-        {% else %}
+        {% elif loan.status == "REJECTED" %}
             <p class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm">
                 Ditolak{% if loan.rejection_reason %}: {{ loan.rejection_reason }}{% endif %}
+            </p>
+        {% else %}
+            <p class="bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm">
+                Pengajuan ini berstatus {{ loan.status }} dan tidak dapat diproses lagi di sini.
             </p>
         {% endif %}
     </div>

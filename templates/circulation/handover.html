@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Penyerahan Buku - Digital Library{% endblock %}
+
+{% block content %}
+
+<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
+    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
+        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+            Penyerahan Buku
+        </h1>
+        <p class="text-slate-500 text-sm mt-1">
+            Pindai QR Pickup dengan kamera atau ketik token secara manual, lalu konfirmasi penyerahan.
+        </p>
+    </div>
+
+    <div class="p-6 sm:p-8 space-y-6">
+        {% if error %}
+            <p class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm">
+                {{ error }}
+            </p>
+        {% endif %}
+
+        <form method="post" action="{% url 'circulation:handover' %}" id="pickup-form" class="space-y-4">
+            {% csrf_token %}
+            <div>
+                <label for="token-input" class="block text-sm font-medium text-slate-700 mb-1.5">
+                    Token QR Pickup
+                </label>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <input type="text" name="token" id="token-input" value="{{ token }}" autocomplete="off"
+                           placeholder="Tempel token atau hasil pindaian..."
+                           class="flex-1 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <button type="submit"
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
+                        Periksa
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <div class="rounded-xl border border-slate-200 p-5">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                <h2 class="font-semibold text-slate-900">Pindai dengan kamera</h2>
+                <button type="button" id="cam-toggle"
+                        class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm font-medium transition">
+                    Nyalakan kamera
+                </button>
+            </div>
+            <div id="qr-reader" class="hidden w-full max-w-md overflow-hidden rounded-xl border border-slate-200"></div>
+            <p id="cam-status" class="text-sm text-slate-500 mt-2">
+                Pemindai bawaan sistem (tidak tergantung browser). Izinkan akses kamera saat diminta.
+                Kamera membutuhkan koneksi aman (HTTPS atau localhost).
+            </p>
+        </div>
+
+        {% if loan %}
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-5">
+                <h2 class="font-semibold text-slate-900 mb-1">
+                    Pengajuan #{{ loan.pk }} &middot; {{ loan.user.full_name }}
+                </h2>
+                <p class="text-xs text-slate-500 mb-4">
+                    Token valid sampai {{ loan.pickup_exp_at|date:"d M Y H:i" }}.
+                    Periksa daftar buku berikut sebelum menyerahkan fisik buku.
+                </p>
+                <div class="rounded-xl border border-slate-200 bg-white overflow-hidden mb-4">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="bg-slate-50 text-left text-slate-500">
+                                <th class="px-4 py-2.5 font-medium">Kode</th>
+                                <th class="px-4 py-2.5 font-medium">Judul</th>
+                                <th class="px-4 py-2.5 font-medium">Lokasi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for item in loan.items.all %}
+                                <tr>
+                                    <td class="px-4 py-2.5 font-medium">{{ item.book_copy.copy_code }}</td>
+                                    <td class="px-4 py-2.5">{{ item.book_copy.book.title }}</td>
+                                    <td class="px-4 py-2.5 text-slate-600">{{ item.book_copy.location }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <form method="post" action="{% url 'circulation:handover_confirm' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="token" value="{{ token }}">
+                    <button type="submit"
+                            class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
+                        Konfirmasi penyerahan ({{ loan.items.count }} eksemplar)
+                    </button>
+                </form>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script src="{% static 'js/html5-qrcode.min.js' %}"></script>
+<script>
+(function () {
+    var toggle = document.getElementById("cam-toggle");
+    var readerBox = document.getElementById("qr-reader");
+    var statusEl = document.getElementById("cam-status");
+    var input = document.getElementById("token-input");
+    var form = document.getElementById("pickup-form");
+    var scanner = null;
+    var scanning = false;
+
+    function setStatus(text) {
+        statusEl.textContent = text;
+    }
+
+    async function stopCamera(silent) {
+        if (scanner && scanning) {
+            try {
+                await scanner.stop();
+            } catch (err) {
+                /* abaikan: kamera mungkin sudah mati */
+            }
+            scanning = false;
+        }
+        readerBox.classList.add("hidden");
+        readerBox.innerHTML = "";
+        toggle.textContent = "Nyalakan kamera";
+        if (!silent) {
+            setStatus("Kamera dimatikan. Anda tetap dapat mengetik token manual.");
+        }
+    }
+
+    toggle.addEventListener("click", async function () {
+        if (scanning) {
+            await stopCamera(false);
+            return;
+        }
+        if (typeof Html5Qrcode === "undefined") {
+            setStatus("Library pemindai gagal dimuat. Ketik token secara manual.");
+            return;
+        }
+        scanner = new Html5Qrcode("qr-reader");
+        readerBox.classList.remove("hidden");
+        toggle.textContent = "Matikan kamera";
+        setStatus("Arahkan QR Pickup ke kamera...");
+        try {
+            await scanner.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                function (decodedText) {
+                    input.value = decodedText;
+                    setStatus("QR terbaca. Memeriksa token...");
+                    stopCamera(true).then(function () {
+                        form.submit();
+                    });
+                },
+                function () {
+                    /* frame tanpa QR: abaikan agar bisa coba lagi */
+                }
+            );
+            scanning = true;
+        } catch (err) {
+            var name = err && err.name ? err.name : "";
+            var message = err && err.message ? err.message : "";
+            readerBox.classList.add("hidden");
+            toggle.textContent = "Nyalakan kamera";
+            if (name === "NotAllowedError" || /permission|denied/i.test(message)) {
+                setStatus("Izin kamera ditolak. Aktifkan izin kamera pada browser lalu coba lagi, atau ketik token manual.");
+            } else if (/secure|https/i.test(message)) {
+                setStatus("Kamera membutuhkan koneksi aman (HTTPS atau localhost). Ketik token secara manual.");
+            } else {
+                setStatus("Kamera tidak dapat digunakan di perangkat ini. Ketik token secara manual.");
+            }
+        }
+    });
+})();
+</script>
+
+{% endblock %}

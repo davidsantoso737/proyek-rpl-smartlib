@@ -38,4 +38,10 @@ urlpatterns = [
         views.approval_reject_view,
         name="approval_reject",
     ),
+    path("penyerahan/", views.handover_view, name="handover"),
+    path(
+        "penyerahan/konfirmasi/",
+        views.handover_confirm_view,
+        name="handover_confirm",
+    ),
 ]

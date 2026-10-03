@@ -29,11 +29,15 @@ from .models import Loan, LoanItem
 LOAN_PENDING = "PENDING_APPROVAL"
 LOAN_APPROVED = "APPROVED"
 LOAN_REJECTED = "REJECTED"
+LOAN_ACTIVE = "ACTIVE"
+
+# Status eksemplar saat dipinjam aktif (BR-13, BR-31).
+STATUS_DIPINJAM = "DIPINJAM"
 
 # Status loan yang masih "membawa" eksemplar sehingga eksemplar di
-# dalamnya tidak boleh diminta lagi. APPROVED ikut terbuka karena
-# eksemplar baru bebas setelah handover/return (checkpoint berikut).
-OPEN_LOAN_STATUSES = (LOAN_PENDING, LOAN_APPROVED)
+# dalamnya tidak boleh diminta lagi. ACTIVE ikut terbuka karena
+# eksemplar baru bebas setelah pengembalian (checkpoint berikut).
+OPEN_LOAN_STATUSES = (LOAN_PENDING, LOAN_APPROVED, LOAN_ACTIVE)
 
 ITEM_RETURN_PENDING = "BELUM_KEMBALI"
 FINE_UNPAID = "BELUM_BAYAR"
@@ -359,6 +363,22 @@ def reject_loan(loan_id, approver, reason):
     return loan
 
 
+def _ensure_pickup_usable(loan):
+    """Aturan validitas QR Pickup (BR-39 – BR-42, NFR-17).
+
+    Dipakai verifikasi biasa maupun handover terkunci.
+    """
+    if loan.status != LOAN_APPROVED:
+        raise PickupTokenError(
+            "QR Pickup hanya berlaku pada pengajuan yang disetujui "
+            "dan belum diserahkan."
+        )
+    if loan.pickup_used_at is not None:
+        raise PickupTokenError("QR Pickup sudah digunakan.")
+    if loan.pickup_exp_at is None or loan.pickup_exp_at <= timezone.now():
+        raise PickupTokenError("QR Pickup sudah kedaluarsa.")
+
+
 def verify_pickup_token(token):
     """Validasi token QR Pickup untuk handover (BR-39 – BR-42, NFR-17).
 
@@ -371,15 +391,81 @@ def verify_pickup_token(token):
         loan = Loan.objects.select_related("user").get(pickup_token=token)
     except (Loan.DoesNotExist, ValueError):
         raise PickupTokenError("QR Pickup tidak dikenal.")
-    if loan.status != LOAN_APPROVED:
-        raise PickupTokenError(
-            "QR Pickup hanya berlaku pada pengajuan yang disetujui "
-            "dan belum diserahkan."
+    _ensure_pickup_usable(loan)
+    return loan
+
+
+def activate_handover(token, librarian):
+    """Aktifkan peminjaman saat buku diserahkan (FR-21 – FR-28, BR-19 – BR-24).
+
+    Satu batas transaksi untuk loan + items + copies + token (NFR-16):
+    borrowed_at = waktu aktual konfirmasi (BUKAN requested/approved),
+    due_at dari durasi yang berlaku saat aktivasi (BR-24), eksemplar ->
+    DIPINJAM (BR-13, FR-28), token ditandai sekali pakai (BR-40).
+    """
+    token = (token or "").strip()
+    if not token:
+        raise PickupTokenError("QR Pickup tidak dikenal.")
+    with transaction.atomic():
+        try:
+            loan = (
+                Loan.objects.select_for_update()
+                .select_related("user")
+                .get(pickup_token=token)
+            )
+        except (Loan.DoesNotExist, ValueError):
+            raise PickupTokenError("QR Pickup tidak dikenal.")
+        _ensure_pickup_usable(loan)
+        setting = _current_library_setting()
+        items = list(
+            LoanItem.objects.select_for_update()
+            .filter(loan=loan)
+            .select_related("book_copy__book")
         )
-    if loan.pickup_used_at is not None:
-        raise PickupTokenError("QR Pickup sudah digunakan.")
-    if loan.pickup_exp_at is None or loan.pickup_exp_at <= timezone.now():
-        raise PickupTokenError("QR Pickup sudah kedaluarsa.")
+        if not items:
+            raise PickupTokenError(
+                "Pengajuan tidak memiliki item untuk diserahkan."
+            )
+        for item in items:
+            copy = BookCopy.objects.select_for_update().get(
+                pk=item.book_copy_id
+            )
+            if copy.status != STATUS_TERSEDIA:
+                raise PickupTokenError(
+                    f"Eksemplar {copy.copy_code} sedang tidak tersedia "
+                    "sehingga serah terima dibatalkan."
+                )
+
+        now = timezone.now()
+        due_at = now + timedelta(days=setting.physical_loan_duration)
+        loan.status = LOAN_ACTIVE
+        loan.borrowed_at = now
+        loan.due_at = due_at
+        loan.pickup_used_at = now
+        loan.save(
+            update_fields=[
+                "status",
+                "borrowed_at",
+                "due_at",
+                "pickup_used_at",
+                "updated_at",
+            ]
+        )
+        for item in items:
+            item.borrowed_at = now
+            item.due_at = due_at
+            item.save(update_fields=["borrowed_at", "due_at", "updated_at"])
+        BookCopy.objects.filter(
+            pk__in=[item.book_copy_id for item in items]
+        ).update(status=STATUS_DIPINJAM)
+        _notify(
+            loan.user,
+            "LOAN_ACTIVE",
+            "Peminjaman aktif",
+            f"Pengajuan #{loan.pk} aktif. Jatuh tempo "
+            f"{due_at.strftime('%d %b %Y %H:%M')}.",
+            loan,
+        )
     return loan
 
 

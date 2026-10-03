@@ -30,6 +30,8 @@
                         </div>
                         {% if loan.status == "PENDING_APPROVAL" %}
                             <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Menunggu persetujuan</span>
+                        {% elif loan.status == "ACTIVE" %}
+                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Dipinjam aktif{% if loan.due_at %} &middot; kembali {{ loan.due_at|date:"d M Y" }}{% endif %}</span>
                         {% else %}
                             <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">{{ loan.status }}</span>
                         {% endif %}

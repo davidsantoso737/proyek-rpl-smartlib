@@ -15,6 +15,8 @@ from .services import (
     LOAN_PENDING,
     ApprovalError,
     LoanRequestError,
+    PickupTokenError,
+    activate_handover,
     available_substitutes,
     approve_loan,
     cart_add,
@@ -25,6 +27,7 @@ from .services import (
     make_pickup_qr_png,
     reject_loan,
     request_loan,
+    verify_pickup_token,
 )
 
 User = get_user_model()
@@ -217,3 +220,43 @@ def pickup_qr_image_view(request, pk):
     return HttpResponse(
         make_pickup_qr_png(loan.pickup_token), content_type="image/png"
     )
+
+
+def _handover_loan_preview(token):
+    loan = verify_pickup_token((token or "").strip())
+    return (
+        Loan.objects.prefetch_related("items__book_copy__book")
+        .select_related("user")
+        .get(pk=loan.pk)
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def handover_view(request):
+    """Halaman penyerahan: scan/input token lalu tampilkan item (FR-21 – FR-23).
+
+    Hanya Pustakawan. Kamera memakai BarcodeDetector bawaan browser
+    (tanpa dependensi); input manual selalu tersedia sebagai fallback.
+    """
+    context = {"token": "", "loan": None, "error": ""}
+    if request.method == "POST":
+        token = (request.POST.get("token") or "").strip()
+        context["token"] = token
+        try:
+            context["loan"] = _handover_loan_preview(token)
+        except PickupTokenError as exc:
+            context["error"] = str(exc)
+    return render(request, "circulation/handover.html", context)
+
+
+@role_required(User.Role.PUSTAKAWAN)
+@require_POST
+def handover_confirm_view(request):
+    """Konfirmasi penyerahan buku -> peminjaman aktif (FR-24 – FR-28)."""
+    token = (request.POST.get("token") or "").strip()
+    try:
+        loan = activate_handover(token, request.user)
+    except PickupTokenError as exc:
+        messages.error(request, str(exc))
+        return redirect("circulation:handover")
+    return render(request, "circulation/handover_success.html", {"loan": loan})

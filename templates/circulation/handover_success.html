@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Serah Terima Berhasil - Digital Library{% endblock %}
+
+{% block content %}
+
+<div class="max-w-xl mx-auto bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
+    <div class="p-6 sm:p-8 text-center">
+        <div class="mx-auto mb-4 flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 text-2xl font-bold">
+            &#10003;
+        </div>
+        <h1 class="text-2xl font-bold text-slate-900 mb-2">
+            Peminjaman aktif
+        </h1>
+        <p class="text-slate-500 text-sm mb-5">
+            Pengajuan #{{ loan.pk }} milik {{ loan.user.full_name }} telah diserahkan.
+        </p>
+        <dl class="text-sm text-left bg-slate-50 rounded-xl p-4 space-y-1.5 mb-6">
+            <div class="flex justify-between gap-4">
+                <dt class="text-slate-500">Waktu serah terima</dt>
+                <dd class="font-medium">{{ loan.borrowed_at|date:"d M Y H:i" }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+                <dt class="text-slate-500">Jatuh tempo</dt>
+                <dd class="font-medium">{{ loan.due_at|date:"d M Y H:i" }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+                <dt class="text-slate-500">Eksemplar</dt>
+                <dd class="font-medium">{{ loan.items.count }} diserahkan</dd>
+            </div>
+        </dl>
+        <div class="flex flex-wrap justify-center gap-2">
+            <a href="{% url 'circulation:handover' %}"
+               class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
+                Penyerahan berikutnya
+            </a>
+            <a href="{% url 'circulation:approval_list' %}"
+               class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+                Daftar persetujuan
+            </a>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
