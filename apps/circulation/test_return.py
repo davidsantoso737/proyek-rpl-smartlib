@@ -259,3 +259,17 @@ class ReturnTests(TestCase):
         response = self.client.get(qr)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "image/png")
+
+    def test_label_menampilkan_qr_dan_kode_teks(self):
+        label = reverse("circulation:copy_label", args=[self.copy1.pk])
+        self.assertEqual(self.client.get(label).status_code, 302)
+        self.client.force_login(self.siswa)
+        self.assertEqual(self.client.get(label).status_code, 403)
+        self.client.force_login(self.pus)
+        response = self.client.get(label)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "RT-001")
+        self.assertContains(
+            response,
+            reverse("circulation:copy_identity_qr", args=[self.copy1.pk]),
+        )

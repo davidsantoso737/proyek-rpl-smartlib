@@ -290,6 +290,21 @@ def copy_identity_qr_view(request, pk):
 
 
 @role_required(User.Role.PUSTAKAWAN)
+def copy_label_view(request, pk):
+    """Label cetak QR Identitas + kode sebagai teks (BR-83, BR-84).
+
+    QR tetap merepresentasikan eksemplar yang sama (payload copy_code
+    permanen); kode ditampilkan sebagai teks untuk hasil cetak.
+    """
+    from apps.catalog.models import BookCopy
+
+    copy = get_object_or_404(
+        BookCopy.objects.select_related("book"), pk=pk
+    )
+    return render(request, "circulation/copy_label.html", {"copy": copy})
+
+
+@role_required(User.Role.PUSTAKAWAN)
 def return_view(request):
     """Halaman pengembalian: lookup QR Identitas -> info peminjam (FR-30 – FR-40)."""
     context = {"code": "", "found": None, "error": ""}

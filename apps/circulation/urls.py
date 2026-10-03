@@ -61,6 +61,11 @@ urlpatterns = [
         name="copy_identity_qr",
     ),
     path(
+        "label/<int:pk>/",
+        views.copy_label_view,
+        name="copy_label",
+    ),
+    path(
         "ebook/minta/<int:pk>/",
         views.ebook_request_view,
         name="ebook_request",

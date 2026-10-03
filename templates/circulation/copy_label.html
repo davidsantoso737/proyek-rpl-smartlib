@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Label {{ copy.copy_code }} - Digital Library{% endblock %}
+
+{% block content %}
+
+<div class="max-w-md mx-auto">
+    <div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 p-8 text-center print:shadow-none print:border-black">
+        <img src="{% url 'circulation:copy_identity_qr' copy.pk %}"
+             alt="QR Identitas {{ copy.copy_code }}"
+             class="w-56 h-56 mx-auto bg-white p-2 border border-slate-200 rounded-xl">
+        <p class="mt-4 text-2xl font-bold tracking-widest text-slate-900">
+            {{ copy.copy_code }}
+        </p>
+        <p class="mt-1 text-sm font-medium text-slate-700">
+            {{ copy.book.title }}
+        </p>
+        <p class="text-xs text-slate-500">
+            {{ copy.location }} &middot; Digital Library
+        </p>
+    </div>
+
+    <div class="flex justify-center gap-2 mt-4 print:hidden">
+        <button type="button" onclick="window.print()"
+                class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
+            Cetak label
+        </button>
+        <a href="{% url 'catalog:book_detail' copy.book.pk %}"
+           class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+            Kembali
+        </a>
+    </div>
+</div>
+
+{% endblock %}
