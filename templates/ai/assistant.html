@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}AI Assistant - Digital Library{% endblock %}
+
+{% block content %}
+
+<div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
+    <div class="border-b border-slate-100 px-6 py-5">
+        <h1 class="text-2xl font-bold text-slate-900">
+            AI Assistant
+        </h1>
+        <p class="text-slate-500 text-sm mt-1">
+            Tanyakan koleksi, peminjaman, e-book, denda, atau layanan perpustakaan.
+            Asisten tidak dapat melakukan transaksi.
+        </p>
+    </div>
+
+    <div id="chat-log" class="p-6 space-y-3 min-h-64 max-h-[50vh] overflow-y-auto">
+        <div class="rounded-xl bg-slate-100 px-4 py-2.5 text-sm text-slate-700 max-w-[85%]">
+            Halo! Ada yang bisa saya bantu seputar perpustakaan?
+        </div>
+    </div>
+
+    <form id="chat-form" class="border-t border-slate-100 p-4 flex gap-2">
+        {% csrf_token %}
+        <input type="text" id="chat-input" name="question" autocomplete="off" maxlength="500"
+               placeholder="Tulis pertanyaan..."
+               class="flex-1 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        <button type="submit" id="chat-send"
+                class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm disabled:opacity-50">
+            Kirim
+        </button>
+    </form>
+    <p class="px-6 pb-4 text-xs text-slate-400">
+        Jawaban berdasarkan data sistem; bila ragu, asisten akan mengatakannya.
+    </p>
+</div>
+
+<script>
+(function () {
+    var form = document.getElementById("chat-form");
+    var input = document.getElementById("chat-input");
+    var sendButton = document.getElementById("chat-send");
+    var log = document.getElementById("chat-log");
+    var csrf = form.querySelector("[name=csrfmiddlewaretoken]").value;
+
+    function bubble(text, mine) {
+        var div = document.createElement("div");
+        div.className = mine
+            ? "rounded-xl bg-blue-600 text-white px-4 py-2.5 text-sm max-w-[85%] ml-auto whitespace-pre-line"
+            : "rounded-xl bg-slate-100 px-4 py-2.5 text-sm text-slate-700 max-w-[85%] whitespace-pre-line";
+        div.textContent = text;
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+        return div;
+    }
+
+    form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        var question = input.value.trim();
+        if (!question) {
+            return;
+        }
+        bubble(question, true);
+        input.value = "";
+        sendButton.disabled = true;
+        var loading = bubble("Mengetik...", false);
+        try {
+            var body = new URLSearchParams({ question: question });
+            var response = await fetch("{% url 'ai:assistant_ask' %}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRFToken": csrf,
+                },
+                body: body.toString(),
+            });
+            if (!response.ok) {
+                throw new Error("http-" + response.status);
+            }
+            var data = await response.json();
+            loading.textContent = data.answer || "Maaf, tidak ada jawaban.";
+        } catch (err) {
+            loading.textContent = "Maaf, terjadi gangguan. Silakan coba lagi.";
+            var retry = document.createElement("button");
+            retry.textContent = "Coba lagi";
+            retry.className = "ml-2 underline text-blue-600";
+            retry.addEventListener("click", function () {
+                input.value = question;
+                input.focus();
+            });
+            loading.appendChild(retry);
+        } finally {
+            sendButton.disabled = false;
+            input.focus();
+        }
+    });
+})();
+</script>
+
+{% endblock %}

@@ -33,6 +33,15 @@ ALLOWED_HOSTS = [
 ]
 
 
+# AI Assistant (P16): murni dari environment, tanpa hardcode secret.
+# Provider generik kompatibel OpenAI; kosong = mode lokal (tanpa API call).
+AI_PROVIDER_BASE_URL = os.getenv("AI_PROVIDER_BASE_URL", "")
+AI_API_KEY = os.getenv("AI_API_KEY", "")
+AI_MODEL = os.getenv("AI_MODEL", "")
+AI_TIMEOUT_SECONDS = float(os.getenv("AI_TIMEOUT_SECONDS", "15"))
+AI_MAX_CONTEXT_ITEMS = int(os.getenv("AI_MAX_CONTEXT_ITEMS", "8"))
+
+
 # Application definition
 
 INSTALLED_APPS = [
