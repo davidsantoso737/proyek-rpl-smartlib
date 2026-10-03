@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Opname #{{ opname.pk }} - Digital Library{% endblock %}
+
+{% block content %}
+
+<div class="mb-4">
+    <a href="{% url 'inventory:opname_list' %}" class="text-sm text-blue-600 hover:underline font-medium">
+        &larr; Kembali ke daftar opname
+    </a>
+</div>
+
+<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
+    <div class="border-b border-slate-100 px-6 sm:px-8 py-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+                Opname #{{ opname.pk }}
+            </h1>
+            <p class="text-slate-500 text-sm mt-1">
+                Mulai {{ opname.started_at|date:"d M Y H:i" }} oleh {{ opname.started_by.full_name }}
+                {% if opname.notes %} &middot; {{ opname.notes }}{% endif %}
+            </p>
+        </div>
+        {% if is_running %}
+            <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Berjalan</span>
+        {% else %}
+            <span class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Selesai</span>
+        {% endif %}
+    </div>
+
+    <div class="p-6 sm:p-8 space-y-6">
+        <div class="grid grid-cols-3 gap-3 text-center">
+            <div class="rounded-xl bg-slate-50 border border-slate-200 p-4">
+                <p class="text-2xl font-bold text-slate-900">{{ expected_count }}</p>
+                <p class="text-xs text-slate-500">Ekspektasi</p>
+            </div>
+            <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-4">
+                <p class="text-2xl font-bold text-emerald-700">{{ found|length }}</p>
+                <p class="text-xs text-slate-500">Ditemukan</p>
+            </div>
+            <div class="rounded-xl bg-red-50 border border-red-200 p-4">
+                <p class="text-2xl font-bold text-red-700">{{ missing|length }}</p>
+                <p class="text-xs text-slate-500">Belum ditemukan</p>
+            </div>
+        </div>
+
+        {% if is_running %}
+            {% if error %}
+                <p class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm">
+                    {{ error }}
+                </p>
+            {% endif %}
+
+            <form method="post" action="{% url 'inventory:opname_detail' opname.pk %}" id="opname-form" class="space-y-4">
+                {% csrf_token %}
+                <div>
+                    <label for="code-input" class="block text-sm font-medium text-slate-700 mb-1.5">
+                        Kode eksemplar (QR Identitas)
+                    </label>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <input type="text" name="code" id="code-input" value="{{ code }}" autocomplete="off"
+                               placeholder="Contoh: COPY-001"
+                               class="flex-1 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <button type="submit"
+                                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
+                            Tandai ditemukan
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="rounded-xl border border-slate-200 p-5">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                    <h2 class="font-semibold text-slate-900">Pindai dengan kamera</h2>
+                    <button type="button" id="cam-toggle"
+                            class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm font-medium transition">
+                        Nyalakan kamera
+                    </button>
+                </div>
+                <div id="qr-reader" class="hidden w-full max-w-md overflow-hidden rounded-xl border border-slate-200"></div>
+                <p id="cam-status" class="text-sm text-slate-500 mt-2">
+                    Hasil pindaian mengisi kode lalu menandai otomatis. Bisa pindai berulang tanpa memuat halaman.
+                </p>
+            </div>
+
+            <form method="post" action="{% url 'inventory:opname_complete' opname.pk %}">
+                {% csrf_token %}
+                <button type="submit"
+                        class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
+                    Selesaikan opname
+                </button>
+            </form>
+        {% endif %}
+
+        <div class="grid gap-6 md:grid-cols-2">
+            <div>
+                <h2 class="font-semibold text-slate-900 mb-3">Ditemukan ({{ found|length }})</h2>
+                {% if found %}
+                    <div class="rounded-xl border border-emerald-200 overflow-hidden">
+                        <table class="w-full text-sm">
+                            <tbody class="divide-y divide-slate-100">
+                                {% for copy in found %}
+                                    <tr>
+                                        <td class="px-4 py-2 font-medium">{{ copy.copy_code }}</td>
+                                        <td class="px-4 py-2 text-slate-600">{{ copy.book.title }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-sm text-slate-500">Belum ada yang dipindai.</p>
+                {% endif %}
+            </div>
+            <div>
+                <h2 class="font-semibold text-slate-900 mb-3">Belum ditemukan ({{ missing|length }})</h2>
+                {% if missing %}
+                    <div class="rounded-xl border border-red-200 overflow-hidden">
+                        <table class="w-full text-sm">
+                            <tbody class="divide-y divide-slate-100">
+                                {% for copy in missing|slice:":200" %}
+                                    <tr>
+                                        <td class="px-4 py-2 font-medium">{{ copy.copy_code }}</td>
+                                        <td class="px-4 py-2 text-slate-600">{{ copy.book.title }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% if missing|length > 200 %}
+                        <p class="text-xs text-slate-500 mt-1">…dan {{ missing|length|add:"-200" }} lainnya.</p>
+                    {% endif %}
+                {% else %}
+                    <p class="text-sm text-slate-500">Semua eksemplar ditemukan.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{% static 'js/html5-qrcode.min.js' %}"></script>
+<script>
+(function () {
+    var toggle = document.getElementById("cam-toggle");
+    if (!toggle) {
+        return;
+    }
+    var readerBox = document.getElementById("qr-reader");
+    var statusEl = document.getElementById("cam-status");
+    var input = document.getElementById("code-input");
+    var form = document.getElementById("opname-form");
+    var scanner = null;
+    var scanning = false;
+
+    function setStatus(text) {
+        statusEl.textContent = text;
+    }
+
+    async function stopCamera(silent) {
+        if (scanner && scanning) {
+            try {
+                await scanner.stop();
+            } catch (err) {
+            }
+            scanning = false;
+        }
+        readerBox.classList.add("hidden");
+        readerBox.innerHTML = "";
+        toggle.textContent = "Nyalakan kamera";
+        if (!silent) {
+            setStatus("Kamera dimatikan. Anda tetap dapat mengetik kode manual.");
+        }
+    }
+
+    toggle.addEventListener("click", async function () {
+        if (scanning) {
+            await stopCamera(false);
+            return;
+        }
+        if (typeof Html5Qrcode === "undefined") {
+            setStatus("Library pemindai gagal dimuat. Ketik kode secara manual.");
+            return;
+        }
+        scanner = new Html5Qrcode("qr-reader");
+        readerBox.classList.remove("hidden");
+        toggle.textContent = "Matikan kamera";
+        setStatus("Arahkan QR Identitas ke kamera...");
+        try {
+            await scanner.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                function (decodedText) {
+                    input.value = decodedText;
+                    setStatus("QR terbaca: " + decodedText + ". Mencatat...");
+                    form.submit();
+                },
+                function () {
+                }
+            );
+            scanning = true;
+        } catch (err) {
+            readerBox.classList.add("hidden");
+            toggle.textContent = "Nyalakan kamera";
+            setStatus("Kamera tidak dapat digunakan di perangkat ini. Ketik kode secara manual.");
+        }
+    });
+})();
+</script>
+
+{% endblock %}
