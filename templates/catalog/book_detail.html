@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}{{ book.title }} - Digital Library{% endblock %}
+
+{% block content %}
+
+<div class="mb-4">
+    <a href="{% url 'catalog:catalog' %}" class="text-sm text-blue-600 hover:underline font-medium">
+        &larr; Kembali ke katalog
+    </a>
+</div>
+
+<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
+    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
+        <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-700 mb-3">Buku Fisik</span>
+        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+            {{ book.title }}
+        </h1>
+        <p class="text-slate-500 text-sm mt-1">
+            {% for author in authors %}{{ author.name }}{% if not forloop.last %}, {% endif %}{% empty %}Penulis tidak tercatat{% endfor %}
+            &middot; {{ book.category.name }}
+        </p>
+    </div>
+
+    <div class="grid gap-6 md:grid-cols-2 p-6 sm:p-8">
+        <div>
+            <h2 class="font-semibold text-slate-900 mb-3">Informasi koleksi</h2>
+            <dl class="text-sm space-y-2">
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500">ISBN</dt>
+                    <dd class="font-medium text-right">{{ book.isbn }}</dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500">Penerbit</dt>
+                    <dd class="font-medium text-right">{{ book.publisher|default:"-" }}</dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500">Tahun terbit</dt>
+                    <dd class="font-medium text-right">{{ book.publication_year|default:"-" }}</dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500">Edisi</dt>
+                    <dd class="font-medium text-right">{{ book.edition|default:"-" }}</dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-500">Kategori</dt>
+                    <dd class="font-medium text-right">{{ book.category.name }}</dd>
+                </div>
+            </dl>
+
+            {% if book.description %}
+                <h2 class="font-semibold text-slate-900 mt-6 mb-2">Deskripsi</h2>
+                <p class="text-sm text-slate-600 leading-relaxed">{{ book.description }}</p>
+            {% endif %}
+
+            {% for author in authors %}
+                {% if author.bio %}
+                    <h2 class="font-semibold text-slate-900 mt-6 mb-2">Tentang {{ author.name }}</h2>
+                    <p class="text-sm text-slate-600 leading-relaxed">{{ author.bio }}</p>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        <div>
+            <h2 class="font-semibold text-slate-900 mb-3">Ketersediaan</h2>
+            {% if available > 0 %}
+                <p class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-xl text-sm mb-4">
+                    {{ available }} dari {{ total }} eksemplar tersedia untuk dipinjam.
+                </p>
+            {% else %}
+                <p class="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2.5 rounded-xl text-sm mb-4">
+                    Seluruh {{ total }} eksemplar sedang tidak tersedia.
+                </p>
+            {% endif %}
+
+            {% if copies %}
+                <div class="rounded-xl border border-slate-200 overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="bg-slate-50 text-left text-slate-500">
+                                <th class="px-4 py-2.5 font-medium">Kode</th>
+                                <th class="px-4 py-2.5 font-medium">Status</th>
+                                <th class="px-4 py-2.5 font-medium">Lokasi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for copy in copies %}
+                                <tr>
+                                    <td class="px-4 py-2.5 font-medium">{{ copy.copy_code }}</td>
+                                    <td class="px-4 py-2.5">
+                                        {% if copy.status == "TERSEDIA" %}
+                                            <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">{{ copy.status }}</span>
+                                        {% else %}
+                                            <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">{{ copy.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-4 py-2.5 text-slate-600">{{ copy.location }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-sm text-slate-500">Belum ada eksemplar tercatat untuk judul ini.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}

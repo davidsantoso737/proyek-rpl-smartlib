@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Katalog - Digital Library{% endblock %}
+
+{% block content %}
+
+<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
+    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
+        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+            Katalog Koleksi
+        </h1>
+        <p class="text-slate-500 text-sm mt-1">
+            Cari buku fisik dan e-book berdasarkan judul, penulis, kategori, penerbit, atau ISBN.
+        </p>
+    </div>
+
+    <div class="px-6 sm:px-8 py-6 border-b border-slate-100 bg-slate-50/60">
+        <form method="get" action="{% url 'catalog:catalog' %}" class="flex flex-col md:flex-row gap-3">
+            <input type="text" name="q" value="{{ q }}" placeholder="Cari judul, penulis, kategori, penerbit, ISBN..."
+                   class="flex-1 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <select name="category"
+                    class="border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Semua kategori</option>
+                {% for category in categories %}
+                    <option value="{{ category.id }}" {% if category_id == category.id|stringformat:"s" %}selected{% endif %}>
+                        {{ category.name }}
+                    </option>
+                {% endfor %}
+            </select>
+            <select name="type"
+                    class="border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="" {% if kind == "" %}selected{% endif %}>Fisik + E-Book</option>
+                <option value="book" {% if kind == "book" %}selected{% endif %}>Buku Fisik</option>
+                <option value="ebook" {% if kind == "ebook" %}selected{% endif %}>E-Book</option>
+            </select>
+            <div class="flex gap-2">
+                <button type="submit"
+                        class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
+                    Cari
+                </button>
+                {% if q or category_id or kind %}
+                    <a href="{% url 'catalog:catalog' %}"
+                       class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+                        Reset
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <div class="p-6 sm:p-8">
+        <p class="text-sm text-slate-500 mb-4">
+            Ditemukan <span class="font-semibold text-slate-900">{{ result_count }}</span> koleksi.
+        </p>
+
+        {% if page_obj.object_list %}
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {% for item in page_obj.object_list %}
+                    <div class="rounded-xl border border-slate-200 p-5 flex flex-col hover:shadow-md transition">
+                        <div class="mb-3">
+                            {% if item.kind == "book" %}
+                                <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-700">Buku Fisik</span>
+                            {% else %}
+                                <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-700">E-Book</span>
+                            {% endif %}
+                        </div>
+                        <h2 class="font-semibold text-slate-900 leading-snug mb-1">
+                            {{ item.title }}
+                        </h2>
+                        <p class="text-sm text-slate-500 mb-1">
+                            {{ item.authors|join:", "|default:"Penulis tidak tercatat" }}
+                        </p>
+                        <p class="text-xs text-slate-400 mb-3">
+                            {{ item.obj.category.name }}
+                        </p>
+                        <div class="mt-auto pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                            {% if item.kind == "book" %}
+                                {% if item.available > 0 %}
+                                    <span class="text-xs font-semibold text-emerald-700">{{ item.available }} dari {{ item.total }} tersedia</span>
+                                {% else %}
+                                    <span class="text-xs font-semibold text-amber-700">Sedang tidak tersedia</span>
+                                {% endif %}
+                                <a href="{% url 'catalog:book_detail' item.obj.pk %}"
+                                   class="text-blue-600 hover:underline text-sm font-medium shrink-0">Detail</a>
+                            {% else %}
+                                <span class="text-xs font-semibold text-violet-700">Tersedia sebagai e-book</span>
+                                <a href="{% url 'catalog:ebook_detail' item.obj.pk %}"
+                                   class="text-blue-600 hover:underline text-sm font-medium shrink-0">Detail</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            {% if page_obj.has_other_pages %}
+                <div class="flex items-center justify-center gap-2 mt-8 text-sm">
+                    {% if page_obj.has_previous %}
+                        <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.previous_page_number }}"
+                           class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-medium transition">Sebelumnya</a>
+                    {% endif %}
+                    <span class="px-3 py-2 text-slate-500">
+                        Halaman {{ page_obj.number }} dari {{ page_obj.paginator.num_pages }}
+                    </span>
+                    {% if page_obj.has_next %}
+                        <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.next_page_number }}"
+                           class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-medium transition">Berikutnya</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-12">
+                <p class="text-slate-900 font-semibold mb-1">Tidak ada koleksi yang cocok.</p>
+                <p class="text-slate-500 text-sm">Coba kata kunci lain atau ubah filter kategori dan tipe koleksi.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
