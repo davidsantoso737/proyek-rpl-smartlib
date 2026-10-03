@@ -65,6 +65,10 @@
                        class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Konfigurasi
                     </a>
+                    <a href="{% url 'circulation:ebook_approval_list' %}"
+                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                        E-Approval
+                    </a>
                     <a href="{% url 'accounts:user_list' %}"
                        class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Pengguna
@@ -77,6 +81,10 @@
                     <a href="{% url 'circulation:loan_list' %}"
                        class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Riwayat
+                    </a>
+                    <a href="{% url 'circulation:my_ebooks' %}"
+                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                        E-Book Saya
                     </a>
                     {% endif %}
                     <a href="{% url 'accounts:profile' %}"

@@ -77,9 +77,33 @@
                     <dd class="font-medium text-right">{{ ebook.version }}</dd>
                 </div>
             </dl>
-            <p class="bg-violet-50 border border-violet-200 text-violet-800 px-4 py-2.5 rounded-xl text-sm">
-                E-book dibedakan dari buku fisik: akses baca diberikan melalui peminjaman e-book pada modul Peminjaman.
+            <p class="bg-violet-50 border border-violet-200 text-violet-800 px-4 py-2.5 rounded-xl text-sm mb-4">
+                E-book dibedakan dari buku fisik: akses baca diberikan melalui peminjaman e-book yang disetujui pustakawan.
             </p>
+            {% if user.is_authenticated and user.role != "PUSTAKAWAN" %}
+                {% if loan_info.active %}
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm">
+                        <p class="font-semibold text-emerald-900 mb-1">Anda memiliki akses aktif</p>
+                        <p class="text-emerald-800 mb-3">Berlaku sampai {{ loan_info.active.expires_at|date:"d M Y H:i" }}.</p>
+                        <a href="{% url 'circulation:ebook_reader' loan_info.active.pk %}"
+                           class="inline-block px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition">
+                            Baca sekarang
+                        </a>
+                    </div>
+                {% elif loan_info.pending %}
+                    <p class="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2.5 rounded-xl text-sm">
+                        Pengajuan Anda sedang menunggu persetujuan pustakawan.
+                    </p>
+                {% else %}
+                    <form method="post" action="{% url 'circulation:ebook_request' ebook.pk %}">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm">
+                            Ajukan peminjaman e-book
+                        </button>
+                    </form>
+                {% endif %}
+            {% endif %}
         </div>
     </div>
 </div>

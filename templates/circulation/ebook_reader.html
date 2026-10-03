@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}{{ loan.ebook.title }} - Reader{% endblock %}
+
+{% block content %}
+
+<div class="mb-4">
+    <a href="{% url 'circulation:my_ebooks' %}" class="text-sm text-blue-600 hover:underline font-medium">
+        &larr; Kembali ke E-Book Saya
+    </a>
+</div>
+
+<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
+    <div class="border-b border-slate-100 px-6 sm:px-8 py-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900">
+                {{ loan.ebook.title }}
+            </h1>
+            <p class="text-slate-500 text-sm mt-1">
+                Akses berlaku sampai {{ loan.expires_at|date:"d M Y H:i" }}
+            </p>
+        </div>
+        <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Aktif</span>
+    </div>
+
+    <div class="p-4 sm:p-6">
+        <embed src="{% url 'circulation:ebook_file' loan.pk %}" type="application/pdf"
+               class="w-full rounded-xl border border-slate-200 bg-slate-100"
+               style="min-height: 70vh;">
+        <p class="text-xs text-slate-400 mt-2 text-center">
+            Jika dokumen tidak tampil, peramban Anda tidak mendukung pratinjau sebaris.
+            Akses file tetap terproteksi dan hanya berlaku selama masa peminjaman.
+        </p>
+    </div>
+</div>
+
+{% endblock %}

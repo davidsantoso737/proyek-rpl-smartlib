@@ -19,6 +19,7 @@ db.sqlite3
 # Static / media
 staticfiles/
 media/
+private_files/
 
 # Node
 node_modules/

@@ -1,7 +1,8 @@
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.http import Http404, HttpResponse
+from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -10,28 +11,35 @@ from apps.accounts.authorization import (
     role_required,
 )
 
-from .models import Loan, LoanItem
+from .models import EbookLoan, Loan, LoanItem
 from .services import (
+    EBOOK_PENDING,
     LOAN_APPROVED,
     LOAN_PENDING,
     ApprovalError,
+    EbookLoanError,
     LoanRequestError,
     PickupTokenError,
     ReturnError,
     activate_handover,
+    approve_ebook_loan,
     available_substitutes,
     approve_loan,
     cart_add,
     cart_clear,
     cart_copies,
     cart_remove,
+    get_active_ebook_loan,
     get_cart_ids,
     lookup_return,
     make_pickup_qr_png,
     make_qr_png,
     process_return,
+    reject_ebook_loan,
     reject_loan,
+    request_ebook_loan,
     request_loan,
+    resolve_ebook_file,
     verify_pickup_token,
 )
 
@@ -325,3 +333,150 @@ def return_history_view(request):
     return render(
         request, "circulation/return_history.html", {"page_obj": page_obj}
     )
+
+
+# --- E-book (FR-54 – FR-63) ---
+
+EBOOK_CONTENT_TYPES = {
+    "pdf": "application/pdf",
+    "epub": "application/epub+zip",
+}
+
+
+@role_required(*REQUESTER_ROLES)
+@require_POST
+def ebook_request_view(request, pk):
+    """Ajukan peminjaman e-book (FR-55)."""
+    try:
+        loan = request_ebook_loan(request.user, pk)
+    except EbookLoanError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(
+            request,
+            f"Pengajuan {loan.ebook.title} dibuat dan menunggu "
+            "persetujuan pustakawan.",
+        )
+    return redirect("catalog:ebook_detail", pk=pk)
+
+
+@active_login_required
+def my_ebooks_view(request):
+    """E-book saya: akses aktif, menunggu, dan riwayat (FR-63)."""
+    from django.utils import timezone
+
+    loans = (
+        EbookLoan.objects.filter(user=request.user)
+        .select_related("ebook")
+        .order_by("-requested_at")
+    )
+    now = timezone.now()
+    for loan in loans:
+        loan.is_usable = (
+            loan.status == "APPROVED"
+            and loan.started_at is not None
+            and loan.started_at <= now
+            and loan.expires_at is not None
+            and loan.expires_at > now
+        )
+    return render(request, "circulation/ebook_my.html", {"loans": loans})
+
+
+def _usable_ebook_loan_or_403(request, pk):
+    """Syarat reader: terautentikasi + pemilik + APPROVED + belum kedaluarsa
+    (NFR-24 – NFR-26). Gagal -> 403 dengan pesan yang jelas."""
+    loan = get_object_or_404(
+        EbookLoan.objects.select_related("ebook", "user"), pk=pk
+    )
+    if loan.user_id != request.user.pk:
+        raise PermissionDenied("Akses e-book ini bukan milik Anda.")
+    if loan.status != "APPROVED":
+        raise PermissionDenied(
+            "Peminjaman e-book ini belum disetujui atau sudah ditutup. "
+            "Ajukan peminjaman kembali bila diperlukan."
+        )
+    active = get_active_ebook_loan(request.user, loan.ebook)
+    if active is None or active.pk != loan.pk:
+        raise PermissionDenied(
+            "Masa akses e-book telah berakhir. "
+            "Ajukan peminjaman kembali untuk membaca lagi."
+        )
+    return loan
+
+
+@active_login_required
+def ebook_reader_view(request, pk):
+    """Reader terproteksi (FR-57)."""
+    loan = _usable_ebook_loan_or_403(request, pk)
+    return render(request, "circulation/ebook_reader.html", {"loan": loan})
+
+
+@active_login_required
+def ebook_file_view(request, pk):
+    """Stream file dari storage privat setelah otorisasi penuh (NFR-26).
+
+    Tidak ada URL publik untuk file ini: hanya rute ini yang
+    menyentuh storage, selalu sesudah pemeriksaan di atas.
+    """
+    loan = _usable_ebook_loan_or_403(request, pk)
+    try:
+        path = resolve_ebook_file(loan.ebook)
+    except EbookLoanError as exc:
+        raise Http404(str(exc))
+    content_type = EBOOK_CONTENT_TYPES.get(
+        (loan.ebook.file_type or "").lower(), "application/octet-stream"
+    )
+    return FileResponse(
+        open(path, "rb"),
+        content_type=content_type,
+        filename=loan.ebook.file_name,
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def ebook_approval_list_view(request):
+    """Pengajuan e-book menunggu persetujuan (FR-56)."""
+    loans = (
+        EbookLoan.objects.filter(status=EBOOK_PENDING)
+        .select_related("user", "ebook")
+        .order_by("requested_at")
+    )
+    return render(
+        request, "circulation/ebook_approval_list.html", {"loans": loans}
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def ebook_approval_detail_view(request, pk):
+    loan = get_object_or_404(
+        EbookLoan.objects.select_related("user", "ebook"), pk=pk
+    )
+    return render(
+        request, "circulation/ebook_approval_detail.html", {"loan": loan}
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+@require_POST
+def ebook_approve_view(request, pk):
+    try:
+        loan = approve_ebook_loan(pk, request.user)
+    except EbookLoanError as exc:
+        messages.error(request, str(exc))
+        return redirect("circulation:ebook_approval_detail", pk=pk)
+    messages.success(
+        request, f"{loan.ebook.title} disetujui; akses dimulai sekarang."
+    )
+    return redirect("circulation:ebook_approval_list")
+
+
+@role_required(User.Role.PUSTAKAWAN)
+@require_POST
+def ebook_reject_view(request, pk):
+    try:
+        reject_ebook_loan(pk, request.user, request.POST.get("reason"))
+    except EbookLoanError as exc:
+        messages.error(request, str(exc))
+        return redirect("circulation:ebook_approval_detail", pk=pk)
+    messages.success(request, "Pengajuan e-book ditolak.")
+    return redirect("circulation:ebook_approval_list")

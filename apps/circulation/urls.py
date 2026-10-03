@@ -60,4 +60,40 @@ urlpatterns = [
         views.copy_identity_qr_view,
         name="copy_identity_qr",
     ),
+    path(
+        "ebook/minta/<int:pk>/",
+        views.ebook_request_view,
+        name="ebook_request",
+    ),
+    path("ebook/saya/", views.my_ebooks_view, name="my_ebooks"),
+    path(
+        "ebook/baca/<int:pk>/",
+        views.ebook_reader_view,
+        name="ebook_reader",
+    ),
+    path(
+        "ebook/file/<int:pk>/",
+        views.ebook_file_view,
+        name="ebook_file",
+    ),
+    path(
+        "ebook/persetujuan/",
+        views.ebook_approval_list_view,
+        name="ebook_approval_list",
+    ),
+    path(
+        "ebook/persetujuan/<int:pk>/",
+        views.ebook_approval_detail_view,
+        name="ebook_approval_detail",
+    ),
+    path(
+        "ebook/persetujuan/<int:pk>/setujui/",
+        views.ebook_approve_view,
+        name="ebook_approve",
+    ),
+    path(
+        "ebook/persetujuan/<int:pk>/tolak/",
+        views.ebook_reject_view,
+        name="ebook_reject",
+    ),
 ]

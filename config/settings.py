@@ -149,6 +149,10 @@ STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
 
+# File e-book privat: TIDAK disajikan sebagai static/media publik.
+# Akses hanya lewat view reader yang memeriksa EbookLoan aktif.
+EBOOK_STORAGE_ROOT = BASE_DIR / "private_files" / "ebooks"
+
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 

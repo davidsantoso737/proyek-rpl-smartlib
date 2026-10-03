@@ -175,7 +175,23 @@ def _human_file_size(size):
 @active_login_required
 def ebook_detail_view(request, pk):
     """Detail e-book (FR-10, FR-12: dibedakan dari koleksi fisik)."""
+    from apps.circulation.services import get_active_ebook_loan
+
     ebook = get_object_or_404(_ebook_queryset(), pk=pk)
+    loan_info = None
+    if request.user.is_authenticated and request.user.is_active:
+        from apps.circulation.models import EbookLoan
+        from apps.circulation.services import EBOOK_PENDING
+
+        active = get_active_ebook_loan(request.user, ebook)
+        pending = (
+            EbookLoan.objects.filter(
+                user=request.user, ebook=ebook, status=EBOOK_PENDING
+            ).first()
+            if active is None
+            else None
+        )
+        loan_info = {"active": active, "pending": pending}
     return render(
         request,
         "catalog/ebook_detail.html",
@@ -185,5 +201,6 @@ def ebook_detail_view(request, pk):
                 rel.author for rel in ebook.ebookauthor_set.all()
             ],
             "file_size_display": _human_file_size(ebook.file_size),
+            "loan_info": loan_info,
         },
     )

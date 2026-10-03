@@ -20,10 +20,10 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.catalog.availability import STATUS_TERSEDIA
-from apps.catalog.models import BookCopy
+from apps.catalog.models import BookCopy, Ebook
 from apps.notifications.models import Notification
 
-from .models import Loan, LoanItem
+from .models import EbookLoan, Loan, LoanItem
 
 LOAN_PENDING = "PENDING_APPROVAL"
 LOAN_APPROVED = "APPROVED"
@@ -210,13 +210,13 @@ def request_loan(user, copy_ids):
     return loan
 
 
-def _notify(user, notif_type, title, message, loan):
+def _notify(user, notif_type, title, message, loan, reference_type="loan"):
     Notification.objects.create(
         user=user,
         type=notif_type,
         title=title,
         message=message,
-        reference_type="loan",
+        reference_type=reference_type,
         reference_id=loan.pk,
     )
 
@@ -647,3 +647,156 @@ def process_return(code, librarian, condition="BAIK", lost=False):
             _notify(loan.user, "LOAN_RETURNED", "Buku dikembalikan", message, loan)
     item.copy_refreshed_status = copy.status
     return item
+
+
+# --- E-book (FR-54 – FR-63, BR-50 – BR-58, NFR-24 – NFR-28) ---
+
+EBOOK_PENDING = "PENDING_APPROVAL"
+EBOOK_APPROVED = "APPROVED"
+EBOOK_REJECTED = "REJECTED"
+
+
+class EbookLoanError(LoanRequestError):
+    """Kegagalan alur e-book (pengajuan/akses)."""
+
+
+def get_active_ebook_loan(user, ebook, at=None):
+    """EbookLoan APPROVED yang masih berlaku (started <= now < expires).
+
+    Kedaluwarsa otomatis lewat perbandingan waktu (FR-60); tidak ada
+    perubahan status yang perlu dijadwalkan.
+    """
+    moment = at or timezone.now()
+    return (
+        EbookLoan.objects.filter(
+            user=user,
+            ebook=ebook,
+            status=EBOOK_APPROVED,
+            started_at__lte=moment,
+            expires_at__gt=moment,
+        )
+        .select_related("ebook")
+        .first()
+    )
+
+
+def request_ebook_loan(user, ebook_id):
+    """Ajukan peminjaman e-book (FR-55). Satu pengajuan/akses aktif
+    per pengguna per e-book; beberapa e-book berbeda boleh aktif
+    bersamaan (FR-62)."""
+    if not user.is_active:
+        raise EbookLoanError(
+            "Akun Anda tidak aktif sehingga tidak dapat mengajukan "
+            "peminjaman."
+        )
+    try:
+        ebook = Ebook.objects.get(pk=int(ebook_id), is_active=True)
+    except (Ebook.DoesNotExist, TypeError, ValueError):
+        raise EbookLoanError("E-book yang dipilih tidak tersedia.")
+    if EbookLoan.objects.filter(
+        user=user, ebook=ebook, status=EBOOK_PENDING
+    ).exists():
+        raise EbookLoanError(
+            f"Pengajuan untuk {ebook.title} masih menunggu persetujuan."
+        )
+    if get_active_ebook_loan(user, ebook) is not None:
+        raise EbookLoanError(
+            f"Anda masih memiliki akses aktif untuk {ebook.title}."
+        )
+    return EbookLoan.objects.create(
+        user=user,
+        ebook=ebook,
+        status=EBOOK_PENDING,
+        requested_at=timezone.now(),
+    )
+
+
+def approve_ebook_loan(loan_id, approver):
+    """Setujui + mulai masa akses dari durasi aktif (FR-56 – FR-59)."""
+    with transaction.atomic():
+        try:
+            loan = EbookLoan.objects.select_for_update().get(pk=loan_id)
+        except (EbookLoan.DoesNotExist, TypeError, ValueError):
+            raise EbookLoanError("Pengajuan tidak ditemukan.")
+        if loan.status != EBOOK_PENDING:
+            raise EbookLoanError(
+                "Hanya pengajuan PENDING_APPROVAL yang dapat disetujui."
+            )
+        setting = _current_library_setting()
+        now = timezone.now()
+        loan.status = EBOOK_APPROVED
+        loan.approved_at = now
+        loan.approved_by = approver
+        loan.started_at = now
+        loan.expires_at = now + timedelta(
+            days=setting.ebook_access_duration
+        )
+        loan.save(
+            update_fields=[
+                "status",
+                "approved_at",
+                "approved_by",
+                "started_at",
+                "expires_at",
+                "updated_at",
+            ]
+        )
+        _notify(
+            loan.user,
+            "EBOOK_APPROVED",
+            "Peminjaman e-book disetujui",
+            f"{loan.ebook.title} dapat dibaca sampai "
+            f"{loan.expires_at.strftime('%d %b %Y %H:%M')}.",
+            loan,
+            reference_type="ebook_loan",
+        )
+    return loan
+
+
+def reject_ebook_loan(loan_id, approver, reason):
+    """Tolak pengajuan e-book dengan alasan wajib."""
+    reason = (reason or "").strip()
+    if not reason:
+        raise EbookLoanError("Alasan penolakan wajib diisi.")
+    with transaction.atomic():
+        try:
+            loan = EbookLoan.objects.select_for_update().get(pk=loan_id)
+        except (EbookLoan.DoesNotExist, TypeError, ValueError):
+            raise EbookLoanError("Pengajuan tidak ditemukan.")
+        if loan.status != EBOOK_PENDING:
+            raise EbookLoanError(
+                "Hanya pengajuan PENDING_APPROVAL yang dapat ditolak."
+            )
+        loan.status = EBOOK_REJECTED
+        loan.save(update_fields=["status", "updated_at"])
+        _notify(
+            loan.user,
+            "EBOOK_REJECTED",
+            "Peminjaman e-book ditolak",
+            f"{loan.ebook.title}: {reason}",
+            loan,
+            reference_type="ebook_loan",
+        )
+    return loan
+
+
+def resolve_ebook_file(ebook):
+    """Path file di storage privat (NFR-26). Tidak pernah berupa URL publik."""
+    from pathlib import Path
+
+    from django.conf import settings as dj_settings
+
+    candidates = []
+    raw = (ebook.file_path or "").strip()
+    if raw:
+        candidates.append(Path(raw))
+    base = Path(dj_settings.EBOOK_STORAGE_ROOT)
+    for name in (getattr(ebook, "file_name", "") or "", Path(raw).name if raw else ""):
+        if name:
+            candidates.append(base / Path(name).name)
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise EbookLoanError(
+        "File e-book tidak tersedia di server. Hubungi pustakawan."
+    )
