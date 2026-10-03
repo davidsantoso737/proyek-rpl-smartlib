@@ -48,6 +48,21 @@
                        class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Katalog
                     </a>
+                    {% if user.role == "PUSTAKAWAN" %}
+                    <a href="{% url 'accounts:user_list' %}"
+                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                        Pengguna
+                    </a>
+                    {% else %}
+                    <a href="{% url 'circulation:cart' %}"
+                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                        Keranjang{% if cart_item_count %} ({{ cart_item_count }}){% endif %}
+                    </a>
+                    <a href="{% url 'circulation:loan_list' %}"
+                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                        Riwayat
+                    </a>
+                    {% endif %}
                     <a href="{% url 'accounts:profile' %}"
                        class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Profil

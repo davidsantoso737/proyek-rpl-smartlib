@@ -29,4 +29,20 @@ urlpatterns = [
         views.password_change_view,
         name="password_change",
     ),
+    path("pengguna/", views.user_list_view, name="user_list"),
+    path(
+        "pengguna/tambah/<str:role>/",
+        views.user_create_view,
+        name="user_create",
+    ),
+    path(
+        "pengguna/<int:pk>/ubah/",
+        views.user_update_view,
+        name="user_update",
+    ),
+    path(
+        "pengguna/<int:pk>/status/",
+        views.user_toggle_active_view,
+        name="user_toggle_active",
+    ),
 ]

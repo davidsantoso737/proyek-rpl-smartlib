@@ -1,15 +1,30 @@
+import logging
+
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login, logout, update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
 from django.core.exceptions import PermissionDenied
-from django.shortcuts import redirect, render
+from django.core.paginator import Paginator
+from django.db.models import Q
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from .authorization import active_login_required, role_required
-from .forms import INPUT_CLASS, LoginForm, ProfileForm
+from .forms import (
+    INPUT_CLASS,
+    MANAGEABLE_ROLES,
+    LoginForm,
+    ManagedUserCreateForm,
+    ManagedUserUpdateForm,
+    ProfileForm,
+)
 
 User = get_user_model()
+
+logger = logging.getLogger(__name__)
+
+USER_PAGE_SIZE = 15
 
 
 def _safe_next(request):
@@ -137,3 +152,133 @@ def password_change_view(request):
     for field in form.fields.values():
         field.widget.attrs.update({"class": INPUT_CLASS})
     return render(request, "accounts/password_change.html", {"form": form})
+
+
+def _manageable_user_or_404(pk):
+    """Hanya Siswa/Guru yang dapat dikelola via public UI (scope)."""
+    return get_object_or_404(User, pk=pk, role__in=MANAGEABLE_ROLES)
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def user_list_view(request):
+    """Daftar akun Siswa/Guru (FR-04, BR-77). Hanya Pustakawan."""
+    q = (request.GET.get("q") or "").strip()
+    role_filter = request.GET.get("role") or ""
+    users = User.objects.filter(role__in=MANAGEABLE_ROLES)
+    if role_filter in MANAGEABLE_ROLES:
+        users = users.filter(role=role_filter)
+    else:
+        role_filter = ""
+    if q:
+        users = users.filter(
+            Q(username__icontains=q) | Q(full_name__icontains=q)
+        )
+    users = users.order_by("role", "username")
+    paginator = Paginator(users, USER_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    params = request.GET.copy()
+    params.pop("page", None)
+    return render(
+        request,
+        "accounts/user_list.html",
+        {
+            "page_obj": page_obj,
+            "q": q,
+            "role_filter": role_filter,
+            "querystring": params.urlencode(),
+            "result_count": paginator.count,
+        },
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def user_create_view(request, role):
+    """Tambah akun Siswa/Guru (FR-04, FR-07, BR-77). Hanya Pustakawan."""
+    if role not in MANAGEABLE_ROLES:
+        raise PermissionDenied(
+            "Role tersebut tidak dapat dibuat melalui halaman ini."
+        )
+    if request.method == "POST":
+        form = ManagedUserCreateForm(request.POST, role=role)
+        if form.is_valid():
+            user = form.save()
+            logger.info(
+                "Pustakawan %s membuat akun %s (%s).",
+                request.user.username,
+                user.username,
+                user.role,
+            )
+            messages.success(
+                request,
+                f"Akun {user.username} ({user.get_role_display()}) "
+                "berhasil dibuat.",
+            )
+            return redirect("accounts:user_list")
+    else:
+        form = ManagedUserCreateForm(role=role)
+    return render(
+        request,
+        "accounts/user_form.html",
+        {
+            "form": form,
+            "form_title": (
+                "Tambah Siswa" if role == User.Role.SISWA else "Tambah Guru"
+            ),
+            "submit_label": "Buat akun",
+            "cancel_url": "accounts:user_list",
+        },
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def user_update_view(request, pk):
+    """Ubah data Siswa/Guru (FR-05, FR-07, BR-77). Hanya Pustakawan."""
+    user = _manageable_user_or_404(pk)
+    if request.method == "POST":
+        form = ManagedUserUpdateForm(request.POST, instance=user)
+        if form.is_valid():
+            form.save()
+            logger.info(
+                "Pustakawan %s mengubah akun %s (%s).",
+                request.user.username,
+                user.username,
+                user.role,
+            )
+            messages.success(
+                request, f"Data {user.username} berhasil diperbarui."
+            )
+            return redirect("accounts:user_list")
+    else:
+        form = ManagedUserUpdateForm(instance=user)
+    return render(
+        request,
+        "accounts/user_form.html",
+        {
+            "form": form,
+            "form_title": f"Ubah {user.username}",
+            "submit_label": "Simpan perubahan",
+            "cancel_url": "accounts:user_list",
+        },
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+@require_POST
+def user_toggle_active_view(request, pk):
+    """Aktif/nonaktifkan akun Siswa/Guru (FR-06, BR-78). Hanya Pustakawan."""
+    user = _manageable_user_or_404(pk)
+    user.is_active = not user.is_active
+    user.save(update_fields=["is_active", "updated_at"])
+    logger.info(
+        "Pustakawan %s %s akun %s (%s).",
+        request.user.username,
+        "mengaktifkan" if user.is_active else "menonaktifkan",
+        user.username,
+        user.role,
+    )
+    messages.success(
+        request,
+        f"Akun {user.username} berhasil "
+        f"{'diaktifkan' if user.is_active else 'dinonaktifkan'}.",
+    )
+    return redirect("accounts:user_list")

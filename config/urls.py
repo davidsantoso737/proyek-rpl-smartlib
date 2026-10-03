@@ -28,6 +28,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("accounts/", include("apps.accounts.urls")),
     path("katalog/", include("apps.catalog.urls")),
+    path("peminjaman/", include("apps.circulation.urls")),
     path("test/", test_page),
     path(
         "",
