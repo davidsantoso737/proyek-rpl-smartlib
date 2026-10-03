@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}{{ dashboard_title }} - Digital Library{% endblock %}
+
+{% block content %}
+
+<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
+    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
+        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+            {{ dashboard_title }}
+        </h1>
+        <p class="text-slate-500 text-sm mt-1">
+            {{ dashboard_intro }}
+        </p>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2 p-6 sm:p-8">
+        <div class="rounded-xl border border-slate-200 p-5 hover:shadow-md transition">
+            <h2 class="font-semibold text-slate-900 mb-3">Akun saya</h2>
+            <dl class="text-sm space-y-1.5 mb-4">
+                <div class="flex justify-between gap-2">
+                    <dt class="text-slate-500">Username</dt>
+                    <dd class="font-medium">{{ user.username }}</dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                    <dt class="text-slate-500">Nama</dt>
+                    <dd class="font-medium text-right">{{ user.full_name }}</dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                    <dt class="text-slate-500">Role</dt>
+                    <dd class="font-medium">{{ user.get_role_display }}</dd>
+                </div>
+            </dl>
+            <div class="flex flex-wrap gap-2">
+                <a href="{% url 'accounts:profile' %}"
+                   class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition">
+                    Lihat / ubah profil
+                </a>
+                <a href="{% url 'accounts:password_change' %}"
+                   class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+                    Ubah password
+                </a>
+            </div>
+        </div>
+
+        {% if user.role == "PUSTAKAWAN" %}
+            <div class="rounded-xl border border-slate-200 p-5 hover:shadow-md transition">
+                <h2 class="font-semibold text-slate-900 mb-1">Administrasi</h2>
+                <p class="text-sm text-slate-500 mb-4">
+                    Kelola sistem melalui area administrasi.
+                </p>
+                <a href="{% url 'admin:index' %}"
+                   class="inline-block px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition">
+                    Buka halaman admin
+                </a>
+            </div>
+        {% elif user.role == "GURU" %}
+            <div class="rounded-xl border border-slate-200 p-5 hover:shadow-md transition">
+                <h2 class="font-semibold text-slate-900 mb-1">Bahan ajar</h2>
+                <p class="text-sm text-slate-500">
+                    Pengelolaan bahan ajar tersedia pada modul Bahan Ajar.
+                </p>
+            </div>
+        {% else %}
+            <div class="rounded-xl border border-slate-200 p-5 hover:shadow-md transition">
+                <h2 class="font-semibold text-slate-900 mb-1">Koleksi</h2>
+                <p class="text-sm text-slate-500">
+                    Penelusuran koleksi dan peminjaman tersedia pada modul Katalog.
+                </p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
