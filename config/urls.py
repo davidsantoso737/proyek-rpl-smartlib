@@ -29,6 +29,7 @@ urlpatterns = [
     path("accounts/", include("apps.accounts.urls")),
     path("katalog/", include("apps.catalog.urls")),
     path("peminjaman/", include("apps.circulation.urls")),
+    path("materi/", include("apps.materials.urls")),
     path("", include("apps.core.urls")),
     path("test/", test_page),
     path(

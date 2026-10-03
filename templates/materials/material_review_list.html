@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Verifikasi Bahan Ajar - Digital Library{% endblock %}
+
+{% block content %}
+
+<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
+    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
+        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+            Verifikasi Bahan Ajar
+        </h1>
+        <p class="text-slate-500 text-sm mt-1">
+            Terima/tolak unggahan guru dan putuskan permintaan penghapusan.
+        </p>
+    </div>
+
+    <div class="p-6 sm:p-8 space-y-8">
+        <div>
+            <h2 class="font-semibold text-slate-900 mb-3">Menunggu verifikasi ({{ pending.count }})</h2>
+            {% if pending %}
+                <div class="space-y-2">
+                    {% for material in pending %}
+                        <a href="{% url 'materials:review_detail' material.pk %}"
+                           class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 p-4 hover:shadow-md transition">
+                            <div>
+                                <p class="font-semibold text-slate-900">{{ material.title }}</p>
+                                <p class="text-xs text-slate-500">{{ material.uploaded_by.full_name }}</p>
+                            </div>
+                            <span class="px-4 py-2 rounded-xl bg-amber-500 text-white text-sm font-medium">Periksa</span>
+                        </a>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-sm text-slate-500">Tidak ada antrean verifikasi.</p>
+            {% endif %}
+        </div>
+
+        <div class="border-t border-slate-100 pt-6">
+            <h2 class="font-semibold text-slate-900 mb-3">Permintaan penghapusan ({{ deletions.count }})</h2>
+            {% if deletions %}
+                <div class="space-y-2">
+                    {% for deletion in deletions %}
+                        <div class="rounded-xl border border-slate-200 p-4">
+                            <p class="font-semibold text-slate-900">{{ deletion.material.title }}</p>
+                            <p class="text-xs text-slate-500 mt-0.5">
+                                {{ deletion.requested_by.full_name }} &middot; alasan: {{ deletion.reason }}
+                            </p>
+                            <div class="flex flex-wrap gap-2 mt-3">
+                                <form method="post" action="{% url 'materials:deletion_review' deletion.pk %}" class="inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="decision" value="approve">
+                                    <button type="submit"
+                                            class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition">
+                                        Setujui hapus
+                                    </button>
+                                </form>
+                                <form method="post" action="{% url 'materials:deletion_review' deletion.pk %}" class="inline-flex flex-1 min-w-52 gap-2">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="decision" value="reject">
+                                    <input type="text" name="note" placeholder="Catatan (opsional)..."
+                                           class="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <button type="submit"
+                                            class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+                                        Tolak
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-sm text-slate-500">Tidak ada permintaan penghapusan.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}

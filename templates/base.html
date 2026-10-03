@@ -48,6 +48,10 @@
                        class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Katalog
                     </a>
+                    <a href="{% url 'materials:list' %}"
+                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                        Bahan Ajar
+                    </a>
                     {% if user.role == "PUSTAKAWAN" %}
                     <a href="{% url 'circulation:approval_list' %}"
                        class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
@@ -69,6 +73,10 @@
                        class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         E-Approval
                     </a>
+                    <a href="{% url 'materials:review_list' %}"
+                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                        Verifikasi
+                    </a>
                     <a href="{% url 'accounts:user_list' %}"
                        class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Pengguna
@@ -86,6 +94,12 @@
                        class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         E-Book Saya
                     </a>
+                    {% if user.role == "GURU" %}
+                    <a href="{% url 'materials:my' %}"
+                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                        Materi Saya
+                    </a>
+                    {% endif %}
                     {% endif %}
                     <a href="{% url 'accounts:profile' %}"
                        class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">

@@ -153,6 +153,9 @@ STATICFILES_DIRS = [
 # Akses hanya lewat view reader yang memeriksa EbookLoan aktif.
 EBOOK_STORAGE_ROOT = BASE_DIR / "private_files" / "ebooks"
 
+# File bahan ajar privat: sama perlakuannya (NFR-08, NFR-26).
+MATERIAL_STORAGE_ROOT = BASE_DIR / "private_files" / "materials"
+
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
