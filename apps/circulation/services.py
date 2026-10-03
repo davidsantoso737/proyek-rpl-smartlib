@@ -21,7 +21,6 @@ from django.utils import timezone
 
 from apps.catalog.availability import STATUS_TERSEDIA
 from apps.catalog.models import BookCopy
-from apps.core.models import LibrarySetting
 from apps.notifications.models import Notification
 
 from .models import Loan, LoanItem
@@ -123,7 +122,9 @@ def cart_copies(session):
 
 
 def _current_library_setting():
-    setting = LibrarySetting.objects.order_by("-effective_from").first()
+    from apps.core.services import get_active_setting
+
+    setting = get_active_setting()
     if setting is None:
         raise LoanRequestError(
             "Konfigurasi perpustakaan belum tersedia. "

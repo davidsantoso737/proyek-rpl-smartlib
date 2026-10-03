@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Konfigurasi Kebijakan - Digital Library{% endblock %}
+
+{% block content %}
+
+<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
+    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
+        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+            Konfigurasi Kebijakan
+        </h1>
+        <p class="text-slate-500 text-sm mt-1">
+            Perubahan berlaku untuk transaksi baru; denda, jatuh tempo, dan masa akses yang sudah tercatat tidak berubah.
+        </p>
+    </div>
+
+    <div class="grid gap-0 md:grid-cols-2">
+        <div class="p-6 sm:p-8 border-b md:border-b-0 md:border-r border-slate-100">
+            <h2 class="font-semibold text-slate-900 mb-4">Konfigurasi aktif</h2>
+            {% if active %}
+                <dl class="text-sm space-y-2 mb-6">
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-slate-500">Durasi pinjam fisik</dt>
+                        <dd class="font-medium">{{ active.physical_loan_duration }} hari</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-slate-500">Durasi akses e-book</dt>
+                        <dd class="font-medium">{{ active.ebook_access_duration }} hari</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-slate-500">Masa berlaku QR Pickup</dt>
+                        <dd class="font-medium">{{ active.pickup_qr_validity }} menit</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-slate-500">Tarif denda</dt>
+                        <dd class="font-medium">Rp{{ active.fine_rate_per_day }}/hari</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-slate-500">Berlaku sejak</dt>
+                        <dd class="font-medium">{{ active.effective_from|date:"d M Y H:i" }}</dd>
+                    </div>
+                </dl>
+            {% else %}
+                <p class="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2.5 rounded-xl text-sm mb-6">
+                    Belum ada konfigurasi. Isi form untuk membuat versi pertama.
+                </p>
+            {% endif %}
+
+            <h2 class="font-semibold text-slate-900 mb-4">Riwayat versi</h2>
+            {% if history %}
+                <div class="rounded-xl border border-slate-200 overflow-hidden">
+                    <table class="w-full text-xs">
+                        <thead>
+                            <tr class="bg-slate-50 text-left text-slate-500">
+                                <th class="px-3 py-2 font-medium">Berlaku</th>
+                                <th class="px-3 py-2 font-medium">Durasi</th>
+                                <th class="px-3 py-2 font-medium">Denda/hari</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for version in history %}
+                                <tr>
+                                    <td class="px-3 py-2">{{ version.effective_from|date:"d M Y H:i" }}{% if version.effective_until %} s/d {{ version.effective_until|date:"d M Y H:i" }}{% else %} &middot; aktif{% endif %}</td>
+                                    <td class="px-3 py-2">{{ version.physical_loan_duration }} hr</td>
+                                    <td class="px-3 py-2">Rp{{ version.fine_rate_per_day }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-sm text-slate-500">Belum ada riwayat.</p>
+            {% endif %}
+        </div>
+
+        <div class="p-6 sm:p-8">
+            <h2 class="font-semibold text-slate-900 mb-4">Ubah kebijakan</h2>
+            {% if form.non_field_errors %}
+                <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm mb-4">
+                    {% for error in form.non_field_errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            <form method="post" action="{% url 'core:policy' %}" class="space-y-4">
+                {% csrf_token %}
+                {% for field in form %}
+                    <div>
+                        <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1.5">
+                            {{ field.label }}
+                        </label>
+                        {{ field }}
+                        {% if field.help_text %}
+                            <p class="text-slate-500 text-xs mt-1">{{ field.help_text }}</p>
+                        {% endif %}
+                        {% for error in field.errors %}
+                            <p class="text-red-600 text-sm mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+                <button type="submit"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm">
+                    Simpan sebagai versi baru
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
