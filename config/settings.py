@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'apps.materials',
     'apps.notifications',
     'apps.ai',
+    'apps.reports',
 ]
 
 MIDDLEWARE = [
