@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Notifikasi - Digital Library{% endblock %}
+
+{% block content %}
+
+<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
+    <div class="border-b border-slate-100 px-6 sm:px-8 py-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+                Notifikasi
+            </h1>
+            <p class="text-slate-500 text-sm mt-1">
+                Persetujuan, jatuh tempo, keterlambatan, dan keputusan pustakawan.
+            </p>
+        </div>
+        <form method="post" action="{% url 'notifications:read_all' %}" class="inline">
+            {% csrf_token %}
+            <button type="submit"
+                    class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+                Tandai semua dibaca
+            </button>
+        </form>
+    </div>
+
+    <div class="p-6 sm:p-8">
+        {% if entries %}
+            <div class="space-y-3">
+                {% for entry in entries %}
+                    <div class="rounded-xl border p-4 {% if entry.notif.is_read %}border-slate-200{% else %}border-blue-300 bg-blue-50/50{% endif %}">
+                        <div class="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                                <p class="font-semibold text-slate-900">
+                                    {% if not entry.notif.is_read %}
+                                        <span class="inline-block w-2 h-2 rounded-full bg-blue-600 mr-1.5"></span>
+                                    {% endif %}
+                                    {{ entry.notif.title }}
+                                </p>
+                                <p class="text-sm text-slate-600 mt-1">{{ entry.notif.message }}</p>
+                                <p class="text-xs text-slate-400 mt-1">
+                                    {{ entry.notif.created_at|date:"d M Y H:i" }}
+                                    {% if entry.notif.is_read %} &middot; dibaca{% endif %}
+                                </p>
+                            </div>
+                            <div class="flex gap-2">
+                                {% if entry.url %}
+                                    <form method="post" action="{% url 'notifications:read' entry.notif.pk %}" class="inline">
+                                        {% csrf_token %}
+                                        <button type="submit"
+                                                class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition">
+                                            Lihat
+                                        </button>
+                                    </form>
+                                {% elif not entry.notif.is_read %}
+                                    <form method="post" action="{% url 'notifications:read' entry.notif.pk %}" class="inline">
+                                        {% csrf_token %}
+                                        <button type="submit"
+                                                class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium transition">
+                                            Tandai dibaca
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            {% if page_obj.has_other_pages %}
+                <div class="flex items-center justify-center gap-2 mt-6 text-sm">
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}"
+                           class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-medium transition">Sebelumnya</a>
+                    {% endif %}
+                    <span class="px-3 py-2 text-slate-500">
+                        Halaman {{ page_obj.number }} dari {{ page_obj.paginator.num_pages }}
+                    </span>
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}"
+                           class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-medium transition">Berikutnya</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-12">
+                <p class="text-slate-900 font-semibold mb-1">Belum ada notifikasi.</p>
+                <p class="text-slate-500 text-sm">Aktivitas seperti persetujuan dan jatuh tempo akan muncul di sini.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

@@ -31,6 +31,7 @@ urlpatterns = [
     path("peminjaman/", include("apps.circulation.urls")),
     path("materi/", include("apps.materials.urls")),
     path("stok/", include("apps.inventory.urls")),
+    path("notifikasi/", include("apps.notifications.urls")),
     path("", include("apps.core.urls")),
     path("test/", test_page),
     path(

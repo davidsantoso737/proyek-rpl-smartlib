@@ -106,6 +106,9 @@ def loan_create_view(request):
 @active_login_required
 def loan_list_view(request):
     """Riwayat/status pengajuan milik sendiri."""
+    from apps.notifications.services import sync_due_overdue
+
+    sync_due_overdue()
     loans = (
         Loan.objects.filter(user=request.user)
         .prefetch_related("items__book_copy__book")

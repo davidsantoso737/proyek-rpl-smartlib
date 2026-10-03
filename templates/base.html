@@ -109,6 +109,10 @@
                        class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Profil
                     </a>
+                    <a href="{% url 'notifications:list' %}"
+                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                        Notifikasi{% if unread_notifications %} ({{ unread_notifications }}){% endif %}
+                    </a>
                     <form method="post" action="{% url 'accounts:logout' %}" class="inline">
                         {% csrf_token %}
                         <button type="submit"
