@@ -1,11 +1,19 @@
+from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
+from django.db import IntegrityError
 from django.db.models import Count, Prefetch, Q
-from django.shortcuts import get_object_or_404, render
+from django.db.models.deletion import ProtectedError
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
-from apps.accounts.authorization import active_login_required
+from apps.accounts.authorization import active_login_required, role_required
 
 from .availability import STATUS_TERSEDIA, count_available_copies
-from .models import Book, BookAuthor, Category, Ebook, EbookAuthor
+from .forms import AuthorForm, BookCopyForm, BookForm, CategoryForm, generate_copy_code
+from .models import Author, Book, BookAuthor, BookCopy, Category, Ebook, EbookAuthor
+
+User = get_user_model()
 
 PAGE_SIZE = 12
 
@@ -204,3 +212,242 @@ def ebook_detail_view(request, pk):
             "loan_info": loan_info,
         },
     )
+
+
+# --- Kelola koleksi (FR-82 – FR-85, BR-10 – BR-13). Hanya Pustakawan.
+# Tanpa verifikasi TU (BR-09 di luar scope sistem).
+# Tanpa hapus buku/eksemplar: riwayat dilindungi PROTECT + kebutuhan
+# pelaporan; nonaktifkan buku bila perlu. ---
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def manage_book_list_view(request):
+    """Daftar buku untuk pengelolaan + pencarian (FR-82)."""
+    q = (request.GET.get("q") or "").strip()
+    books = Book.objects.select_related("category").order_by("title")
+    if q:
+        books = books.filter(
+            Q(title__icontains=q) | Q(isbn__icontains=q)
+        )
+    paginator = Paginator(books, PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    params = request.GET.copy()
+    params.pop("page", None)
+    return render(
+        request,
+        "catalog/manage_book_list.html",
+        {
+            "page_obj": page_obj,
+            "q": q,
+            "querystring": params.urlencode(),
+            "result_count": paginator.count,
+        },
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def manage_book_form_view(request, pk=None):
+    """Tambah/ubah buku beserta penulisnya (FR-82 – FR-84)."""
+    book = get_object_or_404(Book, pk=pk) if pk else None
+    if request.method == "POST":
+        form = BookForm(request.POST, instance=book)
+        if form.is_valid():
+            saved = form.save()
+            messages.success(
+                request, f"Buku {saved.title} berhasil disimpan."
+            )
+            return redirect("catalog:manage_book_copies", pk=saved.pk)
+    else:
+        form = BookForm(instance=book)
+    return render(
+        request,
+        "catalog/manage_book_form.html",
+        {"form": form, "book": book},
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+@require_POST
+def manage_book_toggle_view(request, pk):
+    """Aktif/nonaktifkan buku di katalog (bukan hapus)."""
+    book = get_object_or_404(Book, pk=pk)
+    book.is_active = not book.is_active
+    book.save(update_fields=["is_active", "updated_at"])
+    messages.success(
+        request,
+        f"Buku {book.title} kini "
+        f"{'aktif' if book.is_active else 'nonaktif'}.",
+    )
+    return redirect("catalog:manage_books")
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def manage_book_copies_view(request, pk):
+    """Eksemplar per judul + statusnya (FR-85, FR-86)."""
+    book = get_object_or_404(
+        Book.objects.select_related("category"), pk=pk
+    )
+    copies = book.copies.order_by("copy_code")
+    return render(
+        request,
+        "catalog/manage_copies.html",
+        {"book": book, "copies": copies},
+    )
+
+
+def _copy_bound_to_open_loan(copy):
+    from apps.circulation.models import LoanItem
+    from apps.circulation.services import OPEN_LOAN_STATUSES
+
+    return LoanItem.objects.filter(
+        book_copy=copy,
+        loan__status__in=OPEN_LOAN_STATUSES,
+    ).exists()
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def manage_copy_form_view(request, book_pk=None, pk=None):
+    """Tambah/ubah eksemplar + kode unik (FR-85, BR-81 – BR-84)."""
+    if pk:
+        copy = get_object_or_404(
+            BookCopy.objects.select_related("book"), pk=pk
+        )
+        book = copy.book
+    else:
+        copy = None
+        book = get_object_or_404(Book, pk=book_pk)
+    original_status = copy.status if copy else None
+    if request.method == "POST":
+        form = BookCopyForm(request.POST, instance=copy)
+        if form.is_valid():
+            new_copy = form.save(commit=False)
+            new_copy.book = book
+            if not (form.cleaned_data.get("copy_code") or "").strip():
+                new_copy.copy_code = generate_copy_code(book)
+            if (
+                copy is not None
+                and new_copy.status != original_status
+                and _copy_bound_to_open_loan(copy)
+            ):
+                form.add_error(
+                    "status",
+                    "Eksemplar terikat peminjaman aktif sehingga "
+                    "statusnya tidak dapat diubah.",
+                )
+            else:
+                try:
+                    new_copy.save()
+                except IntegrityError:
+                    form.add_error(
+                        "copy_code",
+                        "Kode eksemplar sudah dipakai. Gunakan kode lain.",
+                    )
+                else:
+                    messages.success(
+                        request,
+                        f"Eksemplar {new_copy.copy_code} berhasil disimpan.",
+                    )
+                    return redirect(
+                        "catalog:manage_book_copies", pk=book.pk
+                    )
+    else:
+        form = BookCopyForm(instance=copy)
+    return render(
+        request,
+        "catalog/manage_copy_form.html",
+        {"form": form, "book": book, "copy": copy},
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def manage_categories_view(request):
+    """Daftar + tambah kategori (FR-84)."""
+    if request.method == "POST":
+        form = CategoryForm(request.POST)
+        if form.is_valid():
+            category = form.save()
+            messages.success(
+                request, f"Kategori {category.name} ditambahkan."
+            )
+            return redirect("catalog:manage_categories")
+    else:
+        form = CategoryForm()
+    categories = Category.objects.order_by("name")
+    return render(
+        request,
+        "catalog/manage_categories.html",
+        {"categories": categories, "form": form},
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+@require_POST
+def manage_category_delete_view(request, pk):
+    """Hapus kategori bila tidak dipakai (PROTECT dijaga)."""
+    category = get_object_or_404(Category, pk=pk)
+    try:
+        category.delete()
+    except (ProtectedError, IntegrityError):
+        messages.error(
+            request,
+            f"Kategori {category.name} dipakai koleksi sehingga "
+            "tidak dapat dihapus.",
+        )
+    else:
+        messages.success(
+            request, f"Kategori {category.name} dihapus."
+        )
+    return redirect("catalog:manage_categories")
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def manage_authors_view(request):
+    """Daftar + tambah penulis (FR-84)."""
+    if request.method == "POST":
+        form = AuthorForm(request.POST)
+        if form.is_valid():
+            author = form.save()
+            messages.success(
+                request, f"Penulis {author.name} ditambahkan."
+            )
+            return redirect("catalog:manage_authors")
+    else:
+        form = AuthorForm()
+    authors = Author.objects.order_by("name")
+    return render(
+        request,
+        "catalog/manage_authors.html",
+        {"authors": authors, "form": form},
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+@require_POST
+def manage_author_delete_view(request, pk):
+    """Hapus penulis bila tidak dipakai.
+
+    BookAuthor/EbookAuthor memakai CASCADE sehingga pengecekan eksplisit
+    diperlukan agar hapus tidak diam-diam melepas kepenulisan (NFR-16).
+    """
+    from .models import EbookAuthor
+
+    author = get_object_or_404(Author, pk=pk)
+    if BookAuthor.objects.filter(author=author).exists() or (
+        EbookAuthor.objects.filter(author=author).exists()
+    ):
+        messages.error(
+            request,
+            f"Penulis {author.name} dipakai koleksi sehingga "
+            "tidak dapat dihapus.",
+        )
+        return redirect("catalog:manage_authors")
+    try:
+        author.delete()
+    except (ProtectedError, IntegrityError):
+        messages.error(
+            request,
+            f"Penulis {author.name} tidak dapat dihapus.",
+        )
+    else:
+        messages.success(request, f"Penulis {author.name} dihapus.")
+    return redirect("catalog:manage_authors")

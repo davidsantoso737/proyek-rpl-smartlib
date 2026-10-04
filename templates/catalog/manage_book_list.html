@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Kelola Koleksi - Digital Library{% endblock %}
+
+{% block content %}
+
+<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
+    <div class="border-b border-slate-100 px-6 sm:px-8 py-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+                Kelola Koleksi
+            </h1>
+            <p class="text-slate-500 text-sm mt-1">
+                Tambah dan ubah buku fisik beserta eksemplarnya.
+            </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{% url 'catalog:manage_book_create' %}"
+               class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
+                + Tambah buku
+            </a>
+            <a href="{% url 'catalog:manage_categories' %}"
+               class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+                Kategori
+            </a>
+            <a href="{% url 'catalog:manage_authors' %}"
+               class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+                Penulis
+            </a>
+        </div>
+    </div>
+
+    <div class="px-6 sm:px-8 py-5 border-b border-slate-100 bg-slate-50/60">
+        <form method="get" action="{% url 'catalog:manage_books' %}" class="flex flex-col sm:flex-row gap-3">
+            <input type="text" name="q" value="{{ q }}" placeholder="Cari judul atau ISBN..."
+                   class="flex-1 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <button type="submit"
+                    class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
+                Cari
+            </button>
+        </form>
+    </div>
+
+    <div class="p-6 sm:p-8">
+        <p class="text-sm text-slate-500 mb-4">
+            Ditemukan <span class="font-semibold text-slate-900">{{ result_count }}</span> judul.
+        </p>
+
+        {% if page_obj.object_list %}
+            <div class="rounded-xl border border-slate-200 overflow-x-auto">
+                <table class="w-full text-sm whitespace-nowrap">
+                    <thead>
+                        <tr class="bg-slate-50 text-left text-slate-500">
+                            <th class="px-4 py-2.5 font-medium">Judul</th>
+                            <th class="px-4 py-2.5 font-medium">ISBN</th>
+                            <th class="px-4 py-2.5 font-medium">Kategori</th>
+                            <th class="px-4 py-2.5 font-medium">Status</th>
+                            <th class="px-4 py-2.5 font-medium text-right">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for book in page_obj.object_list %}
+                            <tr class="hover:bg-slate-50/60">
+                                <td class="px-4 py-2.5 font-medium">{{ book.title }}</td>
+                                <td class="px-4 py-2.5 text-slate-600">{{ book.isbn }}</td>
+                                <td class="px-4 py-2.5 text-slate-600">{{ book.category.name }}</td>
+                                <td class="px-4 py-2.5">
+                                    {% if book.is_active %}
+                                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Aktif</span>
+                                    {% else %}
+                                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">Nonaktif</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-2.5">
+                                    <div class="flex justify-end gap-2">
+                                        <a href="{% url 'catalog:manage_book_copies' book.pk %}"
+                                           class="px-3 py-1.5 rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-700 text-xs font-medium transition">Eksemplar</a>
+                                        <a href="{% url 'catalog:manage_book_update' book.pk %}"
+                                           class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium transition">Ubah</a>
+                                        <form method="post" action="{% url 'catalog:manage_book_toggle' book.pk %}" class="inline">
+                                            {% csrf_token %}
+                                            <button type="submit" onclick="return confirm('Ubah status aktif buku ini?')"
+                                                    class="px-3 py-1.5 rounded-lg text-xs font-medium transition {% if book.is_active %}bg-red-100 hover:bg-red-200 text-red-700{% else %}bg-emerald-100 hover:bg-emerald-200 text-emerald-700{% endif %}">
+                                                {% if book.is_active %}Nonaktifkan{% else %}Aktifkan{% endif %}
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if page_obj.has_other_pages %}
+                <div class="flex items-center justify-center gap-2 mt-6 text-sm">
+                    {% if page_obj.has_previous %}
+                        <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.previous_page_number }}"
+                           class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-medium transition">Sebelumnya</a>
+                    {% endif %}
+                    <span class="px-3 py-2 text-slate-500">
+                        Halaman {{ page_obj.number }} dari {{ page_obj.paginator.num_pages }}
+                    </span>
+                    {% if page_obj.has_next %}
+                        <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.next_page_number }}"
+                           class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-medium transition">Berikutnya</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-12">
+                <p class="text-slate-900 font-semibold mb-1">Belum ada judul yang cocok.</p>
+                <p class="text-slate-500 text-sm">Ubah kata kunci atau tambahkan buku baru.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
