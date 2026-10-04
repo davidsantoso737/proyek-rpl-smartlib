@@ -37,7 +37,7 @@
         {% if loan.status == "PENDING_APPROVAL" %}
             <form method="post" action="{% url 'circulation:ebook_approve' loan.pk %}">
                 {% csrf_token %}
-                <button type="submit"
+                <button type="submit" onclick="return confirm('Setujui dan mulai akses e-book?')"
                         class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
                     Setujui &amp; mulai akses
                 </button>
@@ -49,7 +49,7 @@
                 <div class="flex flex-col sm:flex-row gap-3">
                     <input type="text" name="reason" placeholder="Alasan penolakan (wajib)..."
                            class="flex-1 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500">
-                    <button type="submit"
+                    <button type="submit" onclick="return confirm('Tolak pengajuan ini?')"
                             class="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
                         Tolak
                     </button>

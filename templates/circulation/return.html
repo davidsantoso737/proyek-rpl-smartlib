@@ -158,9 +158,17 @@
             );
             scanning = true;
         } catch (err) {
+            var name = err && err.name ? err.name : "";
+            var message = err && err.message ? err.message : "";
             readerBox.classList.add("hidden");
             toggle.textContent = "Nyalakan kamera";
-            setStatus("Kamera tidak dapat digunakan di perangkat ini. Ketik kode secara manual.");
+            if (name === "NotAllowedError" || /permission|denied/i.test(message)) {
+                setStatus("Izin kamera ditolak. Aktifkan izin kamera pada browser lalu coba lagi, atau ketik kode manual.");
+            } else if (/secure|https/i.test(message)) {
+                setStatus("Kamera membutuhkan koneksi aman (HTTPS atau localhost). Ketik kode secara manual.");
+            } else {
+                setStatus("Kamera tidak dapat digunakan di perangkat ini. Ketik kode secara manual.");
+            }
         }
     });
 })();

@@ -86,7 +86,7 @@
 
             <form method="post" action="{% url 'inventory:opname_complete' opname.pk %}">
                 {% csrf_token %}
-                <button type="submit"
+                <button type="submit" onclick="return confirm('Selesaikan sesi opname ini?')"
                         class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
                     Selesaikan opname
                 </button>
@@ -97,7 +97,7 @@
             <div>
                 <h2 class="font-semibold text-slate-900 mb-3">Ditemukan ({{ found|length }})</h2>
                 {% if found %}
-                    <div class="rounded-xl border border-emerald-200 overflow-hidden">
+                    <div class="rounded-xl border border-emerald-200 overflow-x-auto">
                         <table class="w-full text-sm">
                             <tbody class="divide-y divide-slate-100">
                                 {% for copy in found %}
@@ -116,7 +116,7 @@
             <div>
                 <h2 class="font-semibold text-slate-900 mb-3">Belum ditemukan ({{ missing|length }})</h2>
                 {% if missing %}
-                    <div class="rounded-xl border border-red-200 overflow-hidden">
+                    <div class="rounded-xl border border-red-200 overflow-x-auto">
                         <table class="w-full text-sm">
                             <tbody class="divide-y divide-slate-100">
                                 {% for copy in missing|slice:":200" %}
@@ -200,9 +200,17 @@
             );
             scanning = true;
         } catch (err) {
+            var name = err && err.name ? err.name : "";
+            var message = err && err.message ? err.message : "";
             readerBox.classList.add("hidden");
             toggle.textContent = "Nyalakan kamera";
-            setStatus("Kamera tidak dapat digunakan di perangkat ini. Ketik kode secara manual.");
+            if (name === "NotAllowedError" || /permission|denied/i.test(message)) {
+                setStatus("Izin kamera ditolak. Aktifkan izin kamera pada browser lalu coba lagi, atau ketik kode manual.");
+            } else if (/secure|https/i.test(message)) {
+                setStatus("Kamera membutuhkan koneksi aman (HTTPS atau localhost). Ketik kode secara manual.");
+            } else {
+                setStatus("Kamera tidak dapat digunakan di perangkat ini. Ketik kode secara manual.");
+            }
         }
     });
 })();

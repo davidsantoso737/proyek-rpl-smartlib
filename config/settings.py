@@ -77,6 +77,13 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'config.urls'
 
+# Cookie/transport hardening hanya saat produksi (DEBUG=False) agar
+# alur dev HTTP lokal tidak rusak.
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',

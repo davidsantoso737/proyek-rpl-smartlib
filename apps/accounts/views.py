@@ -3,6 +3,7 @@ import logging
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login, logout, update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
+from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -36,15 +37,54 @@ def _safe_next(request):
     return None
 
 
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_LOCKOUT_SECONDS = 300
+
+
+def _client_ip(request):
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "")
+
+
+def _login_throttle_key(request):
+    username = (request.POST.get("username") or "").strip().lower()
+    return f"login-attempts:{_client_ip(request)}:{username}"
+
+
 def login_view(request):
-    """Login + identifikasi role (FR-01, FR-02, BR-02)."""
+    """Login + identifikasi role (FR-01, FR-02, BR-02).
+
+    Brute-force mitigation: maksimal 5 kegagalan per username+IP
+    dalam 5 menit; kunci tanpa membocorkan validitas username
+    (pesan generik yang sama).
+    """
     if request.user.is_authenticated and request.user.is_active:
         return redirect("accounts:dashboard")
     if request.method == "POST":
         form = LoginForm(request, data=request.POST)
-        if form.is_valid():
+        throttle_key = _login_throttle_key(request)
+        if cache.get(throttle_key, 0) >= LOGIN_MAX_ATTEMPTS:
+            form.add_error(
+                None,
+                "Terlalu banyak percobaan masuk. "
+                "Coba lagi beberapa menit kemudian.",
+            )
+        elif form.is_valid():
+            cache.delete(throttle_key)
             login(request, form.get_user())
             return redirect(_safe_next(request) or "accounts:dashboard")
+        else:
+            attempts = cache.get(throttle_key, 0) + 1
+            cache.set(throttle_key, attempts, LOGIN_LOCKOUT_SECONDS)
+            logger.warning(
+                "Login gagal untuk %s dari %s (%s/%s percobaan).",
+                request.POST.get("username", "?"),
+                _client_ip(request),
+                attempts,
+                LOGIN_MAX_ATTEMPTS,
+            )
     else:
         form = LoginForm(request)
     return render(

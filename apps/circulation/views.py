@@ -189,14 +189,17 @@ def _render_approval_detail(request, loan, substitutions=None):
 def approval_approve_view(request, pk):
     """Setujui + hasilkan QR Pickup (FR-18 – FR-20)."""
     loan = _approval_loan_or_404(pk)
-    substitutions = {
-        int(key.split("_", 1)[1]): value
-        for key, value in request.POST.items()
-        if key.startswith("copy_") and value
-    }
+    substitutions = {}
+    for key, value in request.POST.items():
+        if key.startswith("copy_") and value:
+            try:
+                substitutions[int(key.split("_", 1)[1])] = value
+            except (ValueError, IndexError):
+                messages.error(request, "Pilihan eksemplar tidak valid.")
+                return _render_approval_detail(request, loan, {})
     try:
         approve_loan(loan.pk, request.user, substitutions)
-    except (ApprovalError, ValueError) as exc:
+    except ApprovalError as exc:
         messages.error(request, str(exc))
         return _render_approval_detail(request, loan, substitutions)
     messages.success(

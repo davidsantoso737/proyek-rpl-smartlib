@@ -16,7 +16,7 @@
 <body class="min-h-screen flex flex-col bg-slate-100 text-slate-900 antialiased">
 
     <header class="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 min-h-16 py-2 flex items-center justify-between gap-x-4 gap-y-2 flex-wrap">
             <a href="{% if user.is_authenticated %}{% url 'accounts:dashboard' %}{% else %}{% url 'accounts:login' %}{% endif %}"
                class="flex items-center gap-2.5 shrink-0">
                 <span class="flex items-center justify-center w-9 h-9 rounded-xl bg-blue-600 text-white text-lg font-bold shadow">
@@ -28,7 +28,7 @@
                 </span>
             </a>
 
-            <nav class="flex items-center gap-2 text-sm">
+            <nav class="flex items-center gap-2 text-sm flex-wrap justify-end">
                 {% if user.is_authenticated %}
                     <span class="hidden md:inline-flex items-center gap-2 mr-1 px-3 py-1.5 rounded-full bg-slate-100 text-slate-700">
                         <span class="font-medium">{{ user.full_name }}</span>
@@ -41,84 +41,84 @@
                         {% endif %}
                     </span>
                     <a href="{% url 'accounts:dashboard' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Dashboard
                     </a>
                     <a href="{% url 'catalog:catalog' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Katalog
                     </a>
                     <a href="{% url 'materials:list' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Bahan Ajar
                     </a>
                     {% if user.role == "PUSTAKAWAN" %}
                     <a href="{% url 'circulation:approval_list' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Persetujuan
                     </a>
                     <a href="{% url 'circulation:handover' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Penyerahan
                     </a>
                     <a href="{% url 'circulation:return' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Pengembalian
                     </a>
                     <a href="{% url 'core:policy' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Konfigurasi
                     </a>
                     <a href="{% url 'circulation:ebook_approval_list' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         E-Approval
                     </a>
                     <a href="{% url 'materials:review_list' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Verifikasi
                     </a>
                     <a href="{% url 'inventory:opname_list' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Stok Opname
                     </a>
                     <a href="{% url 'reports:report' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Laporan
                     </a>
                     <a href="{% url 'accounts:user_list' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Pengguna
                     </a>
                     {% else %}
                     <a href="{% url 'circulation:cart' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Keranjang{% if cart_item_count %} ({{ cart_item_count }}){% endif %}
                     </a>
                     <a href="{% url 'circulation:loan_list' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Riwayat
                     </a>
                     <a href="{% url 'circulation:my_ebooks' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         E-Book Saya
                     </a>
                     {% if user.role == "GURU" %}
                     <a href="{% url 'materials:my' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Materi Saya
                     </a>
                     {% endif %}
                     {% endif %}
                     <a href="{% url 'accounts:profile' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Profil
                     </a>
                     <a href="{% url 'notifications:list' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         Notifikasi{% if unread_notifications %} ({{ unread_notifications }}){% endif %}
                     </a>
                     <a href="{% url 'ai:assistant' %}"
-                       class="hidden sm:inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
+                       class="inline-block px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
                         AI Assistant
                     </a>
                     <form method="post" action="{% url 'accounts:logout' %}" class="inline">

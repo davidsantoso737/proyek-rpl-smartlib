@@ -49,7 +49,7 @@
         </p>
 
         {% if page_obj.object_list %}
-            <div class="rounded-xl border border-slate-200 overflow-hidden">
+            <div class="rounded-xl border border-slate-200 overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="bg-slate-50 text-left text-slate-500">
@@ -89,7 +89,7 @@
                                            class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium transition">Ubah</a>
                                         <form method="post" action="{% url 'accounts:user_toggle_active' account.pk %}" class="inline">
                                             {% csrf_token %}
-                                            <button type="submit"
+                                            <button type="submit" onclick="return confirm('Ubah status aktif akun ini?')"
                                                     class="px-3 py-1.5 rounded-lg text-xs font-medium transition {% if account.is_active %}bg-red-100 hover:bg-red-200 text-red-700{% else %}bg-emerald-100 hover:bg-emerald-200 text-emerald-700{% endif %}">
                                                 {% if account.is_active %}Nonaktifkan{% else %}Aktifkan{% endif %}
                                             </button>

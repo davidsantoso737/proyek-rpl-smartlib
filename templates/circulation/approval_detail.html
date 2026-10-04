@@ -26,7 +26,7 @@
             <form method="post" action="{% url 'circulation:approval_approve' loan.pk %}">
                 {% csrf_token %}
                 <h2 class="font-semibold text-slate-900 mb-3">Tetapkan eksemplar</h2>
-                <div class="rounded-xl border border-slate-200 overflow-hidden mb-4">
+                <div class="rounded-xl border border-slate-200 overflow-x-auto mb-4">
                     <table class="w-full text-sm">
                         <thead>
                             <tr class="bg-slate-50 text-left text-slate-500">
@@ -56,7 +56,7 @@
                         </tbody>
                     </table>
                 </div>
-                <button type="submit"
+                <button type="submit" onclick="return confirm('Setujui pengajuan dan buat QR Pickup?')"
                         class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
                     Setujui &amp; Buat QR Pickup
                 </button>
@@ -69,7 +69,7 @@
                 <div class="flex flex-col sm:flex-row gap-3">
                     <input type="text" name="reason" placeholder="Alasan penolakan (wajib)..."
                            class="flex-1 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500">
-                    <button type="submit"
+                    <button type="submit" onclick="return confirm('Tolak pengajuan ini?')"
                             class="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
                         Tolak
                     </button>
