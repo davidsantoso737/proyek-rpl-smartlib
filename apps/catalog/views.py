@@ -305,9 +305,63 @@ def _copy_bound_to_open_loan(copy):
     ).exists()
 
 
+def _create_copies_bulk(request, form, book):
+    """Buat 1..N eksemplar sekaligus; semua-atau-tidak-sama-sekali."""
+    from django.db import transaction
+
+    cleaned = form.cleaned_data
+    jumlah = cleaned.get("jumlah") or 1
+    manual = (cleaned.get("copy_code") or "").strip()
+    try:
+        with transaction.atomic():
+            created = []
+            for _ in range(jumlah):
+                code = (
+                    manual
+                    if jumlah == 1 and manual
+                    else generate_copy_code(book)
+                )
+                created.append(
+                    BookCopy.objects.create(
+                        book=book,
+                        copy_code=code,
+                        status=cleaned["status"],
+                        acquired_at=cleaned["acquired_at"],
+                        condition=cleaned["condition"],
+                        location=cleaned["location"],
+                    )
+                )
+    except IntegrityError:
+        form.add_error(
+            "copy_code",
+            "Kode eksemplar sudah dipakai. Gunakan kode lain.",
+        )
+        return render(
+            request,
+            "catalog/manage_copy_form.html",
+            {"form": form, "book": book, "copy": None},
+        )
+    if jumlah == 1:
+        messages.success(
+            request,
+            f"Eksemplar {created[0].copy_code} berhasil disimpan.",
+        )
+    else:
+        messages.success(
+            request,
+            f"{len(created)} eksemplar berhasil ditambahkan "
+            f"({created[0].copy_code} s/d {created[-1].copy_code}).",
+        )
+    return redirect("catalog:manage_book_copies", pk=book.pk)
+
+
 @role_required(User.Role.PUSTAKAWAN)
 def manage_copy_form_view(request, book_pk=None, pk=None):
-    """Tambah/ubah eksemplar + kode unik (FR-85, BR-81 – BR-84)."""
+    """Tambah/ubah eksemplar + kode unik (FR-85, BR-81 – BR-84).
+
+    Mode tambah mendukung bulk: jumlah > 1 membuat N eksemplar
+    sekaligus dengan kode unik per eksemplar.
+    """
     if pk:
         copy = get_object_or_404(
             BookCopy.objects.select_related("book"), pk=pk
@@ -320,13 +374,14 @@ def manage_copy_form_view(request, book_pk=None, pk=None):
     if request.method == "POST":
         form = BookCopyForm(request.POST, instance=copy)
         if form.is_valid():
+            if copy is None:
+                return _create_copies_bulk(request, form, book)
             new_copy = form.save(commit=False)
             new_copy.book = book
             if not (form.cleaned_data.get("copy_code") or "").strip():
                 new_copy.copy_code = generate_copy_code(book)
             if (
-                copy is not None
-                and new_copy.status != original_status
+                new_copy.status != original_status
                 and _copy_bound_to_open_loan(copy)
             ):
                 form.add_error(

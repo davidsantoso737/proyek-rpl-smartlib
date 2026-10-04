@@ -141,6 +141,7 @@ class CollectionAdminTests(TestCase):
             reverse("catalog:manage_copy_create", args=[self.book.pk]),
             {
                 "copy_code": "",
+                "jumlah": 1,
                 "status": "TERSEDIA",
                 "acquired_at": "2026-02-01",
                 "condition": "BAIK",
@@ -161,6 +162,7 @@ class CollectionAdminTests(TestCase):
             reverse("catalog:manage_copy_create", args=[self.book.pk]),
             {
                 "copy_code": "ADM-001",
+                "jumlah": 1,
                 "status": "TERSEDIA",
                 "acquired_at": "2026-02-01",
                 "condition": "BAIK",
@@ -272,6 +274,7 @@ class CollectionAdminTests(TestCase):
             reverse("catalog:manage_copy_create", args=[self.book.pk]),
             {
                 "copy_code": "ADM-777",
+                "jumlah": 1,
                 "status": "TERSEDIA",
                 "acquired_at": "2026-02-01",
                 "condition": "BAIK",
@@ -283,3 +286,45 @@ class CollectionAdminTests(TestCase):
             reverse("circulation:copy_label", args=[copy.pk])
         )
         self.assertContains(response, "ADM-777")
+
+    def test_tambah_eksemplar_bulk(self):
+        self.client.force_login(self.pus)
+        response = self.client.post(
+            reverse("catalog:manage_copy_create", args=[self.book.pk]),
+            {
+                "copy_code": "",
+                "jumlah": 3,
+                "status": "TERSEDIA",
+                "acquired_at": "2026-02-01",
+                "condition": "BAIK",
+                "location": "RAK-A2",
+            },
+        )
+        self.assertRedirects(
+            response,
+            reverse("catalog:manage_book_copies", args=[self.book.pk]),
+        )
+        codes = sorted(
+            BookCopy.objects.filter(book=self.book).values_list(
+                "copy_code", flat=True
+            )
+        )
+        self.assertEqual(len(codes), 4)
+        self.assertEqual(len(set(codes)), 4)
+        self.assertIn("ADM-001", codes)
+
+    def test_bulk_jumlah_invalid_ditolak(self):
+        self.client.force_login(self.pus)
+        response = self.client.post(
+            reverse("catalog:manage_copy_create", args=[self.book.pk]),
+            {
+                "copy_code": "",
+                "jumlah": 0,
+                "status": "TERSEDIA",
+                "acquired_at": "2026-02-01",
+                "condition": "BAIK",
+                "location": "RAK-A2",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(BookCopy.objects.filter(book=self.book).count(), 1)

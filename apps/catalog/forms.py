@@ -77,12 +77,22 @@ class BookForm(forms.ModelForm):
 
 
 class BookCopyForm(forms.ModelForm):
-    """Tambah/ubah eksemplar (FR-85). Kode kosong -> dibuatkan sistem (BR-81)."""
+    """Tambah/ubah eksemplar (FR-85). Kode kosong -> dibuatkan sistem (BR-81).
+
+    Mode tambah mendukung bulk: isi jumlah > 1 dan sistem generate kode
+    unik untuk tiap eksemplar (atribut lain berlaku untuk semuanya).
+    """
 
     copy_code = forms.CharField(
-        label="Kode eksemplar (kosongkan untuk otomatis)",
+        label="Kode eksemplar (kosongkan untuk otomatis; diabaikan bila jumlah > 1)",
         max_length=50,
         required=False,
+    )
+    jumlah = forms.IntegerField(
+        label="Jumlah eksemplar",
+        min_value=1,
+        max_value=100,
+        initial=1,
     )
     status = forms.ChoiceField(
         label="Status",
@@ -104,6 +114,9 @@ class BookCopyForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            # Mode ubah: satu eksemplar, tanpa jumlah.
+            del self.fields["jumlah"]
         style_fields(self)
 
 
