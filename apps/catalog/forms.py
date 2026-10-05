@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Author, Book, BookCopy, Category
+from .models import Author, Book, BookCopy, Category, Ebook, EbookAuthor
 
 INPUT_CLASS = (
     "w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm "
@@ -143,6 +143,11 @@ class AuthorForm(forms.ModelForm):
         style_fields(self)
 
 
+# Tipe/ukuran e-book: keputusan teknis terdokumentasi (NFR-27).
+EBOOK_EXTENSIONS = frozenset({"pdf", "epub"})
+EBOOK_MAX_SIZE = 50 * 1024 * 1024
+
+
 def generate_copy_code(book):
     """Kode unik sistematis; tetap menghormati unique DB (BR-81)."""
     seq = book.copies.count() + 1
@@ -151,3 +156,80 @@ def generate_copy_code(book):
         if not BookCopy.objects.filter(copy_code=code).exists():
             return code
         seq += 1
+
+
+class EbookForm(forms.ModelForm):
+    """Tambah/ubah e-book + penulisnya (FR-82 – FR-84).
+
+    File divalidasi tipe/ukuran (NFR-27); eisbn unik ditegakkan di level
+    form karena kolom DB existing tidak unique (tanpa migration).
+    """
+
+    authors = forms.ModelMultipleChoiceField(
+        label="Penulis",
+        queryset=Author.objects.order_by("name"),
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+    )
+    file = forms.FileField(
+        label="File e-book (pdf/epub, maks 50 MB)",
+        required=False,
+    )
+
+    class Meta:
+        model = Ebook
+        fields = [
+            "category", "eisbn", "title", "description", "publisher",
+            "publication_year", "edition", "cover_url", "version",
+            "is_active",
+        ]
+        labels = {
+            "category": "Kategori",
+            "eisbn": "E-ISBN",
+            "title": "Judul",
+            "description": "Deskripsi",
+            "publisher": "Penerbit",
+            "publication_year": "Tahun terbit",
+            "edition": "Edisi",
+            "cover_url": "URL sampul",
+            "version": "Versi",
+            "is_active": "Aktif di katalog",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["authors"].initial = Author.objects.filter(
+                ebookauthor__ebook=self.instance
+            )
+            self.fields["file"].help_text = (
+                "Kosongkan bila file tidak diganti."
+            )
+        style_fields(self)
+
+    def clean_eisbn(self):
+        eisbn = (self.cleaned_data.get("eisbn") or "").strip()
+        qs = Ebook.objects.filter(eisbn=eisbn)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError("E-ISBN sudah dipakai e-book lain.")
+        return eisbn
+
+    def save(self, commit=True):
+        ebook = super().save(commit=commit)
+        if commit:
+            EbookAuthor.objects.filter(ebook=ebook).exclude(
+                author__in=self.cleaned_data["authors"]
+            ).delete()
+            existing = set(
+                EbookAuthor.objects.filter(ebook=ebook).values_list(
+                    "author_id", flat=True
+                )
+            )
+            EbookAuthor.objects.bulk_create(
+                EbookAuthor(ebook=ebook, author=author)
+                for author in self.cleaned_data["authors"]
+                if author.pk not in existing
+            )
+        return ebook

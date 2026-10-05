@@ -1,13 +1,16 @@
 import datetime
+import tempfile
 from decimal import Decimal
+from pathlib import Path
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.catalog.models import (
-    Author, Book, BookAuthor, BookCopy, Category,
+    Author, Book, BookAuthor, BookCopy, Category, Ebook, EbookAuthor,
 )
 from apps.circulation.services import (
     activate_handover, approve_loan, request_loan,
@@ -328,3 +331,184 @@ class CollectionAdminTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(BookCopy.objects.filter(book=self.book).count(), 1)
+
+
+TMP_EBOOK_ROOT = Path(tempfile.mkdtemp(prefix="ebook_admin_test_"))
+
+
+@override_settings(EBOOK_STORAGE_ROOT=TMP_EBOOK_ROOT)
+class EbookAdminTests(TestCase):
+    def setUp(self):
+        self.pus = self._make_user("pus1", User.Role.PUSTAKAWAN)
+        self.siswa = self._make_user("siswa1", User.Role.SISWA, nis="10001")
+        self.guru = self._make_user("guru1", User.Role.GURU, nip="20001")
+        self.category = Category.objects.create(name="Digital")
+        self.author = Author.objects.create(name="Penulis E")
+        self.ebook = Ebook.objects.create(
+            category=self.category,
+            eisbn="E-ADM-1",
+            title="Kelola E",
+            file_path="lama.pdf",
+            file_name="lama.pdf",
+            file_type="pdf",
+            file_size=64,
+            version="1.0",
+        )
+        (TMP_EBOOK_ROOT / "lama.pdf").write_bytes(b"%PDF-1.4 lama")
+        EbookAuthor.objects.create(ebook=self.ebook, author=self.author)
+
+    def _make_user(self, username, role, password="secret123", **extra):
+        defaults = {"full_name": f"{username} Full"}
+        defaults.update(extra)
+        user = User(username=username, role=role, **defaults)
+        user.set_password(password)
+        user.full_clean()
+        user.save()
+        return user
+
+    def _ebook_data(self, **overrides):
+        data = {
+            "category": self.category.pk,
+            "eisbn": "E-BARU-1",
+            "title": "Ebook Baru",
+            "description": "",
+            "publisher": "",
+            "publication_year": "",
+            "edition": "",
+            "cover_url": "",
+            "version": "1.0",
+            "is_active": True,
+            "authors": [self.author.pk],
+            "file": SimpleUploadedFile("baru.pdf", b"%PDF-1.4 baru"),
+        }
+        data.update(overrides)
+        return data
+
+    def test_tambah_ebook_dengan_file(self):
+        self.client.force_login(self.pus)
+        response = self.client.post(
+            reverse("catalog:manage_ebook_create"), self._ebook_data()
+        )
+        self.assertRedirects(response, reverse("catalog:manage_ebooks"))
+        ebook = Ebook.objects.get(eisbn="E-BARU-1")
+        self.assertEqual(ebook.file_type, "pdf")
+        self.assertEqual(ebook.file_size, len(b"%PDF-1.4 baru"))
+        self.assertTrue((TMP_EBOOK_ROOT / ebook.file_path).is_file())
+        self.assertEqual(
+            list(Author.objects.filter(ebookauthor__ebook=ebook)),
+            [self.author],
+        )
+        self.client.force_login(self.siswa)
+        self.assertContains(
+            self.client.get(reverse("catalog:catalog")), "Ebook Baru"
+        )
+
+    def test_tipe_invalid_dan_oversize_ditolak(self):
+        self.client.force_login(self.pus)
+        before = set(TMP_EBOOK_ROOT.iterdir())
+        response = self.client.post(
+            reverse("catalog:manage_ebook_create"),
+            self._ebook_data(
+                file=SimpleUploadedFile("x.exe", b"MZ..."),
+            ),
+        )
+        self.assertEqual(response.status_code, 200)
+        response = self.client.post(
+            reverse("catalog:manage_ebook_create"),
+            self._ebook_data(
+                eisbn="E-BESAR-1",
+                file=SimpleUploadedFile(
+                    "besar.pdf", b"x" * (51 * 1024 * 1024)
+                ),
+            ),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Ebook.objects.filter(eisbn="E-BESAR-1").exists())
+        self.assertEqual(set(TMP_EBOOK_ROOT.iterdir()), before)
+
+    def test_eisbn_ganda_ditolak(self):
+        self.client.force_login(self.pus)
+        response = self.client.post(
+            reverse("catalog:manage_ebook_create"),
+            self._ebook_data(eisbn="E-ADM-1"),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Ebook.objects.filter(eisbn="E-ADM-1").count(), 1)
+
+    def test_ubah_metadata_tanpa_ganti_file(self):
+        self.client.force_login(self.pus)
+        data = self._ebook_data()
+        data.update(
+            {
+                "eisbn": "E-ADM-1",
+                "title": "Kelola E Revisi",
+                "authors": [],
+            }
+        )
+        del data["file"]
+        response = self.client.post(
+            reverse("catalog:manage_ebook_update", args=[self.ebook.pk]),
+            data,
+        )
+        self.assertRedirects(response, reverse("catalog:manage_ebooks"))
+        self.ebook.refresh_from_db()
+        self.assertEqual(self.ebook.title, "Kelola E Revisi")
+        self.assertEqual(self.ebook.file_path, "lama.pdf")
+        self.assertTrue((TMP_EBOOK_ROOT / "lama.pdf").is_file())
+
+    def test_ganti_file_hapus_yang_lama(self):
+        self.client.force_login(self.pus)
+        data = self._ebook_data()
+        data.update({"eisbn": "E-ADM-1", "title": "Kelola E"})
+        del data["authors"]
+        response = self.client.post(
+            reverse("catalog:manage_ebook_update", args=[self.ebook.pk]),
+            data,
+        )
+        self.assertRedirects(response, reverse("catalog:manage_ebooks"))
+        self.ebook.refresh_from_db()
+        self.assertNotEqual(self.ebook.file_path, "lama.pdf")
+        self.assertFalse((TMP_EBOOK_ROOT / "lama.pdf").exists())
+        self.assertTrue(
+            (TMP_EBOOK_ROOT / self.ebook.file_path).is_file()
+        )
+
+    def test_nonaktifkan_sembunyi_dari_katalog(self):
+        self.client.force_login(self.pus)
+        self.client.post(
+            reverse("catalog:manage_ebook_toggle", args=[self.ebook.pk])
+        )
+        self.ebook.refresh_from_db()
+        self.assertFalse(self.ebook.is_active)
+        self.client.force_login(self.siswa)
+        response = self.client.get(reverse("catalog:catalog"))
+        titles = [
+            item["title"]
+            for item in response.context["page_obj"].object_list
+        ]
+        self.assertNotIn("Kelola E", titles)
+
+    def test_unauthorized(self):
+        urls = [
+            reverse("catalog:manage_ebooks"),
+            reverse("catalog:manage_ebook_create"),
+        ]
+        for url in urls:
+            self.assertEqual(self.client.get(url).status_code, 302)
+        self.client.force_login(self.siswa)
+        for url in urls:
+            self.assertEqual(self.client.get(url).status_code, 403)
+        self.assertEqual(
+            self.client.post(
+                reverse("catalog:manage_ebook_create"), self._ebook_data()
+            ).status_code,
+            403,
+        )
+        self.client.force_login(self.guru)
+        self.assertEqual(
+            self.client.get(
+                reverse("catalog:manage_ebooks")
+            ).status_code,
+            403,
+        )
+        self.assertFalse(Ebook.objects.filter(eisbn="E-BARU-1").exists())

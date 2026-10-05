@@ -59,4 +59,20 @@ urlpatterns = [
         views.manage_author_delete_view,
         name="manage_author_delete",
     ),
+    path("kelola/ebook/", views.manage_ebook_list_view, name="manage_ebooks"),
+    path(
+        "kelola/ebook/tambah/",
+        views.manage_ebook_form_view,
+        name="manage_ebook_create",
+    ),
+    path(
+        "kelola/ebook/<int:pk>/ubah/",
+        views.manage_ebook_form_view,
+        name="manage_ebook_update",
+    ),
+    path(
+        "kelola/ebook/<int:pk>/status/",
+        views.manage_ebook_toggle_view,
+        name="manage_ebook_toggle",
+    ),
 ]

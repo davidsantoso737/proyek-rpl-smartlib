@@ -10,7 +10,16 @@ from django.views.decorators.http import require_POST
 from apps.accounts.authorization import active_login_required, role_required
 
 from .availability import STATUS_TERSEDIA, count_available_copies
-from .forms import AuthorForm, BookCopyForm, BookForm, CategoryForm, generate_copy_code
+from .forms import (
+    EBOOK_EXTENSIONS,
+    EBOOK_MAX_SIZE,
+    AuthorForm,
+    BookCopyForm,
+    BookForm,
+    CategoryForm,
+    EbookForm,
+    generate_copy_code,
+)
 from .models import Author, Book, BookAuthor, BookCopy, Category, Ebook, EbookAuthor
 
 User = get_user_model()
@@ -506,3 +515,191 @@ def manage_author_delete_view(request, pk):
     else:
         messages.success(request, f"Penulis {author.name} dihapus.")
     return redirect("catalog:manage_authors")
+
+
+def _ebook_storage_root():
+    from pathlib import Path
+
+    from django.conf import settings as dj_settings
+
+    root = Path(dj_settings.EBOOK_STORAGE_ROOT)
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _validate_ebook_upload(uploaded):
+    """Validasi tipe/ukuran/integritas file e-book (NFR-27)."""
+    if uploaded is None or uploaded.size == 0:
+        raise ValueError("File e-book tidak boleh kosong.")
+    from pathlib import Path
+
+    ext = Path(uploaded.name).suffix.lower().lstrip(".")
+    if ext not in EBOOK_EXTENSIONS:
+        raise ValueError(
+            f"Tipe file .{ext or '?'} tidak diizinkan. "
+            "Gunakan: pdf, epub."
+        )
+    if uploaded.size > EBOOK_MAX_SIZE:
+        raise ValueError("Ukuran file melebihi 50 MB.")
+    return ext
+
+
+def _store_ebook_upload(uploaded, ext):
+    import uuid
+
+    name = f"{uuid.uuid4().hex}.{ext}"
+    target = _ebook_storage_root() / name
+    try:
+        with open(target, "wb") as dest:
+            for chunk in uploaded.chunks():
+                dest.write(chunk)
+    except Exception:
+        target.unlink(missing_ok=True)
+        raise ValueError("File gagal diproses dan tidak disimpan.")
+    return name
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def manage_ebook_list_view(request):
+    """Daftar e-book untuk pengelolaan (FR-82)."""
+    q = (request.GET.get("q") or "").strip()
+    ebooks = Ebook.objects.select_related("category").order_by("title")
+    if q:
+        ebooks = ebooks.filter(
+            Q(title__icontains=q) | Q(eisbn__icontains=q)
+        )
+    paginator = Paginator(ebooks, PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    params = request.GET.copy()
+    params.pop("page", None)
+    return render(
+        request,
+        "catalog/manage_ebook_list.html",
+        {
+            "page_obj": page_obj,
+            "q": q,
+            "querystring": params.urlencode(),
+            "result_count": paginator.count,
+        },
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def manage_ebook_form_view(request, pk=None):
+    """Tambah/ubah e-book + file privat (FR-82 – FR-84, NFR-26 – NFR-28).
+
+    Tanpa hapus: riwayat EbookLoan dilindungi PROTECT; nonaktifkan bila
+    perlu. File baru menggantikan lama hanya setelah baris tersimpan.
+    """
+    ebook = get_object_or_404(Ebook, pk=pk) if pk else None
+    if request.method == "POST":
+        form = EbookForm(request.POST, request.FILES, instance=ebook)
+        uploaded = request.FILES.get("file")
+        if ebook is None and uploaded is None:
+            form.add_error("file", "File e-book wajib diunggah.")
+        elif uploaded is not None:
+            try:
+                _validate_ebook_upload(uploaded)
+            except ValueError as exc:
+                form.add_error("file", str(exc))
+        if form.is_valid():
+            if ebook is None:
+                ext = _validate_ebook_upload(uploaded)
+                try:
+                    stored = _store_ebook_upload(uploaded, ext)
+                except ValueError as exc:
+                    form.add_error("file", str(exc))
+                    return render(
+                        request,
+                        "catalog/manage_ebook_form.html",
+                        {"form": form, "ebook": ebook},
+                    )
+                try:
+                    ebook = Ebook(
+                        category=form.cleaned_data["category"],
+                        eisbn=form.cleaned_data["eisbn"],
+                        title=form.cleaned_data["title"],
+                        description=(
+                            form.cleaned_data["description"] or None
+                        ),
+                        publisher=form.cleaned_data["publisher"] or None,
+                        publication_year=form.cleaned_data[
+                            "publication_year"
+                        ],
+                        edition=form.cleaned_data["edition"] or None,
+                        cover_url=form.cleaned_data["cover_url"] or None,
+                        file_path=stored,
+                        file_name=uploaded.name,
+                        file_type=ext,
+                        file_size=uploaded.size,
+                        version=form.cleaned_data["version"],
+                        is_active=form.cleaned_data["is_active"],
+                    )
+                    ebook.save()
+                    form.instance = ebook
+                    form.save()
+                except Exception:
+                    (_ebook_storage_root() / stored).unlink(
+                        missing_ok=True
+                    )
+                    raise
+                messages.success(
+                    request, f"E-book {ebook.title} berhasil ditambahkan."
+                )
+                return redirect("catalog:manage_ebooks")
+            old_path = ebook.file_path
+            saved = form.save()
+            if uploaded is not None:
+                ext = _validate_ebook_upload(uploaded)
+                try:
+                    stored = _store_ebook_upload(uploaded, ext)
+                except ValueError as exc:
+                    form.add_error("file", str(exc))
+                    return render(
+                        request,
+                        "catalog/manage_ebook_form.html",
+                        {"form": form, "ebook": saved},
+                    )
+                saved.file_path = stored
+                saved.file_name = uploaded.name
+                saved.file_type = ext
+                saved.file_size = uploaded.size
+                try:
+                    saved.save(
+                        update_fields=[
+                            "file_path", "file_name", "file_type",
+                            "file_size", "updated_at",
+                        ]
+                    )
+                except Exception:
+                    (_ebook_storage_root() / stored).unlink(
+                        missing_ok=True
+                    )
+                    raise
+                (_ebook_storage_root() / old_path).unlink(missing_ok=True)
+            messages.success(
+                request, f"E-book {saved.title} berhasil disimpan."
+            )
+            return redirect("catalog:manage_ebooks")
+    else:
+        form = EbookForm(instance=ebook)
+    return render(
+        request,
+        "catalog/manage_ebook_form.html",
+        {"form": form, "ebook": ebook},
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+@require_POST
+def manage_ebook_toggle_view(request, pk):
+    """Aktif/nonaktifkan e-book di katalog (bukan hapus)."""
+    ebook = get_object_or_404(Ebook, pk=pk)
+    ebook.is_active = not ebook.is_active
+    ebook.save(update_fields=["is_active", "updated_at"])
+    messages.success(
+        request,
+        f"E-book {ebook.title} kini "
+        f"{'aktif' if ebook.is_active else 'nonaktif'}.",
+    )
+    return redirect("catalog:manage_ebooks")
