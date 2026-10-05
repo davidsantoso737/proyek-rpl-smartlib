@@ -4,34 +4,31 @@
 
 {% block content %}
 
-<div class="mb-4">
-    <a href="{% url 'circulation:approval_list' %}" class="text-sm text-blue-600 hover:underline font-medium">
-        &larr; Kembali ke daftar persetujuan
-    </a>
+{% url 'circulation:approval_list' as back_url %}
+{% include "partials/_back_link.html" with href=back_url label="Kembali ke daftar persetujuan" %}
+
+<div class="mb-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+        Pengajuan #{{ loan.pk }} &middot; {{ loan.user.full_name }}
+    </h1>
+    <p class="text-slate-500 text-sm mt-1">
+        {{ loan.user.get_role_display }} &middot; diajukan {{ loan.requested_at|date:"d M Y H:i" }} &middot;
+        status <span class="font-semibold">{{ loan.status }}</span>
+    </p>
 </div>
 
-<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
-    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
-        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-            Pengajuan #{{ loan.pk }} &middot; {{ loan.user.full_name }}
-        </h1>
-        <p class="text-slate-500 text-sm mt-1">
-            {{ loan.user.get_role_display }} &middot; diajukan {{ loan.requested_at|date:"d M Y H:i" }} &middot;
-            status <span class="font-semibold">{{ loan.status }}</span>
-        </p>
-    </div>
-
-    <div class="p-6 sm:p-8 space-y-6">
+<div class="space-y-6">
+    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6 space-y-6">
         {% if loan.status == "PENDING_APPROVAL" %}
             <form method="post" action="{% url 'circulation:approval_approve' loan.pk %}">
                 {% csrf_token %}
-                <h2 class="font-semibold text-slate-900 mb-3">Tetapkan eksemplar</h2>
-                <div class="rounded-xl border border-slate-200 overflow-x-auto mb-4">
+                <h2 class="text-base font-semibold text-slate-900 mb-3">Tetapkan eksemplar</h2>
+                <div class="rounded-xl border border-slate-200 overflow-x-auto mb-4" tabindex="0" role="region" aria-label="Tabel eksemplar ditetapkan, dapat digeser horizontal">
                     <table class="w-full text-sm">
                         <thead>
                             <tr class="bg-slate-50 text-left text-slate-500">
-                                <th class="px-4 py-2.5 font-medium">Judul diminta</th>
-                                <th class="px-4 py-2.5 font-medium">Eksemplar ditetapkan</th>
+                                <th scope="col" class="px-4 py-2.5 font-medium">Judul diminta</th>
+                                <th scope="col" class="px-4 py-2.5 font-medium">Eksemplar ditetapkan</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -39,11 +36,11 @@
                                 <tr>
                                     <td class="px-4 py-2.5">
                                         {{ row.item.book_copy.book.title }}
-                                        <span class="block text-xs text-slate-400">diminta: {{ row.item.book_copy.copy_code }}</span>
+                                        <span class="block text-xs text-slate-500">diminta: {{ row.item.book_copy.copy_code }}</span>
                                     </td>
                                     <td class="px-4 py-2.5">
                                         <select name="copy_{{ row.item.pk }}"
-                                                class="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                                class="max-w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                                             {% for copy in row.choices %}
                                                 <option value="{{ copy.pk }}" {% if row.selected == copy.pk|stringformat:"s" %}selected{% endif %}>
                                                     {{ copy.copy_code }} &middot; {{ copy.location }}
@@ -57,7 +54,7 @@
                     </table>
                 </div>
                 <button type="submit" onclick="return confirm('Setujui pengajuan dan buat QR Pickup?')"
-                        class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
+                        class="w-full sm:w-auto bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
                     Setujui &amp; Buat QR Pickup
                 </button>
             </form>
@@ -65,10 +62,10 @@
             <form method="post" action="{% url 'circulation:approval_reject' loan.pk %}"
                   class="border-t border-slate-100 pt-6">
                 {% csrf_token %}
-                <h2 class="font-semibold text-slate-900 mb-3">Tolak pengajuan</h2>
+                <h2 class="text-base font-semibold text-slate-900 mb-3">Tolak pengajuan</h2>
                 <div class="flex flex-col sm:flex-row gap-3">
                     <input type="text" name="reason" placeholder="Alasan penolakan (wajib)..."
-                           class="flex-1 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500">
+                           class="flex-1 min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500">
                     <button type="submit" onclick="return confirm('Tolak pengajuan ini?')"
                             class="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
                         Tolak

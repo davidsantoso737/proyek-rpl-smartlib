@@ -1,0 +1,20 @@
+{# SmartLib shared pagination (F-C02). Contract: page_obj (required), #}
+{# querystring (optional; when absent or empty, plain ?page= links are built). #}
+{# Behavior matches the pre-existing per-page blocks: rendered only when #}
+{# has_other_pages; previous/next links shown only when available; existing #}
+{# GET filters preserved via querystring. #}
+{% if page_obj.has_other_pages %}
+<nav aria-label="Pagination" class="flex items-center justify-center gap-2 mt-6 text-sm">
+    {% if page_obj.has_previous %}
+        <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.previous_page_number }}" rel="prev"
+           class="inline-flex items-center min-h-[44px] min-w-[44px] justify-center px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-medium transition">Sebelumnya</a>
+    {% endif %}
+    <span class="px-3 py-2 text-slate-500" aria-current="page">
+        Halaman {{ page_obj.number }} dari {{ page_obj.paginator.num_pages }}
+    </span>
+    {% if page_obj.has_next %}
+        <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.next_page_number }}" rel="next"
+           class="inline-flex items-center min-h-[44px] min-w-[44px] justify-center px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-medium transition">Berikutnya</a>
+    {% endif %}
+</nav>
+{% endif %}

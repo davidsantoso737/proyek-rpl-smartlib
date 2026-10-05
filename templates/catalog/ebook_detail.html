@@ -4,27 +4,24 @@
 
 {% block content %}
 
-<div class="mb-4">
-    <a href="{% url 'catalog:catalog' %}" class="text-sm text-blue-600 hover:underline font-medium">
-        &larr; Kembali ke katalog
-    </a>
+{% url 'catalog:catalog' as back_url %}
+{% include "partials/_back_link.html" with href=back_url label="Kembali ke katalog" %}
+
+<div class="mb-6">
+    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-700 mb-3">E-Book</span>
+    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+        {{ ebook.title }}
+    </h1>
+    <p class="text-slate-500 text-sm mt-1">
+        {% for author in authors %}{{ author.name }}{% if not forloop.last %}, {% endif %}{% empty %}Penulis tidak tercatat{% endfor %}
+        &middot; {{ ebook.category.name }}
+    </p>
 </div>
 
-<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
-    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
-        <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-700 mb-3">E-Book</span>
-        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-            {{ ebook.title }}
-        </h1>
-        <p class="text-slate-500 text-sm mt-1">
-            {% for author in authors %}{{ author.name }}{% if not forloop.last %}, {% endif %}{% empty %}Penulis tidak tercatat{% endfor %}
-            &middot; {{ ebook.category.name }}
-        </p>
-    </div>
-
-    <div class="grid gap-6 md:grid-cols-2 p-6 sm:p-8">
-        <div>
-            <h2 class="font-semibold text-slate-900 mb-3">Informasi koleksi</h2>
+<div class="space-y-6">
+    <div class="grid gap-6 md:grid-cols-2">
+        <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
+            <h2 class="text-base font-semibold text-slate-900 mb-3">Informasi koleksi</h2>
             <dl class="text-sm space-y-2">
                 <div class="flex justify-between gap-4">
                     <dt class="text-slate-500">E-ISBN</dt>
@@ -49,20 +46,20 @@
             </dl>
 
             {% if ebook.description %}
-                <h2 class="font-semibold text-slate-900 mt-6 mb-2">Deskripsi</h2>
+                <h2 class="text-base font-semibold text-slate-900 mt-6 mb-2">Deskripsi</h2>
                 <p class="text-sm text-slate-600 leading-relaxed">{{ ebook.description }}</p>
             {% endif %}
 
             {% for author in authors %}
                 {% if author.bio %}
-                    <h2 class="font-semibold text-slate-900 mt-6 mb-2">Tentang {{ author.name }}</h2>
+                    <h2 class="text-base font-semibold text-slate-900 mt-6 mb-2">Tentang {{ author.name }}</h2>
                     <p class="text-sm text-slate-600 leading-relaxed">{{ author.bio }}</p>
                 {% endif %}
             {% endfor %}
         </div>
 
-        <div>
-            <h2 class="font-semibold text-slate-900 mb-3">File e-book</h2>
+        <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
+            <h2 class="text-base font-semibold text-slate-900 mb-3">File e-book</h2>
             <dl class="text-sm space-y-2 mb-4">
                 <div class="flex justify-between gap-4">
                     <dt class="text-slate-500">Format</dt>
@@ -77,7 +74,7 @@
                     <dd class="font-medium text-right">{{ ebook.version }}</dd>
                 </div>
             </dl>
-            <p class="bg-violet-50 border border-violet-200 text-violet-800 px-4 py-2.5 rounded-xl text-sm mb-4">
+            <p class="bg-sky-50 border border-sky-200 text-sky-800 px-4 py-2.5 rounded-xl text-sm mb-4">
                 E-book dibedakan dari buku fisik: akses baca diberikan melalui peminjaman e-book yang disetujui pustakawan.
             </p>
             {% if user.is_authenticated and user.role != "PUSTAKAWAN" %}
@@ -86,7 +83,7 @@
                         <p class="font-semibold text-emerald-900 mb-1">Anda memiliki akses aktif</p>
                         <p class="text-emerald-800 mb-3">Berlaku sampai {{ loan_info.active.expires_at|date:"d M Y H:i" }}.</p>
                         <a href="{% url 'circulation:ebook_reader' loan_info.active.pk %}"
-                           class="inline-block px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition">
+                           class="inline-block px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition">
                             Baca sekarang
                         </a>
                     </div>
@@ -98,7 +95,7 @@
                     <form method="post" action="{% url 'circulation:ebook_request' ebook.pk %}">
                         {% csrf_token %}
                         <button type="submit"
-                                class="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm">
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm">
                             Ajukan peminjaman e-book
                         </button>
                     </form>

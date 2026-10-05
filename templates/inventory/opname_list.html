@@ -4,24 +4,24 @@
 
 {% block content %}
 
-<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
-    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
-        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-            Stock Opname
-        </h1>
-        <p class="text-slate-500 text-sm mt-1">
-            Cakupan: seluruh eksemplar koleksi. Hasil hanya perbandingan, tanpa koreksi otomatis.
-        </p>
-    </div>
+<div class="mb-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+        Stock Opname
+    </h1>
+    <p class="text-slate-500 text-sm mt-1">
+        Cakupan: seluruh eksemplar koleksi. Hasil hanya perbandingan, tanpa koreksi otomatis.
+    </p>
+</div>
 
-    <div class="p-6 sm:p-8 space-y-6">
+<div class="space-y-6">
+    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6 space-y-6">
         {% if running %}
             <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 flex flex-wrap items-center justify-between gap-3">
                 <p class="text-sm text-amber-800">
                     Sesi #{{ running.pk }} sedang berjalan (mulai {{ running.started_at|date:"d M Y H:i" }}).
                 </p>
                 <a href="{% url 'inventory:opname_detail' running.pk %}"
-                   class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition">
+                   class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition">
                     Lanjutkan sesi
                 </a>
             </div>
@@ -29,7 +29,7 @@
             <form method="post" action="{% url 'inventory:opname_start' %}" class="flex flex-col sm:flex-row gap-3">
                 {% csrf_token %}
                 <input type="text" name="notes" placeholder="Catatan sesi (opsional)..."
-                       class="flex-1 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                       class="flex-1 min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 <button type="submit"
                         class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
                     Mulai opname baru
@@ -38,12 +38,12 @@
         {% endif %}
 
         <div>
-            <h2 class="font-semibold text-slate-900 mb-3">Riwayat sesi</h2>
+            <h2 class="text-base font-semibold text-slate-900 mb-3">Riwayat sesi</h2>
             {% if opnames %}
                 <div class="space-y-2">
                     {% for opname in opnames %}
                         <a href="{% url 'inventory:opname_detail' opname.pk %}"
-                           class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 p-4 hover:shadow-md transition">
+                           class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-4">
                             <div>
                                 <p class="font-semibold text-slate-900">
                                     Sesi #{{ opname.pk }} &middot; {{ opname.started_by.full_name }}
@@ -54,9 +54,9 @@
                                 </p>
                             </div>
                             {% if opname.status == "BERJALAN" %}
-                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Berjalan</span>
+                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-700">Berjalan</span>
                             {% else %}
-                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Selesai</span>
+                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-100 text-emerald-700">Selesai</span>
                             {% endif %}
                         </a>
                     {% endfor %}

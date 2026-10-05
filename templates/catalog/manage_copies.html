@@ -4,14 +4,10 @@
 
 {% block content %}
 
-<div class="mb-4">
-    <a href="{% url 'catalog:manage_books' %}" class="text-sm text-blue-600 hover:underline font-medium">
-        &larr; Kembali ke kelola koleksi
-    </a>
-</div>
+{% url 'catalog:manage_books' as back_url %}
+{% include "partials/_back_link.html" with href=back_url label="Kembali ke kelola koleksi" %}
 
-<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
-    <div class="border-b border-slate-100 px-6 sm:px-8 py-6 flex flex-wrap items-start justify-between gap-3">
+<div class="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
             <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
                 {{ book.title }}
@@ -27,17 +23,18 @@
         </a>
     </div>
 
-    <div class="p-6 sm:p-8">
+  <div class="space-y-6">
+    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
         {% if copies %}
-            <div class="rounded-xl border border-slate-200 overflow-x-auto">
-                <table class="w-full text-sm whitespace-nowrap">
+            <div class="rounded-xl border border-slate-200 overflow-x-auto" tabindex="0" role="region" aria-label="Tabel eksemplar buku, dapat digeser horizontal">
+                <table class="w-full text-sm">
                     <thead>
                         <tr class="bg-slate-50 text-left text-slate-500">
-                            <th class="px-4 py-2.5 font-medium">Kode</th>
-                            <th class="px-4 py-2.5 font-medium">Status</th>
-                            <th class="px-4 py-2.5 font-medium">Kondisi</th>
-                            <th class="px-4 py-2.5 font-medium">Lokasi</th>
-                            <th class="px-4 py-2.5 font-medium text-right">Aksi</th>
+                            <th scope="col" class="px-4 py-2.5 font-medium">Kode</th>
+                            <th scope="col" class="px-4 py-2.5 font-medium">Status</th>
+                            <th scope="col" class="px-4 py-2.5 font-medium">Kondisi</th>
+                            <th scope="col" class="px-4 py-2.5 font-medium">Lokasi</th>
+                            <th scope="col" class="px-4 py-2.5 font-medium text-right">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -50,9 +47,9 @@
                                 <td class="px-4 py-2.5">
                                     <div class="flex justify-end gap-2">
                                         <a href="{% url 'circulation:copy_label' copy.pk %}" target="_blank" rel="noopener"
-                                           class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium transition">QR</a>
+                                           class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium transition">QR</a>
                                         <a href="{% url 'catalog:manage_copy_update' copy.pk %}"
-                                           class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium transition">Ubah</a>
+                                           class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium transition">Ubah</a>
                                     </div>
                                 </td>
                             </tr>

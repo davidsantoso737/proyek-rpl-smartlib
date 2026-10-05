@@ -4,22 +4,22 @@
 
 {% block content %}
 
-<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
-    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
-        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-            Riwayat Peminjaman
-        </h1>
-        <p class="text-slate-500 text-sm mt-1">
-            Status dan riwayat pengajuan peminjaman Anda.
-        </p>
-    </div>
+<div class="mb-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+        Riwayat Peminjaman
+    </h1>
+    <p class="text-slate-500 text-sm mt-1">
+        Status dan riwayat pengajuan peminjaman Anda.
+    </p>
+</div>
 
-    <div class="p-6 sm:p-8">
+<div class="space-y-6">
+    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
         {% if loans %}
             <div class="space-y-3">
                 {% for loan in loans %}
                     <a href="{% url 'circulation:loan_detail' loan.pk %}"
-                       class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4 hover:shadow-md transition">
+                       class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
                         <div>
                             <p class="font-semibold text-slate-900">
                                 Pengajuan #{{ loan.pk }} &middot; {{ loan.items.count }} eksemplar
@@ -29,11 +29,11 @@
                             </p>
                         </div>
                         {% if loan.status == "PENDING_APPROVAL" %}
-                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Menunggu persetujuan</span>
+                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-700">Menunggu persetujuan</span>
                         {% elif loan.status == "ACTIVE" %}
-                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Dipinjam aktif{% if loan.due_at %} &middot; kembali {{ loan.due_at|date:"d M Y" }}{% endif %}</span>
+                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-sky-100 text-sky-700">Dipinjam aktif{% if loan.due_at %} &middot; kembali {{ loan.due_at|date:"d M Y" }}{% endif %}</span>
                         {% else %}
-                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">{{ loan.status }}</span>
+                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-700">{{ loan.status }}</span>
                         {% endif %}
                     </a>
                 {% endfor %}

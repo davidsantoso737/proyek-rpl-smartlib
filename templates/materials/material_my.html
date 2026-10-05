@@ -4,8 +4,7 @@
 
 {% block content %}
 
-<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
-    <div class="border-b border-slate-100 px-6 sm:px-8 py-6 flex flex-wrap items-start justify-between gap-3">
+<div class="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
             <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
                 Bahan Ajar Saya
@@ -18,25 +17,26 @@
            class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
             + Unggah materi
         </a>
-    </div>
+</div>
 
-    <div class="p-6 sm:p-8">
+<div class="space-y-6">
+    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
         {% if materials %}
             <div class="space-y-3">
                 {% for material in materials %}
-                    <div class="rounded-xl border border-slate-200 p-4">
+                    <div class="rounded-xl border border-slate-200 bg-white p-4">
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <p class="font-semibold text-slate-900">{{ material.title }}</p>
                             {% if material.status == "TERSEDIA" %}
-                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Tersedia</span>
+                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-100 text-emerald-700">Tersedia</span>
                             {% elif material.status == "MENUNGGU" %}
-                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Menunggu verifikasi</span>
+                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-700">Menunggu verifikasi</span>
                             {% elif material.status == "DITOLAK" %}
-                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Ditolak</span>
+                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-red-100 text-red-700">Ditolak</span>
                             {% elif material.status == "MENUNGGU_PENGHAPUSAN" %}
-                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Menunggu penghapusan</span>
+                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-700">Menunggu penghapusan</span>
                             {% else %}
-                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">{{ material.status }}</span>
+                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-700">{{ material.status }}</span>
                             {% endif %}
                         </div>
                         {% if material.status == "DITOLAK" and material.rejection_reason %}
@@ -46,9 +46,9 @@
                             <form method="post" action="{% url 'materials:deletion_request' material.pk %}" class="flex flex-col sm:flex-row gap-2 mt-3">
                                 {% csrf_token %}
                                 <input type="text" name="reason" placeholder="Alasan penghapusan..."
-                                       class="flex-1 border border-slate-300 rounded-xl px-3.5 py-2 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                       class="flex-1 min-w-0 border border-slate-300 rounded-xl px-3.5 py-2 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                                 <button type="submit"
-                                        class="px-4 py-2 rounded-xl bg-red-100 hover:bg-red-200 text-red-700 text-sm font-medium transition">
+                                        class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition">
                                     Minta hapus
                                 </button>
                             </form>

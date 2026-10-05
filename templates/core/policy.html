@@ -4,19 +4,19 @@
 
 {% block content %}
 
-<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
-    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
-        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-            Konfigurasi Kebijakan
-        </h1>
-        <p class="text-slate-500 text-sm mt-1">
-            Perubahan berlaku untuk transaksi baru; denda, jatuh tempo, dan masa akses yang sudah tercatat tidak berubah.
-        </p>
-    </div>
+<div class="mb-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+        Konfigurasi Kebijakan
+    </h1>
+    <p class="text-slate-500 text-sm mt-1">
+        Perubahan berlaku untuk transaksi baru; denda, jatuh tempo, dan masa akses yang sudah tercatat tidak berubah.
+    </p>
+</div>
 
-    <div class="grid gap-0 md:grid-cols-2">
-        <div class="p-6 sm:p-8 border-b md:border-b-0 md:border-r border-slate-100">
-            <h2 class="font-semibold text-slate-900 mb-4">Konfigurasi aktif</h2>
+<div class="space-y-6">
+    <div class="grid gap-6 md:grid-cols-2">
+        <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
+            <h2 class="text-base font-semibold text-slate-900 mb-3">Konfigurasi aktif</h2>
             {% if active %}
                 <dl class="text-sm space-y-2 mb-6">
                     <div class="flex justify-between gap-4">
@@ -46,15 +46,15 @@
                 </p>
             {% endif %}
 
-            <h2 class="font-semibold text-slate-900 mb-4">Riwayat versi</h2>
+            <h2 class="text-base font-semibold text-slate-900 mb-3">Riwayat versi</h2>
             {% if history %}
-                <div class="rounded-xl border border-slate-200 overflow-x-auto">
+                <div class="rounded-xl border border-slate-200 overflow-x-auto" tabindex="0" role="region" aria-label="Tabel riwayat kebijakan, dapat digeser horizontal">
                     <table class="w-full text-xs">
                         <thead>
                             <tr class="bg-slate-50 text-left text-slate-500">
-                                <th class="px-3 py-2 font-medium">Berlaku</th>
-                                <th class="px-3 py-2 font-medium">Durasi</th>
-                                <th class="px-3 py-2 font-medium">Denda/hari</th>
+                                <th scope="col" class="px-3 py-2 font-medium">Berlaku</th>
+                                <th scope="col" class="px-3 py-2 font-medium">Durasi</th>
+                                <th scope="col" class="px-3 py-2 font-medium">Denda/hari</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -73,10 +73,10 @@
             {% endif %}
         </div>
 
-        <div class="p-6 sm:p-8">
-            <h2 class="font-semibold text-slate-900 mb-4">Ubah kebijakan</h2>
+        <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
+            <h2 class="text-base font-semibold text-slate-900 mb-3">Ubah kebijakan</h2>
             {% if form.non_field_errors %}
-                <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm mb-4">
+                <div role="alert" class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm mb-4">
                     {% for error in form.non_field_errors %}
                         <p>{{ error }}</p>
                     {% endfor %}
@@ -94,14 +94,16 @@
                             <p class="text-slate-500 text-xs mt-1">{{ field.help_text }}</p>
                         {% endif %}
                         {% for error in field.errors %}
-                            <p class="text-red-600 text-sm mt-1">{{ error }}</p>
+                            <p class="text-red-700 text-sm mt-1">{{ error }}</p>
                         {% endfor %}
                     </div>
                 {% endfor %}
-                <button type="submit"
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm">
-                    Simpan sebagai versi baru
-                </button>
+                <div class="flex flex-wrap items-center gap-3 pt-1">
+                    <button type="submit"
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm">
+                        Simpan sebagai versi baru
+                    </button>
+                </div>
             </form>
         </div>
     </div>

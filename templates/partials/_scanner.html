@@ -1,0 +1,18 @@
+{# SmartLib shared QR scanner UI (F-P03). Behavior is driven by #}
+{# static/js/qr-scan.js via data attributes; page-specific workflow #}
+{# (which input/form receives the decoded value) stays in data-input / #}
+{# data-form so business logic never moves into shared code. #}
+{# Usage: {% include "partials/_scanner.html" with input_id="token-input" form_id="pickup-form" hint="..." msg_scanning="..." msg_reading="..." msg_nolib="..." msg_stopped="..." msg_denied="..." msg_secure="..." msg_unavailable="..." %} #}
+{# DOM IDs (cam-toggle / qr-reader / cam-status) are preserved for #}
+{# compatibility; each page includes this partial at most once. #}
+<div class="rounded-xl border border-slate-200 bg-white p-5" data-qr-scanner data-input="{{ input_id }}" data-form="{{ form_id }}" data-msg-scanning="{{ msg_scanning }}" data-msg-reading="{{ msg_reading }}" data-msg-nolib="{{ msg_nolib }}" data-msg-stopped="{{ msg_stopped }}" data-msg-denied="{{ msg_denied }}" data-msg-secure="{{ msg_secure }}" data-msg-unavailable="{{ msg_unavailable }}">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <h2 class="text-base font-semibold text-slate-900">Pindai dengan kamera</h2>
+        <button type="button" id="cam-toggle" data-qr-toggle aria-label="Nyalakan atau matikan kamera pemindai"
+                class="px-4 py-2 min-h-[44px] rounded-xl bg-slate-100 hover:bg-slate-200 text-sm font-medium transition">
+            Nyalakan kamera
+        </button>
+    </div>
+    <div id="qr-reader" data-qr-reader class="hidden w-full max-w-md overflow-hidden rounded-xl border border-slate-200"></div>
+    <p id="cam-status" data-qr-status role="status" class="text-sm text-slate-500 mt-2">{{ hint }}</p>
+</div>

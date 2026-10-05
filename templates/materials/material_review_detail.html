@@ -4,25 +4,22 @@
 
 {% block content %}
 
-<div class="mb-4">
-    <a href="{% url 'materials:review_list' %}" class="text-sm text-blue-600 hover:underline font-medium">
-        &larr; Kembali ke antre verifikasi
-    </a>
+{% url 'materials:review_list' as back_url %}
+{% include "partials/_back_link.html" with href=back_url label="Kembali ke antre verifikasi" %}
+
+<div class="mb-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+        {{ material.title }}
+    </h1>
+    <p class="text-slate-500 text-sm mt-1">
+        {{ material.uploaded_by.full_name }} &middot;
+        {{ material.file_name }} ({{ material.file_type|upper }}) &middot;
+        status {{ material.status }}
+    </p>
 </div>
 
-<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
-    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
-        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-            {{ material.title }}
-        </h1>
-        <p class="text-slate-500 text-sm mt-1">
-            {{ material.uploaded_by.full_name }} &middot;
-            {{ material.file_name }} ({{ material.file_type|upper }}) &middot;
-            status {{ material.status }}
-        </p>
-    </div>
-
-    <div class="p-6 sm:p-8 space-y-6">
+<div class="space-y-6">
+    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6 space-y-6">
         {% if material.description %}
             <p class="text-sm text-slate-600 leading-relaxed">{{ material.description }}</p>
         {% endif %}
@@ -32,7 +29,7 @@
                 {% csrf_token %}
                 <input type="hidden" name="decision" value="approve">
                 <button type="submit" onclick="return confirm('Terima dan terbitkan bahan ajar ini?')"
-                        class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
+                        class="w-full sm:w-auto bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
                     Terima &amp; terbitkan
                 </button>
             </form>

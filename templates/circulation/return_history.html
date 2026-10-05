@@ -4,28 +4,28 @@
 
 {% block content %}
 
-<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
-    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
-        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-            Riwayat Pengembalian
-        </h1>
-        <p class="text-slate-500 text-sm mt-1">
-            Seluruh eksemplar yang telah kembali, termasuk denda dan statusnya.
-        </p>
-    </div>
+<div class="mb-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+        Riwayat Pengembalian
+    </h1>
+    <p class="text-slate-500 text-sm mt-1">
+        Seluruh eksemplar yang telah kembali, termasuk denda dan statusnya.
+    </p>
+</div>
 
-    <div class="p-6 sm:p-8">
+<div class="space-y-6">
+    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
         {% if page_obj.object_list %}
-            <div class="rounded-xl border border-slate-200 overflow-x-auto">
+            <div class="rounded-xl border border-slate-200 overflow-x-auto" tabindex="0" role="region" aria-label="Tabel riwayat pengembalian, dapat digeser horizontal">
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="bg-slate-50 text-left text-slate-500">
-                            <th class="px-4 py-2.5 font-medium">Kembali</th>
-                            <th class="px-4 py-2.5 font-medium">Kode</th>
-                            <th class="px-4 py-2.5 font-medium">Peminjam</th>
-                            <th class="px-4 py-2.5 font-medium">Terlambat</th>
-                            <th class="px-4 py-2.5 font-medium">Denda</th>
-                            <th class="px-4 py-2.5 font-medium">Status</th>
+                            <th scope="col" class="px-4 py-2.5 font-medium">Kembali</th>
+                            <th scope="col" class="px-4 py-2.5 font-medium">Kode</th>
+                            <th scope="col" class="px-4 py-2.5 font-medium">Peminjam</th>
+                            <th scope="col" class="px-4 py-2.5 font-medium">Terlambat</th>
+                            <th scope="col" class="px-4 py-2.5 font-medium">Denda</th>
+                            <th scope="col" class="px-4 py-2.5 font-medium">Status</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -38,9 +38,9 @@
                                 <td class="px-4 py-2.5">Rp{{ item.fine_amount }}</td>
                                 <td class="px-4 py-2.5">
                                     {% if item.return_status == "HILANG" %}
-                                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">Hilang</span>
+                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-red-100 text-red-700">Hilang</span>
                                     {% else %}
-                                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Kembali</span>
+                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-100 text-emerald-700">Kembali</span>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -49,21 +49,7 @@
                 </table>
             </div>
 
-            {% if page_obj.has_other_pages %}
-                <div class="flex items-center justify-center gap-2 mt-6 text-sm">
-                    {% if page_obj.has_previous %}
-                        <a href="?page={{ page_obj.previous_page_number }}"
-                           class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-medium transition">Sebelumnya</a>
-                    {% endif %}
-                    <span class="px-3 py-2 text-slate-500">
-                        Halaman {{ page_obj.number }} dari {{ page_obj.paginator.num_pages }}
-                    </span>
-                    {% if page_obj.has_next %}
-                        <a href="?page={{ page_obj.next_page_number }}"
-                           class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-medium transition">Berikutnya</a>
-                    {% endif %}
-                </div>
-            {% endif %}
+            {% include "partials/_pagination.html" %}
         {% else %}
             <div class="text-center py-12">
                 <p class="text-slate-900 font-semibold mb-1">Belum ada pengembalian tercatat.</p>

@@ -4,27 +4,24 @@
 
 {% block content %}
 
-<div class="mb-4">
-    <a href="{% url 'catalog:catalog' %}" class="text-sm text-blue-600 hover:underline font-medium">
-        &larr; Kembali ke katalog
-    </a>
+{% url 'catalog:catalog' as back_url %}
+{% include "partials/_back_link.html" with href=back_url label="Kembali ke katalog" %}
+
+<div class="mb-6">
+    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-700 mb-3">Buku Fisik</span>
+    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+        {{ book.title }}
+    </h1>
+    <p class="text-slate-500 text-sm mt-1">
+        {% for author in authors %}{{ author.name }}{% if not forloop.last %}, {% endif %}{% empty %}Penulis tidak tercatat{% endfor %}
+        &middot; {{ book.category.name }}
+    </p>
 </div>
 
-<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
-    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
-        <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-700 mb-3">Buku Fisik</span>
-        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-            {{ book.title }}
-        </h1>
-        <p class="text-slate-500 text-sm mt-1">
-            {% for author in authors %}{{ author.name }}{% if not forloop.last %}, {% endif %}{% empty %}Penulis tidak tercatat{% endfor %}
-            &middot; {{ book.category.name }}
-        </p>
-    </div>
-
-    <div class="grid gap-6 md:grid-cols-2 p-6 sm:p-8">
-        <div>
-            <h2 class="font-semibold text-slate-900 mb-3">Informasi koleksi</h2>
+<div class="space-y-6">
+    <div class="grid gap-6 md:grid-cols-2">
+        <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
+            <h2 class="text-base font-semibold text-slate-900 mb-3">Informasi koleksi</h2>
             <dl class="text-sm space-y-2">
                 <div class="flex justify-between gap-4">
                     <dt class="text-slate-500">ISBN</dt>
@@ -49,20 +46,20 @@
             </dl>
 
             {% if book.description %}
-                <h2 class="font-semibold text-slate-900 mt-6 mb-2">Deskripsi</h2>
+                <h2 class="text-base font-semibold text-slate-900 mt-6 mb-2">Deskripsi</h2>
                 <p class="text-sm text-slate-600 leading-relaxed">{{ book.description }}</p>
             {% endif %}
 
             {% for author in authors %}
                 {% if author.bio %}
-                    <h2 class="font-semibold text-slate-900 mt-6 mb-2">Tentang {{ author.name }}</h2>
+                    <h2 class="text-base font-semibold text-slate-900 mt-6 mb-2">Tentang {{ author.name }}</h2>
                     <p class="text-sm text-slate-600 leading-relaxed">{{ author.bio }}</p>
                 {% endif %}
             {% endfor %}
         </div>
 
-        <div>
-            <h2 class="font-semibold text-slate-900 mb-3">Ketersediaan</h2>
+        <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
+            <h2 class="text-base font-semibold text-slate-900 mb-3">Ketersediaan</h2>
             {% if available > 0 %}
                 <p class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-xl text-sm mb-4">
                     {{ available }} dari {{ total }} eksemplar tersedia untuk dipinjam.
@@ -74,14 +71,14 @@
             {% endif %}
 
             {% if copies %}
-                <div class="rounded-xl border border-slate-200 overflow-x-auto">
+                <div class="rounded-xl border border-slate-200 overflow-x-auto overflow-hidden" tabindex="0" role="region" aria-label="Tabel eksemplar tersedia, dapat digeser horizontal">
                     <table class="w-full text-sm">
                         <thead>
                             <tr class="bg-slate-50 text-left text-slate-500">
-                                <th class="px-4 py-2.5 font-medium">Kode</th>
-                                <th class="px-4 py-2.5 font-medium">Status</th>
-                                <th class="px-4 py-2.5 font-medium">Lokasi</th>
-                                <th class="px-4 py-2.5 font-medium text-right">Aksi</th>
+                                <th scope="col" class="px-4 py-2.5 font-medium">Kode</th>
+                                <th scope="col" class="px-4 py-2.5 font-medium">Status</th>
+                                <th scope="col" class="px-4 py-2.5 font-medium">Lokasi</th>
+                                <th scope="col" class="px-4 py-2.5 font-medium text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -90,9 +87,9 @@
                                     <td class="px-4 py-2.5 font-medium">{{ copy.copy_code }}</td>
                                     <td class="px-4 py-2.5">
                                         {% if copy.status == "TERSEDIA" %}
-                                            <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">{{ copy.status }}</span>
+                                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-100 text-emerald-700">{{ copy.status }}</span>
                                         {% else %}
-                                            <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">{{ copy.status }}</span>
+                                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-700">{{ copy.status }}</span>
                                         {% endif %}
                                     </td>
                                     <td class="px-4 py-2.5 text-slate-600">{{ copy.location }}</td>
@@ -101,14 +98,14 @@
                                             <form method="post" action="{% url 'circulation:cart_add' copy.pk %}" class="inline">
                                                 {% csrf_token %}
                                                 <button type="submit"
-                                                        class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition">
+                                                        class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition">
                                                     + Keranjang
                                                 </button>
                                             </form>
                                         {% endif %}
                                         {% if user.role == "PUSTAKAWAN" %}
                                             <a href="{% url 'circulation:copy_label' copy.pk %}" target="_blank" rel="noopener"
-                                               class="inline-block px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium transition">
+                                               class="inline-block px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium transition">
                                                 QR
                                             </a>
                                         {% endif %}

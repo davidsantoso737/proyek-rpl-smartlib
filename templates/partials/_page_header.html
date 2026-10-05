@@ -1,0 +1,8 @@
+{# SmartLib layout partial: page header (Level 1). No card, no shadow. #}
+{# Usage: {% include "partials/_page_header.html" with title="..." subtitle="..." %} #}
+<div class="mb-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">{{ title }}</h1>
+    {% if subtitle %}
+        <p class="text-slate-500 text-sm mt-1">{{ subtitle }}</p>
+    {% endif %}
+</div>

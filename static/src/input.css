@@ -1,3 +1,23 @@
 @import "tailwindcss";
 
 @source "../../templates";
+
+/* Phase 3 (F-R04): subtle press feedback for touch input. Hover does not
+   exist on touchscreens, so :active gives the only tap confirmation.
+   Brightness shift only, no animation, no layout effect. */
+@media (hover: none) {
+  a:active,
+  button:active {
+    filter: brightness(0.96);
+  }
+}
+
+/* Phase 4 (F-H01): global keyboard focus indicator. Unlayered author CSS
+   wins over layered Tailwind utilities, so this restores a visible outline
+   even where utilities set focus:outline-none; :focus-visible keeps mouse
+   focus unchanged. Outline (not shadow) so it never depends on color
+   alone and stays visible on any light background. */
+:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 2px;
+}

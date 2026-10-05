@@ -5,19 +5,19 @@
 
 {% block content %}
 
-<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
-    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
-        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-            Pengembalian Buku
-        </h1>
-        <p class="text-slate-500 text-sm mt-1">
-            Pindai QR Identitas eksemplar atau ketik kode eksemplar, periksa data peminjaman, lalu konfirmasi.
-        </p>
-    </div>
+<div class="mb-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+        Pengembalian Buku
+    </h1>
+    <p class="text-slate-500 text-sm mt-1">
+        Pindai QR Identitas eksemplar atau ketik kode eksemplar, periksa data peminjaman, lalu konfirmasi.
+    </p>
+</div>
 
-    <div class="p-6 sm:p-8 space-y-6">
+<div class="space-y-6">
+    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6 space-y-6">
         {% if error %}
-            <p class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm">
+            <p role="alert" class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm">
                 {{ error }}
             </p>
         {% endif %}
@@ -31,7 +31,7 @@
                 <div class="flex flex-col sm:flex-row gap-3">
                     <input type="text" name="code" id="code-input" value="{{ code }}" autocomplete="off"
                            placeholder="Contoh: COPY-001"
-                           class="flex-1 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                           class="flex-1 min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <button type="submit"
                             class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
                         Cari
@@ -40,23 +40,11 @@
             </div>
         </form>
 
-        <div class="rounded-xl border border-slate-200 p-5">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-                <h2 class="font-semibold text-slate-900">Pindai dengan kamera</h2>
-                <button type="button" id="cam-toggle"
-                        class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm font-medium transition">
-                    Nyalakan kamera
-                </button>
-            </div>
-            <div id="qr-reader" class="hidden w-full max-w-md overflow-hidden rounded-xl border border-slate-200"></div>
-            <p id="cam-status" class="text-sm text-slate-500 mt-2">
-                Arahkan QR Identitas eksemplar ke kamera. Bisa pindai ulang tanpa memuat halaman.
-            </p>
-        </div>
+        {% include "partials/_scanner.html" with input_id="code-input" form_id="return-form" hint="Arahkan QR Identitas eksemplar ke kamera. Bisa pindai ulang tanpa memuat halaman." msg_scanning="Arahkan QR Identitas ke kamera..." msg_reading="QR terbaca: {code}. Mencari data..." msg_nolib="Library pemindai gagal dimuat. Ketik kode secara manual." msg_stopped="Kamera dimatikan. Anda tetap dapat mengetik kode manual." msg_denied="Izin kamera ditolak. Aktifkan izin kamera pada browser lalu coba lagi, atau ketik kode manual." msg_secure="Kamera membutuhkan koneksi aman (HTTPS atau localhost). Ketik kode secara manual." msg_unavailable="Kamera tidak dapat digunakan di perangkat ini. Ketik kode secara manual." %}
 
         {% if found %}
             <div class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-5">
-                <h2 class="font-semibold text-slate-900 mb-3">
+                <h2 class="text-base font-semibold text-slate-900 mb-3">
                     {{ found.copy.copy_code }} &middot; {{ found.copy.book.title }}
                 </h2>
                 <dl class="text-sm space-y-1.5 mb-4">
@@ -78,18 +66,18 @@
                     <input type="hidden" name="code" value="{{ found.copy.copy_code }}">
                     <div class="flex flex-col sm:flex-row gap-3">
                         <select name="condition"
-                                class="border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                class="w-full sm:w-auto min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                             <option value="BAIK">Kondisi: Baik</option>
                             <option value="RUSAK RINGAN">Kondisi: Rusak ringan</option>
                             <option value="RUSAK BERAT">Kondisi: Rusak berat</option>
                         </select>
-                        <label class="inline-flex items-center gap-2 text-sm text-slate-700 bg-white border border-slate-300 rounded-xl px-3.5 py-2.5">
-                            <input type="checkbox" name="lost" class="accent-red-600">
+                        <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-700 bg-white border border-slate-300 rounded-xl px-3.5 py-2.5">
+                            <input type="checkbox" name="lost" class="h-4 w-4 shrink-0 accent-red-600">
                             Buku hilang
                         </label>
                     </div>
                     <button type="submit"
-                            class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
+                            class="w-full sm:w-auto bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
                         Konfirmasi pengembalian
                     </button>
                 </form>
@@ -99,79 +87,6 @@
 </div>
 
 <script src="{% static 'js/html5-qrcode.min.js' %}"></script>
-<script>
-(function () {
-    var toggle = document.getElementById("cam-toggle");
-    var readerBox = document.getElementById("qr-reader");
-    var statusEl = document.getElementById("cam-status");
-    var input = document.getElementById("code-input");
-    var form = document.getElementById("return-form");
-    var scanner = null;
-    var scanning = false;
-
-    function setStatus(text) {
-        statusEl.textContent = text;
-    }
-
-    async function stopCamera(silent) {
-        if (scanner && scanning) {
-            try {
-                await scanner.stop();
-            } catch (err) {
-            }
-            scanning = false;
-        }
-        readerBox.classList.add("hidden");
-        readerBox.innerHTML = "";
-        toggle.textContent = "Nyalakan kamera";
-        if (!silent) {
-            setStatus("Kamera dimatikan. Anda tetap dapat mengetik kode manual.");
-        }
-    }
-
-    toggle.addEventListener("click", async function () {
-        if (scanning) {
-            await stopCamera(false);
-            return;
-        }
-        if (typeof Html5Qrcode === "undefined") {
-            setStatus("Library pemindai gagal dimuat. Ketik kode secara manual.");
-            return;
-        }
-        scanner = new Html5Qrcode("qr-reader");
-        readerBox.classList.remove("hidden");
-        toggle.textContent = "Matikan kamera";
-        setStatus("Arahkan QR Identitas ke kamera...");
-        try {
-            await scanner.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 250, height: 250 } },
-                function (decodedText) {
-                    input.value = decodedText;
-                    setStatus("QR terbaca: " + decodedText + ". Mencari data...");
-                    stopCamera(true).then(function () {
-                        form.submit();
-                    });
-                },
-                function () {
-                }
-            );
-            scanning = true;
-        } catch (err) {
-            var name = err && err.name ? err.name : "";
-            var message = err && err.message ? err.message : "";
-            readerBox.classList.add("hidden");
-            toggle.textContent = "Nyalakan kamera";
-            if (name === "NotAllowedError" || /permission|denied/i.test(message)) {
-                setStatus("Izin kamera ditolak. Aktifkan izin kamera pada browser lalu coba lagi, atau ketik kode manual.");
-            } else if (/secure|https/i.test(message)) {
-                setStatus("Kamera membutuhkan koneksi aman (HTTPS atau localhost). Ketik kode secara manual.");
-            } else {
-                setStatus("Kamera tidak dapat digunakan di perangkat ini. Ketik kode secara manual.");
-            }
-        }
-    });
-})();
-</script>
+<script src="{% static 'js/qr-scan.js' %}"></script>
 
 {% endblock %}

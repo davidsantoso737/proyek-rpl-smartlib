@@ -1,0 +1,9 @@
+{# SmartLib shared back link (F-C03). Usage: #}
+{# {% url 'catalog:catalog' as back_url %} #}
+{# {% include "partials/_back_link.html" with href=back_url label="Kembali ke katalog" %} #}
+{# Destinations and labels stay page-specific; only presentation is shared. #}
+<div class="mb-4">
+    <a href="{{ href }}" class="inline-flex items-center gap-1.5 min-h-[44px] py-2 pr-2 rounded-xl text-sm text-blue-600 hover:underline font-medium">
+        <span aria-hidden="true">&larr;</span> {{ label|default:"Kembali" }}
+    </a>
+</div>
