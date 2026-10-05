@@ -4,6 +4,7 @@ from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_POST
 
 from apps.accounts.authorization import (
@@ -427,12 +428,20 @@ def _usable_ebook_loan_or_403(request, pk):
 
 @active_login_required
 def ebook_reader_view(request, pk):
-    """Reader terproteksi (FR-57)."""
+    """Reader terproteksi (FR-57). Pratinjau sebaris hanya untuk PDF."""
     loan = _usable_ebook_loan_or_403(request, pk)
-    return render(request, "circulation/ebook_reader.html", {"loan": loan})
+    return render(
+        request,
+        "circulation/ebook_reader.html",
+        {
+            "loan": loan,
+            "is_pdf": (loan.ebook.file_type or "").lower() == "pdf",
+        },
+    )
 
 
 @active_login_required
+@xframe_options_sameorigin
 def ebook_file_view(request, pk):
     """Stream file dari storage privat setelah otorisasi penuh (NFR-26).
 
@@ -447,10 +456,13 @@ def ebook_file_view(request, pk):
     content_type = EBOOK_CONTENT_TYPES.get(
         (loan.ebook.file_type or "").lower(), "application/octet-stream"
     )
+    # PDF ditampilkan sebaris; format lain diunduh agar tidak melewati
+    # jalur pratinjau browser yang tidak mendukungnya.
     return FileResponse(
         open(path, "rb"),
         content_type=content_type,
         filename=loan.ebook.file_name,
+        as_attachment=(loan.ebook.file_type or "").lower() != "pdf",
     )
 
 

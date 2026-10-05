@@ -46,9 +46,19 @@
         {% if user.role == "PUSTAKAWAN" %}
             <div class="rounded-xl border border-slate-200 p-5 hover:shadow-md transition">
                 <h2 class="font-semibold text-slate-900 mb-1">Administrasi</h2>
-                <p class="text-sm text-slate-500 mb-4">
-                    Kelola akun Siswa dan Guru perpustakaan.
-                </p>
+                {% if pending_total %}
+                    <p class="text-sm mb-4 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-800">
+                        Ada {{ pending_total }} hal menunggu aksi:
+                        {{ pending_loans }} pengajuan pinjam,
+                        {{ pending_ebooks }} e-book,
+                        {{ pending_materials }} verifikasi materi,
+                        {{ pending_deletions }} permintaan hapus.
+                    </p>
+                {% else %}
+                    <p class="text-sm text-slate-500 mb-4">
+                        Kelola akun Siswa dan Guru perpustakaan.
+                    </p>
+                {% endif %}
                 <div class="flex flex-wrap gap-2">
                     <a href="{% url 'circulation:approval_list' %}"
                        class="inline-block px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium transition">

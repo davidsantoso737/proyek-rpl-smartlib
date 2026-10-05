@@ -125,12 +125,47 @@ class EbookTests(TestCase):
         )
         self.assertEqual(reader.status_code, 200)
         self.assertContains(reader, "Ebook Satu")
+        self.assertContains(reader, "<embed")
         content = self.client.get(
             reverse("circulation:ebook_file", args=[loan.pk])
         )
         self.assertEqual(content.status_code, 200)
         self.assertEqual(content["Content-Type"], "application/pdf")
+        self.assertEqual(content["X-Frame-Options"], "SAMEORIGIN")
+        self.assertNotIn("attachment", content.get("Content-Disposition", ""))
         self.assertTrue(b"".join(content.streaming_content).startswith(b"%PDF"))
+
+    def test_non_pdf_tanpa_embed_tapi_unduh(self):
+        (TMP_ROOT / "tiga.epub").write_bytes(b"epub-dummy")
+        category = Category.objects.first()
+        author = Author.objects.first()
+        ebook = Ebook.objects.create(
+            category=category,
+            eisbn="E-103",
+            title="Ebook Tiga",
+            file_path="tiga.epub",
+            file_name="tiga.epub",
+            file_type="epub",
+            file_size=64,
+            version="1.0",
+        )
+        EbookAuthor.objects.create(ebook=ebook, author=author)
+        loan = self._approve(request_ebook_loan(self.siswa, ebook.pk))
+        self.client.force_login(self.siswa)
+        reader = self.client.get(
+            reverse("circulation:ebook_reader", args=[loan.pk])
+        )
+        self.assertEqual(reader.status_code, 200)
+        self.assertNotContains(reader, "<embed")
+        self.assertContains(reader, "Unduh e-book")
+        content = self.client.get(
+            reverse("circulation:ebook_file", args=[loan.pk])
+        )
+        self.assertEqual(content.status_code, 200)
+        self.assertEqual(
+            content["Content-Type"], "application/epub+zip"
+        )
+        self.assertIn("attachment", content["Content-Disposition"])
 
     def test_expired_access_ditolak_dan_bisa_pinjam_lagi(self):
         loan = self._approve(request_ebook_loan(self.siswa, self.ebook1.pk))

@@ -96,6 +96,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'apps.circulation.context_processors.cart_item_count',
                 'apps.notifications.context_processors.unread_notifications',
+                'apps.core.context_processors.librarian_pending',
             ],
         },
     },

@@ -24,13 +24,31 @@
     </div>
 
     <div class="p-4 sm:p-6">
-        <embed src="{% url 'circulation:ebook_file' loan.pk %}" type="application/pdf"
-               class="w-full rounded-xl border border-slate-200 bg-slate-100"
-               style="min-height: 70vh;">
-        <p class="text-xs text-slate-400 mt-2 text-center">
-            Jika dokumen tidak tampil, peramban Anda tidak mendukung pratinjau sebaris.
-            Akses file tetap terproteksi dan hanya berlaku selama masa peminjaman.
-        </p>
+        {% if is_pdf %}
+            <embed src="{% url 'circulation:ebook_file' loan.pk %}" type="application/pdf"
+                   class="w-full rounded-xl border border-slate-200 bg-slate-100"
+                   style="min-height: 70vh;">
+            <p class="text-xs text-slate-400 mt-2 text-center">
+                Jika dokumen tidak tampil, gunakan tombol Unduh di bawah.
+                Akses file tetap terproteksi dan hanya berlaku selama masa peminjaman.
+            </p>
+        {% else %}
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center">
+                <p class="font-semibold text-slate-900 mb-1">
+                    Format {{ loan.ebook.file_type|upper }} tidak dapat dipratinjau di browser
+                </p>
+                <p class="text-sm text-slate-500 mb-4">
+                    Unduh file lalu buka dengan aplikasi pembaca di perangkat Anda.
+                    Tautan unduh terproteksi dan hanya berlaku selama masa peminjaman.
+                </p>
+            </div>
+        {% endif %}
+        <div class="flex justify-center mt-4">
+            <a href="{% url 'circulation:ebook_file' loan.pk %}"
+               class="inline-block px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
+                Unduh e-book
+            </a>
+        </div>
     </div>
 </div>
 
