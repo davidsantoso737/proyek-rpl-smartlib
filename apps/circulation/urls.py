@@ -66,6 +66,16 @@ urlpatterns = [
         name="copy_label",
     ),
     path(
+        "label/massal/",
+        views.copy_label_batch_view,
+        name="copy_label_batch",
+    ),
+    path(
+        "label/cetak/",
+        views.copy_label_print_view,
+        name="copy_label_print",
+    ),
+    path(
         "ebook/minta/<int:pk>/",
         views.ebook_request_view,
         name="ebook_request",

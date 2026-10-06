@@ -273,3 +273,61 @@ class ReturnTests(TestCase):
             response,
             reverse("circulation:copy_identity_qr", args=[self.copy1.pk]),
         )
+
+    def test_label_hanya_cetak_qr(self):
+        self.client.force_login(self.pus)
+        response = self.client.get(
+            reverse("circulation:copy_label", args=[self.copy1.pk])
+        )
+        html = response.content.decode()
+        self.assertIn("print:hidden", html)
+        self.assertIn("RT-001", html)
+
+    def test_label_batch_filter_per_buku(self):
+        batch = reverse("circulation:copy_label_batch")
+        self.client.force_login(self.pus)
+        response = self.client.get(batch)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pilih buku terlebih dahulu")
+        book_pk = self.copy1.book.pk
+        response = self.client.get(batch, {"book": book_pk})
+        self.assertContains(response, "RT-001")
+        self.assertContains(response, "RT-002")
+        self.assertNotContains(response, "RT-003")
+
+    def test_label_print_beberapa_copy_satu_halaman(self):
+        url = (
+            reverse("circulation:copy_label_print")
+            + f"?copy={self.copy1.pk}&copy={self.copy2.pk}&copy=abc&copy=99999"
+        )
+        self.client.force_login(self.pus)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "RT-001")
+        self.assertContains(response, "RT-002")
+        self.assertNotContains(response, "RT-003")
+        self.assertContains(response, "window.print")
+
+    def test_label_print_kosong(self):
+        self.client.force_login(self.pus)
+        response = self.client.get(reverse("circulation:copy_label_print"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Tidak ada eksemplar terpilih")
+
+    def test_label_batch_unauthorized(self):
+        for url in (
+            reverse("circulation:copy_label_batch"),
+            reverse("circulation:copy_label_print"),
+        ):
+            self.assertEqual(self.client.get(url).status_code, 302)
+        self.client.force_login(self.siswa)
+        for url in (
+            reverse("circulation:copy_label_batch"),
+            reverse("circulation:copy_label_print"),
+        ):
+            self.assertEqual(self.client.get(url).status_code, 403)
+        self.client.force_login(self.guru)
+        self.assertEqual(
+            self.client.get(reverse("circulation:copy_label_batch")).status_code,
+            403,
+        )

@@ -17,10 +17,16 @@
                 Kode dibuat sistem bila dikosongkan; QR mengikuti kode.
             </p>
         </div>
+        <div class="flex flex-wrap gap-2">
+        <a href="{% url 'circulation:copy_label_batch' %}?book={{ book.pk }}"
+           class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+            Cetak banyak
+        </a>
         <a href="{% url 'catalog:manage_copy_create' book.pk %}"
            class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
             + Tambah eksemplar
         </a>
+        </div>
     </div>
 
   <div class="space-y-6">

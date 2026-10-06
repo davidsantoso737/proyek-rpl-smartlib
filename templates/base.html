@@ -15,7 +15,7 @@
 
 <body class="min-h-screen flex flex-col bg-slate-100 text-slate-900 antialiased">
 
-    <header id="site-header" class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
+    <header id="site-header" class="print:hidden sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
         {% with current_url=request.resolver_match.url_name|default:"" current_ns=request.resolver_match.namespace|default:"" %}
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-2 flex items-center justify-between gap-3">
             <a href="{% if user.is_authenticated %}{% url 'accounts:dashboard' %}{% else %}{% url 'accounts:login' %}{% endif %}"
@@ -356,7 +356,7 @@
         {% endblock %}
     </main>
 
-    <footer class="border-t border-slate-200 bg-white">
+    <footer class="print:hidden border-t border-slate-200 bg-white">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-xs text-slate-500">
             Digital Library &mdash; Sistem Perpustakaan Sekolah
         </div>

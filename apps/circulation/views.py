@@ -312,6 +312,55 @@ def copy_label_view(request, pk):
 
 
 @role_required(User.Role.PUSTAKAWAN)
+def copy_label_batch_view(request):
+    """Pilih eksemplar per buku untuk cetak massal (filter ?book=pk)."""
+    from apps.catalog.models import Book, BookCopy
+
+    books = Book.objects.filter(is_active=True).order_by("title")
+    selected_book = None
+    copies = []
+    book_id = (request.GET.get("book") or "").strip()
+    if book_id.isdigit():
+        selected_book = Book.objects.filter(
+            pk=int(book_id), is_active=True
+        ).first()
+        if selected_book is not None:
+            copies = list(
+                BookCopy.objects.filter(book=selected_book).order_by(
+                    "copy_code"
+                )
+            )
+    return render(
+        request,
+        "circulation/copy_label_batch.html",
+        {
+            "books": books,
+            "selected_book": selected_book,
+            "copies": copies,
+        },
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def copy_label_print_view(request):
+    """Satu halaman label untuk eksemplar terpilih (?copy=pk berulang, maks 100)."""
+    from apps.catalog.models import BookCopy
+
+    ids = []
+    for raw in request.GET.getlist("copy"):
+        if str(raw).isdigit():
+            ids.append(int(raw))
+    copies = list(
+        BookCopy.objects.filter(pk__in=ids[:100])
+        .select_related("book")
+        .order_by("book__title", "copy_code")
+    )
+    return render(
+        request, "circulation/copy_label_print.html", {"copies": copies}
+    )
+
+
+@role_required(User.Role.PUSTAKAWAN)
 def return_view(request):
     """Halaman pengembalian: lookup QR Identitas -> info peminjam (FR-30 – FR-40)."""
     context = {"code": "", "found": None, "error": ""}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Cetak {{ copies|length }} Label - Digital Library{% endblock %}
+
+{% block content %}
+
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4 print:hidden">
+    <a href="{% url 'circulation:copy_label_batch' %}" class="text-sm text-blue-600 hover:underline font-medium">
+        &larr; Kembali ke pilih eksemplar
+    </a>
+    {% if copies %}
+        <button type="button" onclick="window.print()"
+                class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
+            Cetak {{ copies|length }} label
+        </button>
+    {% endif %}
+</div>
+
+{% if copies %}
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 print:grid-cols-3 print:gap-2">
+        {% for copy in copies %}
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 text-center print:rounded-none print:border-black print:shadow-none break-inside-avoid">
+                <img src="{% url 'circulation:copy_identity_qr' copy.pk %}"
+                     alt="QR Identitas {{ copy.copy_code }}"
+                     class="w-36 h-36 mx-auto bg-white p-1 border border-slate-200 rounded-lg print:border-none">
+                <p class="mt-2 text-base font-bold tracking-widest text-slate-900">
+                    {{ copy.copy_code }}
+                </p>
+                <p class="text-xs font-medium text-slate-700">
+                    {{ copy.book.title }}
+                </p>
+                <p class="text-[11px] text-slate-500">
+                    {{ copy.location }} &middot; Digital Library
+                </p>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="bg-white rounded-2xl border border-slate-200 p-8 text-center">
+        <p class="text-slate-900 font-semibold mb-1">Tidak ada eksemplar terpilih.</p>
+        <p class="text-slate-500 text-sm">Kembali dan pilih minimal satu eksemplar.</p>
+    </div>
+{% endif %}
+
+{% endblock %}

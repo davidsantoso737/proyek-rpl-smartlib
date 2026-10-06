@@ -4,10 +4,10 @@
 
 {% block content %}
 
-{% url 'catalog:manage_ebooks' as back_url %}
-{% include "partials/_back_link.html" with href=back_url label="Kembali ke kelola e-book" %}
+<div class="max-w-4xl mx-auto">
+    {% url 'catalog:manage_ebooks' as back_url %}
+    {% include "partials/_back_link.html" with href=back_url label="Kembali ke kelola e-book" %}
 
-<div class="max-w-2xl">
     <div class="mb-6">
         <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
             {% if ebook %}Ubah {{ ebook.title }}{% else %}Tambah e-book{% endif %}
@@ -23,32 +23,194 @@
 
     <div class="rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
         {% if form.non_field_errors %}
-            <div role="alert" class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm mb-4">
+            <div role="alert" class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm mb-6">
                 {% for error in form.non_field_errors %}
                     <p>{{ error }}</p>
                 {% endfor %}
             </div>
         {% endif %}
 
-        <form method="post" enctype="multipart/form-data" class="space-y-4">
+        <form method="post" enctype="multipart/form-data" class="space-y-8">
             {% csrf_token %}
-            {% for field in form %}
+
+            <div class="grid gap-x-6 gap-y-8 md:grid-cols-2">
+                <section aria-labelledby="ebook-basic-heading">
+                    <h2 id="ebook-basic-heading" class="text-base font-semibold text-slate-900 mb-4">Informasi dasar</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="{{ form.category.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1.5">
+                                {{ form.category.label }}
+                            </label>
+                            {{ form.category }}
+                            {% if form.category.help_text %}
+                                <p class="text-slate-500 text-xs mt-1">{{ form.category.help_text }}</p>
+                            {% endif %}
+                            {% for error in form.category.errors %}
+                                <p class="text-red-700 text-sm mt-1">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                        <div>
+                            <label for="{{ form.eisbn.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1.5">
+                                {{ form.eisbn.label }}
+                            </label>
+                            {{ form.eisbn }}
+                            {% if form.eisbn.help_text %}
+                                <p class="text-slate-500 text-xs mt-1">{{ form.eisbn.help_text }}</p>
+                            {% endif %}
+                            {% for error in form.eisbn.errors %}
+                                <p class="text-red-700 text-sm mt-1">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                        <div>
+                            <label for="{{ form.title.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1.5">
+                                {{ form.title.label }}
+                            </label>
+                            {{ form.title }}
+                            {% if form.title.help_text %}
+                                <p class="text-slate-500 text-xs mt-1">{{ form.title.help_text }}</p>
+                            {% endif %}
+                            {% for error in form.title.errors %}
+                                <p class="text-red-700 text-sm mt-1">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </section>
+
+                <section aria-labelledby="ebook-pub-heading">
+                    <h2 id="ebook-pub-heading" class="text-base font-semibold text-slate-900 mb-4">Publikasi</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="{{ form.publisher.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1.5">
+                                {{ form.publisher.label }}
+                            </label>
+                            {{ form.publisher }}
+                            {% if form.publisher.help_text %}
+                                <p class="text-slate-500 text-xs mt-1">{{ form.publisher.help_text }}</p>
+                            {% endif %}
+                            {% for error in form.publisher.errors %}
+                                <p class="text-red-700 text-sm mt-1">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="min-w-0">
+                                <label for="{{ form.publication_year.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1.5">
+                                    {{ form.publication_year.label }}
+                                </label>
+                                {{ form.publication_year }}
+                                {% if form.publication_year.help_text %}
+                                    <p class="text-slate-500 text-xs mt-1">{{ form.publication_year.help_text }}</p>
+                                {% endif %}
+                                {% for error in form.publication_year.errors %}
+                                    <p class="text-red-700 text-sm mt-1">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                            <div class="min-w-0">
+                                <label for="{{ form.edition.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1.5">
+                                    {{ form.edition.label }}
+                                </label>
+                                {{ form.edition }}
+                                {% if form.edition.help_text %}
+                                    <p class="text-slate-500 text-xs mt-1">{{ form.edition.help_text }}</p>
+                                {% endif %}
+                                {% for error in form.edition.errors %}
+                                    <p class="text-red-700 text-sm mt-1">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="min-w-0 col-span-2 sm:col-span-1">
+                                <label for="{{ form.cover_url.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1.5">
+                                    {{ form.cover_url.label }}
+                                </label>
+                                {{ form.cover_url }}
+                                {% if form.cover_url.help_text %}
+                                    <p class="text-slate-500 text-xs mt-1">{{ form.cover_url.help_text }}</p>
+                                {% endif %}
+                                {% for error in form.cover_url.errors %}
+                                    <p class="text-red-700 text-sm mt-1">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                            <div class="min-w-0 col-span-2 sm:col-span-1">
+                                <label for="{{ form.version.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1.5">
+                                    {{ form.version.label }}
+                                </label>
+                                {{ form.version }}
+                                {% if form.version.help_text %}
+                                    <p class="text-slate-500 text-xs mt-1">{{ form.version.help_text }}</p>
+                                {% endif %}
+                                {% for error in form.version.errors %}
+                                    <p class="text-red-700 text-sm mt-1">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <section aria-labelledby="ebook-file-heading" class="border-t border-slate-100 pt-6">
+                <h2 id="ebook-file-heading" class="text-base font-semibold text-slate-900 mb-4">File e-book</h2>
                 <div>
-                    <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1.5">
-                        {{ field.label }}
+                    <label for="{{ form.file.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1.5">
+                        {{ form.file.label }}
                     </label>
-                    {{ field }}
-                    {% if field.help_text %}
-                        <p class="text-slate-500 text-xs mt-1">{{ field.help_text }}</p>
+                    {{ form.file }}
+                    {% if form.file.help_text %}
+                        <p class="text-slate-500 text-xs mt-1">{{ form.file.help_text }}</p>
                     {% endif %}
-                    {% for error in field.errors %}
+                    {% for error in form.file.errors %}
                         <p class="text-red-700 text-sm mt-1">{{ error }}</p>
                     {% endfor %}
                 </div>
-            {% endfor %}
-            <div class="flex flex-wrap items-center gap-3 pt-1">
+            </section>
+
+            <section aria-labelledby="ebook-desc-heading" class="border-t border-slate-100 pt-6">
+                <h2 id="ebook-desc-heading" class="text-base font-semibold text-slate-900 mb-4">Deskripsi</h2>
+                <div>
+                    <label for="{{ form.description.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1.5">
+                        {{ form.description.label }}
+                    </label>
+                    {{ form.description }}
+                    {% if form.description.help_text %}
+                        <p class="text-slate-500 text-xs mt-1">{{ form.description.help_text }}</p>
+                    {% endif %}
+                    {% for error in form.description.errors %}
+                        <p class="text-red-700 text-sm mt-1">{{ error }}</p>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <div class="grid gap-x-6 gap-y-8 md:grid-cols-2 border-t border-slate-100 pt-6">
+                <section aria-labelledby="ebook-authors-heading">
+                    <h2 id="ebook-authors-heading" class="text-base font-semibold text-slate-900 mb-4">{{ form.authors.label }}</h2>
+                    <div class="max-w-sm">
+                        {{ form.authors }}
+                        {% if form.authors.help_text %}
+                            <p class="text-slate-500 text-xs mt-1">{{ form.authors.help_text }}</p>
+                        {% endif %}
+                        {% for error in form.authors.errors %}
+                            <p class="text-red-700 text-sm mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <section aria-labelledby="ebook-status-heading">
+                    <h2 id="ebook-status-heading" class="text-base font-semibold text-slate-900 mb-4">Status katalog</h2>
+                    <label for="{{ form.is_active.id_for_label }}" class="inline-flex cursor-pointer items-center gap-2.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-medium text-slate-700">
+                        {{ form.is_active }}
+                        {{ form.is_active.label }}
+                    </label>
+                    {% if form.is_active.help_text %}
+                        <p class="text-slate-500 text-xs mt-1">{{ form.is_active.help_text }}</p>
+                    {% endif %}
+                    {% for error in form.is_active.errors %}
+                        <p class="text-red-700 text-sm mt-1">{{ error }}</p>
+                    {% endfor %}
+                </section>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100">
                 <button type="submit"
-                        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm">
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
                     Simpan e-book
                 </button>
             </div>
