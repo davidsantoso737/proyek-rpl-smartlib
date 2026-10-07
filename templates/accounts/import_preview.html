@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Pratinjau Import {{ kind_title }} - Digital Library{% endblock %}
+
+{% block content %}
+
+{% url 'accounts:import_upload' kind=kind as back_url %}
+{% include "partials/_back_link.html" with href=back_url label="Upload ulang berkas" %}
+
+<div class="mb-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+        Pratinjau import {{ kind_title }}
+    </h1>
+    <p class="text-slate-500 text-sm mt-1">
+        Periksa setiap baris sebelum konfirmasi. Baris bermasalah menyebut nomor baris, identifier, dan alasannya.
+    </p>
+</div>
+
+<div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6 mb-6">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
+            <p class="text-xs text-slate-500">Total</p>
+            <p class="text-xl font-bold text-slate-900">{{ preview.summary.total }}</p>
+        </div>
+        <div class="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
+            <p class="text-xs text-emerald-700">Valid</p>
+            <p class="text-xl font-bold text-emerald-800">{{ preview.summary.valid }}</p>
+        </div>
+        <div class="rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+            <p class="text-xs text-red-700">Invalid</p>
+            <p class="text-xl font-bold text-red-800">{{ preview.summary.invalid }}</p>
+        </div>
+        <div class="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+            <p class="text-xs text-amber-700">Conflict</p>
+            <p class="text-xl font-bold text-amber-800">{{ preview.summary.conflict }}</p>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        {% if preview.can_confirm %}
+            <form method="post" action="{% url 'accounts:import_confirm' kind=kind %}">
+                {% csrf_token %}
+                <button type="submit"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm">
+                    Konfirmasi {{ preview.summary.valid }} akun valid
+                </button>
+            </form>
+        {% else %}
+            <button type="button" disabled
+                    class="bg-slate-200 text-slate-500 font-semibold px-5 py-2.5 rounded-xl cursor-not-allowed">
+                Belum dapat dikonfirmasi
+            </button>
+            <p class="text-slate-500 text-xs mt-2">
+                Masih ada baris Invalid atau Conflict. Perbaiki berkas lalu upload ulang. Tidak ada akun yang dibuat.
+            </p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
+    <div class="rounded-xl border border-slate-200 overflow-x-auto" tabindex="0" role="region" aria-label="Tabel pratinjau import, dapat digeser horizontal">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="bg-slate-50 text-left text-slate-500">
+                    <th scope="col" class="px-4 py-2.5 font-medium">Baris</th>
+                    <th scope="col" class="px-4 py-2.5 font-medium">{{ preview.identifier_label }}</th>
+                    <th scope="col" class="px-4 py-2.5 font-medium">Nama</th>
+                    <th scope="col" class="px-4 py-2.5 font-medium">Email</th>
+                    <th scope="col" class="px-4 py-2.5 font-medium">Kelas</th>
+                    <th scope="col" class="px-4 py-2.5 font-medium">Department</th>
+                    <th scope="col" class="px-4 py-2.5 font-medium">Status</th>
+                    <th scope="col" class="px-4 py-2.5 font-medium">Pesan</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for row in preview.rows %}
+                    <tr class="hover:bg-slate-50/60">
+                        <td class="px-4 py-2.5 text-slate-600">{{ row.row_number }}</td>
+                        <td class="px-4 py-2.5 font-medium">{% if kind == "SISWA" %}{{ row.data.nis|default:"-" }}{% else %}{{ row.data.nip|default:"-" }}{% endif %}</td>
+                        <td class="px-4 py-2.5">{{ row.data.full_name|default:"-" }}</td>
+                        <td class="px-4 py-2.5 text-slate-600">{{ row.data.email|default:"-" }}</td>
+                        <td class="px-4 py-2.5 text-slate-600">{{ row.data.student_class|default:"-" }}</td>
+                        <td class="px-4 py-2.5 text-slate-600">{{ row.data.department|default:"-" }}</td>
+                        <td class="px-4 py-2.5">
+                            {% if row.status == "VALID" %}
+                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-100 text-emerald-700">Valid</span>
+                            {% elif row.status == "CONFLICT" %}
+                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-800">Conflict</span>
+                            {% else %}
+                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-red-100 text-red-700">Invalid</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-2.5 text-xs text-slate-600">
+                            {% if row.messages %}
+                                {% for message in row.messages %}
+                                    <p>{{ message }}</p>
+                                {% endfor %}
+                            {% else %}
+                                <span class="text-slate-400">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

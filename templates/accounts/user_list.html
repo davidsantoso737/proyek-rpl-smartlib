@@ -22,6 +22,14 @@
                class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
                 + Tambah Guru
             </a>
+            <a href="{% url 'accounts:import_upload' kind='SISWA' %}"
+               class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+                Import Siswa
+            </a>
+            <a href="{% url 'accounts:import_upload' kind='GURU' %}"
+               class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+                Import Guru
+            </a>
         </div>
     </div>
 
@@ -87,6 +95,13 @@
                                     <div class="flex justify-end gap-2">
                                         <a href="{% url 'accounts:user_update' account.pk %}"
                                            class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium transition">Ubah</a>
+                                        <form method="post" action="{% url 'accounts:user_reset_password' account.pk %}" class="inline">
+                                            {% csrf_token %}
+                                            <button type="submit" onclick="return confirm('Reset password akun ini ke NIS/NIP awal? Pengguna wajib mengganti password saat login berikutnya.')"
+                                                    class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium transition">
+                                                Reset
+                                            </button>
+                                        </form>
                                         <form method="post" action="{% url 'accounts:user_toggle_active' account.pk %}" class="inline">
                                             {% csrf_token %}
                                             <button type="submit" onclick="return confirm('Ubah status aktif akun ini?')"

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Import {{ kind_title }} dari Excel - Digital Library{% endblock %}
+
+{% block content %}
+
+{% url 'accounts:user_list' as back_url %}
+{% include "partials/_back_link.html" with href=back_url label="Kembali ke daftar pengguna" %}
+
+<div class="max-w-2xl">
+    <div class="mb-6">
+        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+            Import {{ kind_title }} dari Excel
+        </h1>
+        <p class="text-slate-500 text-sm mt-1">
+            Unggah berkas .xlsx, periksa pratinjau hasil validasi, lalu konfirmasi. Tidak ada akun yang dibuat sebelum konfirmasi.
+        </p>
+        <p class="text-blue-700 text-sm mt-2 bg-blue-50 border border-blue-200 rounded-xl px-3.5 py-2.5">
+            Belum punya formatnya? Unduh
+            <a href="{% url 'accounts:import_template' kind=kind %}" class="font-semibold underline">template {{ kind_title }}</a>.
+            Username dan password awal akun yang dibuat otomatis sama dengan {% if kind == "SISWA" %}NIS{% else %}NIP{% endif %}.
+        </p>
+    </div>
+
+    <div class="rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
+        {% if form_error %}
+            <div role="alert" class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm mb-4">
+                <p>{{ form_error }}</p>
+            </div>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" class="space-y-4">
+            {% csrf_token %}
+
+            <div>
+                <label for="id_file" class="block text-sm font-medium text-slate-700 mb-1.5">
+                    Berkas .xlsx
+                </label>
+                <input type="file" id="id_file" name="file" accept=".xlsx" required
+                       class="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <p class="text-slate-500 text-xs mt-1">Maksimal 5 MB. Hanya format .xlsx yang diterima.</p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 pt-1">
+                <button type="submit"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm">
+                    Upload dan pratinjau
+                </button>
+                <a href="{% url 'accounts:user_list' %}"
+                   class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+                    Batal
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

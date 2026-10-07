@@ -26,30 +26,24 @@ class UserAdminTests(TestCase):
         user.save()
         return user
 
-    def _siswa_data(self, username="siswaBaru", **overrides):
+    def _siswa_data(self, **overrides):
         data = {
-            "username": username,
             "full_name": "Siswa Baru",
             "nis": "99901",
             "email": "",
             "phone": "",
             "student_class": "XII-A",
-            "password1": "rahasia-aman-123",
-            "password2": "rahasia-aman-123",
         }
         data.update(overrides)
         return data
 
-    def _guru_data(self, username="guruBaru", **overrides):
+    def _guru_data(self, **overrides):
         data = {
-            "username": username,
             "full_name": "Guru Baru",
             "nip": "88801",
             "email": "",
             "phone": "",
             "department": "Matematika",
-            "password1": "rahasia-aman-123",
-            "password2": "rahasia-aman-123",
         }
         data.update(overrides)
         return data
@@ -70,14 +64,20 @@ class UserAdminTests(TestCase):
             self._siswa_data(),
         )
         self.assertRedirects(response, reverse("accounts:user_list"))
-        user = User.objects.get(username="siswaBaru")
+        user = User.objects.get(nis="99901")
+        self.assertEqual(user.username, "99901")
         self.assertEqual(user.role, User.Role.SISWA)
-        self.assertEqual(user.nis, "99901")
-        self.assertTrue(user.check_password("rahasia-aman-123"))
-        self.assertTrue(
-            self.client.login(
-                username="siswaBaru", password="rahasia-aman-123"
-            )
+        self.assertTrue(user.must_change_password)
+        self.assertNotEqual(user.password, "99901")
+        self.assertTrue(user.check_password("99901"))
+        # Login pertama diarahkan ke password change (P1 enforcement).
+        self.client.post(reverse("accounts:logout"))
+        response = self.client.post(
+            reverse("accounts:login"),
+            {"username": "99901", "password": "99901"},
+        )
+        self.assertRedirects(
+            response, reverse("accounts:password_change")
         )
 
     def test_pustakawan_menambah_guru(self):
@@ -87,9 +87,12 @@ class UserAdminTests(TestCase):
             self._guru_data(),
         )
         self.assertRedirects(response, reverse("accounts:user_list"))
-        user = User.objects.get(username="guruBaru")
+        user = User.objects.get(nip="88801")
+        self.assertEqual(user.username, "88801")
         self.assertEqual(user.role, User.Role.GURU)
-        self.assertEqual(user.nip, "88801")
+        self.assertTrue(user.must_change_password)
+        self.assertNotEqual(user.password, "88801")
+        self.assertTrue(user.check_password("88801"))
 
     def test_pustakawan_mengubah_data(self):
         self.client.force_login(self.pus)
@@ -142,7 +145,7 @@ class UserAdminTests(TestCase):
         self.assertEqual(
             self.client.post(
                 reverse("accounts:user_create", args=["SISWA"]),
-                self._siswa_data(username="siswaX"),
+                self._siswa_data(nis="99601"),
             ).status_code,
             403,
         )
@@ -154,7 +157,7 @@ class UserAdminTests(TestCase):
             ).status_code,
             403,
         )
-        self.assertFalse(User.objects.filter(username="siswaX").exists())
+        self.assertFalse(User.objects.filter(nis="99601").exists())
 
     def test_guru_forbidden(self):
         self.client.force_login(self.guru)
@@ -164,11 +167,11 @@ class UserAdminTests(TestCase):
         self.assertEqual(
             self.client.post(
                 reverse("accounts:user_create", args=["GURU"]),
-                self._guru_data(username="guruX"),
+                self._guru_data(nip="88701"),
             ).status_code,
             403,
         )
-        self.assertFalse(User.objects.filter(username="guruX").exists())
+        self.assertFalse(User.objects.filter(nip="88701").exists())
 
     def test_anonymous_diarahkan_ke_login(self):
         response = self.client.get(reverse("accounts:user_list"))
@@ -183,32 +186,124 @@ class UserAdminTests(TestCase):
         self.client.force_login(self.pus)
         response = self.client.post(
             reverse("accounts:user_create", args=["SISWA"]),
-            self._siswa_data(username="siswaBad", nis=""),
+            self._siswa_data(nis=""),
         )
         self.assertEqual(response.status_code, 200)
         self.assertFalse(
-            User.objects.filter(username="siswaBad").exists()
+            User.objects.filter(full_name="Siswa Baru").exists()
         )
 
-    def test_invalid_data_username_ganda_ditolak(self):
+    def test_duplicate_nis_ditolak_tanpa_overwrite(self):
+        self.client.force_login(self.pus)
+        before = User.objects.count()
+        response = self.client.post(
+            reverse("accounts:user_create", args=["SISWA"]),
+            self._siswa_data(nis="10001"),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "sudah digunakan")
+        self.assertEqual(User.objects.count(), before)
+        # Account existing tidak tertimpa.
+        original = User.objects.get(nis="10001")
+        self.assertEqual(original.username, "siswa1")
+        self.assertEqual(original.full_name, "siswa1 Full")
+        self.assertTrue(original.check_password("secret123"))
+
+    def test_duplicate_nip_ditolak_tanpa_overwrite(self):
+        self.client.force_login(self.pus)
+        before = User.objects.count()
+        response = self.client.post(
+            reverse("accounts:user_create", args=["GURU"]),
+            self._guru_data(nip="20001"),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "sudah digunakan")
+        self.assertEqual(User.objects.count(), before)
+        original = User.objects.get(nip="20001")
+        self.assertEqual(original.username, "guru1")
+        self.assertTrue(original.check_password("secret123"))
+
+    def test_duplicate_username_ditolak(self):
+        # Username otomatis = identifier; NIS yang sama dengan
+        # username akun lain tetap ditolak.
+        self.client.force_login(self.pus)
+        before = User.objects.count()
+        response = self.client.post(
+            reverse("accounts:user_create", args=["SISWA"]),
+            self._siswa_data(nis="guru1"),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(User.objects.count(), before)
+
+    def test_leading_zero_dipertahankan(self):
         self.client.force_login(self.pus)
         response = self.client.post(
             reverse("accounts:user_create", args=["SISWA"]),
-            self._siswa_data(username="siswa1"),
+            self._siswa_data(nis="006112"),
         )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(User.objects.filter(username="siswa1").count(), 1)
+        self.assertRedirects(response, reverse("accounts:user_list"))
+        user = User.objects.get(nis="006112")
+        self.assertEqual(user.username, "006112")
+        self.assertTrue(user.check_password("006112"))
+        self.assertIsNone(User.objects.filter(username="6112").first())
+        self.client.force_login(self.pus)
+        response = self.client.post(
+            reverse("accounts:user_create", args=["GURU"]),
+            self._guru_data(nip="007889"),
+        )
+        self.assertRedirects(response, reverse("accounts:user_list"))
+        guru = User.objects.get(nip="007889")
+        self.assertEqual(guru.username, "007889")
+        self.assertTrue(guru.check_password("007889"))
+
+    def test_username_tidak_bisa_diinput_bebas(self):
+        self.client.force_login(self.pus)
+        response = self.client.post(
+            reverse("accounts:user_create", args=["SISWA"]),
+            dict(
+                self._siswa_data(nis="99902"),
+                username="hacker-bebas",
+                password1="apa-saja-123",
+                password2="apa-saja-123",
+            ),
+        )
+        self.assertRedirects(response, reverse("accounts:user_list"))
+        user = User.objects.get(nis="99902")
+        self.assertEqual(user.username, "99902")
+        self.assertTrue(user.check_password("99902"))
+        self.assertFalse(
+            User.objects.filter(username="hacker-bebas").exists()
+        )
+
+    def test_form_create_tanpa_field_username_password(self):
+        self.client.force_login(self.pus)
+        for role in ("SISWA", "GURU"):
+            response = self.client.get(
+                reverse("accounts:user_create", args=[role])
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertNotContains(response, 'name="username"')
+            self.assertNotContains(response, 'name="password1"')
+            self.assertNotContains(response, 'name="password2"')
 
     def test_role_tidak_bisa_dimanipulasi_via_post(self):
         self.client.force_login(self.pus)
         # Upaya menyusupkan role pustakawan diabaikan: role dari URL.
+        # Upaya menyusupkan username bebas juga diabaikan.
         response = self.client.post(
             reverse("accounts:user_create", args=["SISWA"]),
-            dict(self._siswa_data(username="siswaHack"), role="PUSTAKAWAN"),
+            dict(
+                self._siswa_data(nis="99903"),
+                role="PUSTAKAWAN",
+                username="siswaHack",
+            ),
         )
         self.assertRedirects(response, reverse("accounts:user_list"))
-        self.assertEqual(
-            User.objects.get(username="siswaHack").role, User.Role.SISWA
+        user = User.objects.get(nis="99903")
+        self.assertEqual(user.role, User.Role.SISWA)
+        self.assertEqual(user.username, "99903")
+        self.assertFalse(
+            User.objects.filter(username="siswaHack").exists()
         )
         # Tidak ada URL untuk membuat Pustakawan via public UI.
         self.assertEqual(

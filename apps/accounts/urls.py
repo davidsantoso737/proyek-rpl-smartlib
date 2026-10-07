@@ -45,4 +45,24 @@ urlpatterns = [
         views.user_toggle_active_view,
         name="user_toggle_active",
     ),
+    path(
+        "pengguna/<int:pk>/reset-password/",
+        views.user_reset_password_view,
+        name="user_reset_password",
+    ),
+    path(
+        "pengguna/import/<str:kind>/",
+        views.import_upload_view,
+        name="import_upload",
+    ),
+    path(
+        "pengguna/import/<str:kind>/template/",
+        views.import_template_view,
+        name="import_template",
+    ),
+    path(
+        "pengguna/import/<str:kind>/konfirmasi/",
+        views.import_confirm_view,
+        name="import_confirm",
+    ),
 ]

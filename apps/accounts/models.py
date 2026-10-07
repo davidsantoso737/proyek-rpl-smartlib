@@ -51,6 +51,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     department = models.CharField(max_length=100, null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    # P1 — Account Provisioning foundation: akun hasil provisioning
+    # (SISWA/GURU) wajib mengganti password saat login pertama.
+    # Default False agar existing users tetap kompatibel.
+    must_change_password = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

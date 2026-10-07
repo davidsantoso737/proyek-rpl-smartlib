@@ -7,11 +7,18 @@ from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from .authorization import active_login_required, role_required
+from .excel_import import (
+    ExcelImportError,
+    build_template_workbook,
+    parse_import_workbook,
+    template_filename,
+)
 from .forms import (
     INPUT_CLASS,
     MANAGEABLE_ROLES,
@@ -20,6 +27,8 @@ from .forms import (
     ManagedUserUpdateForm,
     ProfileForm,
 )
+from .import_validation import STATUS_VALID, build_preview
+from .import_creation import create_imported_accounts
 
 User = get_user_model()
 
@@ -61,6 +70,8 @@ def login_view(request):
     (pesan generik yang sama).
     """
     if request.user.is_authenticated and request.user.is_active:
+        if getattr(request.user, "must_change_password", False):
+            return redirect("accounts:password_change")
         return redirect("accounts:dashboard")
     if request.method == "POST":
         form = LoginForm(request, data=request.POST)
@@ -73,7 +84,12 @@ def login_view(request):
             )
         elif form.is_valid():
             cache.delete(throttle_key)
-            login(request, form.get_user())
+            user = form.get_user()
+            login(request, user)
+            # P1 — first-login enforcement: akun provisioning wajib
+            # mengganti password sebelum akses normal (abaikan ?next=).
+            if getattr(user, "must_change_password", False):
+                return redirect("accounts:password_change")
             return redirect(_safe_next(request) or "accounts:dashboard")
         else:
             attempts = cache.get(throttle_key, 0) + 1
@@ -179,12 +195,21 @@ def profile_view(request):
 
 @active_login_required
 def password_change_view(request):
-    """Ubah password sendiri dengan verifikasi password lama (NFR-04)."""
+    """Ubah password sendiri dengan verifikasi password lama (NFR-04).
+
+    P1: keberhasilan juga menuntaskan first-login enforcement
+    (must_change_password -> False). View ini dikecualikan dari
+    enforcement agar tidak terjadi redirect loop.
+    """
     if request.method == "POST":
         form = PasswordChangeForm(request.user, request.POST)
         if form.is_valid():
             form.save()
-            update_session_auth_hash(request, form.user)
+            user = form.user
+            if getattr(user, "must_change_password", False):
+                user.must_change_password = False
+                user.save(update_fields=["must_change_password", "updated_at"])
+            update_session_auth_hash(request, user)
             messages.success(request, "Password berhasil diubah.")
             return redirect("accounts:profile")
     else:
@@ -210,8 +235,13 @@ def user_list_view(request):
     else:
         role_filter = ""
     if q:
+        # Username hasil provisioning = NIS/NIP, tetapi akun lama
+        # dapat memiliki username berbeda; cari di ketiganya.
         users = users.filter(
-            Q(username__icontains=q) | Q(full_name__icontains=q)
+            Q(username__icontains=q)
+            | Q(full_name__icontains=q)
+            | Q(nis__icontains=q)
+            | Q(nip__icontains=q)
         )
     users = users.order_by("role", "username")
     paginator = Paginator(users, USER_PAGE_SIZE)
@@ -233,7 +263,11 @@ def user_list_view(request):
 
 @role_required(User.Role.PUSTAKAWAN)
 def user_create_view(request, role):
-    """Tambah akun Siswa/Guru (FR-04, FR-07, BR-77). Hanya Pustakawan."""
+    """Tambah akun Siswa/Guru (FR-04, FR-07, BR-77). Hanya Pustakawan.
+
+    P2 — manual provisioning: username/password awal otomatis =
+    NIS (Siswa) atau NIP (Guru); ``must_change_password`` True.
+    """
     if role not in MANAGEABLE_ROLES:
         raise PermissionDenied(
             "Role tersebut tidak dapat dibuat melalui halaman ini."
@@ -248,10 +282,12 @@ def user_create_view(request, role):
                 user.username,
                 user.role,
             )
+            identifier = user.nis or user.nip or user.username
             messages.success(
                 request,
                 f"Akun {user.username} ({user.get_role_display()}) "
-                "berhasil dibuat.",
+                "berhasil dibuat. Username dan password awal: "
+                f"{identifier}.",
             )
             return redirect("accounts:user_list")
     else:
@@ -266,6 +302,13 @@ def user_create_view(request, role):
             ),
             "submit_label": "Buat akun",
             "cancel_url": "accounts:user_list",
+            "info_text": (
+                "Username dan password awal otomatis sama dengan NIS. "
+                "Siswa wajib mengganti password saat login pertama."
+                if role == User.Role.SISWA
+                else "Username dan password awal otomatis sama dengan NIP. "
+                "Guru wajib mengganti password saat login pertama."
+            ),
         },
     )
 
@@ -322,3 +365,178 @@ def user_toggle_active_view(request, pk):
         f"{'diaktifkan' if user.is_active else 'dinonaktifkan'}.",
     )
     return redirect("accounts:user_list")
+
+
+@role_required(User.Role.PUSTAKAWAN)
+@require_POST
+def user_reset_password_view(request, pk):
+    """Reset password Siswa/Guru ke identifier. Hanya Pustakawan.
+
+    P6: password dikembalikan ke NIS (Siswa) / NIP (Guru), di-hash
+    via set_password, dan ``must_change_password`` diset True
+    sehingga first-login enforcement (P1) berlaku lagi. Role,
+    username, identifier, dan status aktif tidak diubah. Tanpa
+    nilai password di pesan maupun log.
+    """
+    user = _manageable_user_or_404(pk)
+    if user.role == User.Role.SISWA:
+        identifier = (user.nis or "").strip()
+        label = "NIS"
+    else:
+        identifier = (user.nip or "").strip()
+        label = "NIP"
+    if not identifier:
+        messages.error(
+            request,
+            f"Akun {user.username} tidak memiliki {label} "
+            "sehingga password tidak dapat direset.",
+        )
+        return redirect("accounts:user_list")
+    user.set_password(identifier)
+    user.must_change_password = True
+    user.save(update_fields=["password", "must_change_password", "updated_at"])
+    logger.info(
+        "Pustakawan %s mereset password akun %s (%s).",
+        request.user.username,
+        user.username,
+        user.role,
+    )
+    messages.success(
+        request,
+        f"Password {user.username} direset ke {label} awal. "
+        "Pengguna wajib mengganti password saat login berikutnya.",
+    )
+    return redirect("accounts:user_list")
+
+
+IMPORT_SESSION_KEY = "account_import_preview"
+
+IMPORT_XLSX_CONTENT_TYPE = (
+    "application/vnd.openxmlformats-officedocument"
+    ".spreadsheetml.sheet"
+)
+
+
+def _import_kind_or_403(kind):
+    """Hanya SISWA/GURU yang dapat diimport via public UI (scope)."""
+    if kind not in MANAGEABLE_ROLES:
+        raise PermissionDenied(
+            "Jenis import tersebut tidak tersedia."
+        )
+    return kind
+
+
+def _import_context(kind):
+    return {
+        "kind": kind,
+        "kind_title": "Siswa" if kind == User.Role.SISWA else "Guru",
+    }
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def import_upload_view(request, kind):
+    """Upload .xlsx -> parse -> normalisasi -> validasi -> preview.
+
+    Konfirmasi + bulk creation terjadi di ``import_confirm_view``.
+    File hanya dibaca (openpyxl, data_only), tidak dieksekusi;
+    validasi ekstensi + isi dilakukan server-side.
+    """
+    _import_kind_or_403(kind)
+    context = _import_context(kind)
+    if request.method == "POST":
+        uploaded = request.FILES.get("file")
+        if uploaded is None or uploaded.size == 0:
+            context["form_error"] = (
+                "Pilih berkas .xlsx yang akan diimport."
+            )
+            return render(request, "accounts/import_upload.html", context)
+        try:
+            parsed = parse_import_workbook(uploaded, kind)
+        except ExcelImportError as exc:
+            context["form_error"] = str(exc)
+            return render(request, "accounts/import_upload.html", context)
+        preview = build_preview(parsed)
+        request.session[IMPORT_SESSION_KEY] = {
+            "kind": kind,
+            "parsed": parsed,
+        }
+        context["preview"] = preview
+        return render(request, "accounts/import_preview.html", context)
+    return render(request, "accounts/import_upload.html", context)
+
+
+@role_required(User.Role.PUSTAKAWAN)
+def import_template_view(request, kind):
+    """Unduh template .xlsx untuk jenis import (Hanya Pustakawan)."""
+    _import_kind_or_403(kind)
+    response = HttpResponse(
+        build_template_workbook(kind),
+        content_type=IMPORT_XLSX_CONTENT_TYPE,
+    )
+    response["Content-Disposition"] = (
+        f'attachment; filename="{template_filename(kind)}"'
+    )
+    return response
+
+
+@role_required(User.Role.PUSTAKAWAN)
+@require_POST
+def import_confirm_view(request, kind):
+    """Konfirmasi hasil preview dengan validasi ulang terhadap database.
+
+    P5: baris VALID dibuat via bulk creation atomic (transaksi penuh;
+    conflict tak terduga dilewati dengan alasan, error fatal
+    me-rollback seluruh batch). Password awal = identifier (di-hash),
+    tidak pernah ditampilkan per akun.
+    """
+    _import_kind_or_403(kind)
+    stored = request.session.get(IMPORT_SESSION_KEY)
+    if not stored or stored.get("kind") != kind:
+        messages.error(
+            request,
+            "Data preview tidak ditemukan. Silakan upload ulang berkas.",
+        )
+        return redirect("accounts:import_upload", kind=kind)
+    preview = build_preview(stored["parsed"])
+    context = _import_context(kind)
+    context["preview"] = preview
+    if not preview["can_confirm"]:
+        messages.error(
+            request,
+            "Masih ada baris error atau conflict. "
+            "Perbaiki berkas lalu upload ulang; "
+            "tidak ada akun yang dibuat.",
+        )
+        return render(request, "accounts/import_preview.html", context)
+    valid_rows = [
+        {"row_number": row["row_number"], "data": row["data"]}
+        for row in preview["rows"]
+        if row["status"] == STATUS_VALID
+    ]
+    try:
+        result = create_imported_accounts(kind, valid_rows)
+    except Exception:
+        # Fatal: tidak ada yang ter-commit (rollback oleh atomic).
+        # Tidak ada password di log/exception (hanya hitungan).
+        logger.exception(
+            "Import %s oleh %s gagal total (%s baris); rollback.",
+            kind,
+            request.user.username,
+            len(valid_rows),
+        )
+        messages.error(
+            request,
+            "Terjadi kesalahan saat membuat akun. "
+            "Tidak ada akun yang dibuat; silakan coba lagi.",
+        )
+        return render(request, "accounts/import_preview.html", context)
+    request.session.pop(IMPORT_SESSION_KEY, None)
+    logger.info(
+        "Pustakawan %s import %s selesai: %s dibuat, %s dilewati.",
+        request.user.username,
+        kind,
+        result["created_count"],
+        result["skipped_count"],
+    )
+    context["result"] = result
+    return render(request, "accounts/import_result.html", context)

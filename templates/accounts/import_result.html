@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Hasil Import {{ kind_title }} - Digital Library{% endblock %}
+
+{% block content %}
+
+{% url 'accounts:user_list' as back_url %}
+{% include "partials/_back_link.html" with href=back_url label="Kembali ke daftar pengguna" %}
+
+<div class="mb-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+        Import berhasil
+    </h1>
+    <p class="text-slate-500 text-sm mt-1">
+        Total data: {{ result.total }}, berhasil dibuat: {{ result.created_count }}{% if result.skipped_count %}, dilewati: {{ result.skipped_count }}{% endif %}.
+    </p>
+    <div class="text-blue-700 text-sm mt-2 bg-blue-50 border border-blue-200 rounded-xl px-3.5 py-2.5">
+        <p>Password awal siswa = NIS.</p>
+        <p>Password awal guru = NIP.</p>
+        <p>Semua account baru wajib mengganti password saat login pertama.</p>
+    </div>
+</div>
+
+<div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6 mb-6">
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div class="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
+            <p class="text-xs text-slate-500">Total data</p>
+            <p class="text-xl font-bold text-slate-900">{{ result.total }}</p>
+        </div>
+        <div class="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
+            <p class="text-xs text-emerald-700">Berhasil dibuat</p>
+            <p class="text-xl font-bold text-emerald-800">{{ result.created_count }}</p>
+        </div>
+        <div class="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+            <p class="text-xs text-amber-700">Dilewati</p>
+            <p class="text-xl font-bold text-amber-800">{{ result.skipped_count }}</p>
+        </div>
+    </div>
+
+    {% if result.created %}
+        <div class="mt-4 rounded-xl border border-slate-200 overflow-x-auto" tabindex="0" role="region" aria-label="Tabel akun yang dibuat, dapat digeser horizontal">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="bg-slate-50 text-left text-slate-500">
+                        <th scope="col" class="px-4 py-2.5 font-medium">Baris</th>
+                        <th scope="col" class="px-4 py-2.5 font-medium">Username</th>
+                        <th scope="col" class="px-4 py-2.5 font-medium">Nama</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for account in result.created %}
+                        <tr class="hover:bg-slate-50/60">
+                            <td class="px-4 py-2.5 text-slate-600">{{ account.row_number }}</td>
+                            <td class="px-4 py-2.5 font-medium">{{ account.username }}</td>
+                            <td class="px-4 py-2.5">{{ account.full_name }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+    {% if result.skipped %}
+        <div class="mt-4">
+            <h2 class="text-sm font-semibold text-slate-900 mb-2">Data yang tidak diproses</h2>
+            <div class="rounded-xl border border-amber-200 overflow-x-auto" tabindex="0" role="region" aria-label="Tabel data yang dilewati, dapat digeser horizontal">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="bg-amber-50 text-left text-amber-800">
+                            <th scope="col" class="px-4 py-2.5 font-medium">Baris</th>
+                            <th scope="col" class="px-4 py-2.5 font-medium">Identifier</th>
+                            <th scope="col" class="px-4 py-2.5 font-medium">Alasan</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-amber-100">
+                        {% for item in result.skipped %}
+                            <tr>
+                                <td class="px-4 py-2.5 text-slate-600">{{ item.row_number }}</td>
+                                <td class="px-4 py-2.5 font-medium">{{ item.identifier }}</td>
+                                <td class="px-4 py-2.5 text-xs text-slate-600">{{ item.reason }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="flex flex-wrap items-center gap-3 pt-4">
+        <a href="{% url 'accounts:user_list' %}"
+           class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm text-sm">
+            Ke daftar pengguna
+        </a>
+        <a href="{% url 'accounts:import_upload' kind=kind %}"
+           class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+            Import berkas lain
+        </a>
+    </div>
+</div>
+
+{% endblock %}

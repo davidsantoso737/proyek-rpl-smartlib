@@ -1,8 +1,10 @@
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.db.models import Q
+
+from .provisioning import normalize_identifier
 
 User = get_user_model()
 
@@ -58,19 +60,37 @@ class LoginForm(AuthenticationForm):
 
 
 class ProfileForm(forms.ModelForm):
-    """Edit profil milik sendiri: tanpa role/username/NIS/NIP (FR-03)."""
+    """Edit profil milik sendiri (FR-03).
+
+    Username, role, dan NIS/NIP TIDAK ada di form sehingga tidak
+    dapat diubah via self-service. Kelas (Siswa) / Jurusan (Guru)
+    mengikuti field yang tersedia di model.
+    """
 
     class Meta:
         model = User
-        fields = ["full_name", "email", "phone"]
+        fields = [
+            "full_name",
+            "email",
+            "phone",
+            "student_class",
+            "department",
+        ]
         labels = {
             "full_name": "Nama lengkap",
             "email": "Email",
             "phone": "No. HP / Telepon",
+            "student_class": "Kelas",
+            "department": "Jurusan / Departemen",
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        role = getattr(self.instance, "role", None)
+        if role == User.Role.SISWA:
+            del self.fields["department"]
+        elif role == User.Role.GURU:
+            del self.fields["student_class"]
         for field in self.fields.values():
             field.widget.attrs.update({"class": INPUT_CLASS})
 
@@ -103,25 +123,17 @@ def validate_identity_for_role(role, cleaned_data):
 class ManagedUserCreateForm(forms.ModelForm):
     """Tambah akun Siswa/Guru oleh Pustakawan (FR-04, FR-07, NFR-23).
 
-    Role TIDAK ada di form: ditentukan view dari URL sehingga tidak
-    dapat dimanipulasi via POST (role restriction).
+    P2 — manual provisioning: username TIDAK diinput (otomatis =
+    NIS untuk Siswa, NIP untuk Guru), password awal otomatis =
+    identifier yang sama (di-hash via set_password), dan
+    ``must_change_password`` selalu True. Role TIDAK ada di form:
+    ditentukan view dari URL sehingga tidak dapat dimanipulasi
+    via POST (role restriction).
     """
-
-    password1 = forms.CharField(
-        label="Password sementara",
-        widget=forms.PasswordInput,
-        strip=False,
-    )
-    password2 = forms.CharField(
-        label="Ulangi password",
-        widget=forms.PasswordInput,
-        strip=False,
-    )
 
     class Meta:
         model = User
         fields = [
-            "username",
             "full_name",
             "nis",
             "nip",
@@ -131,7 +143,6 @@ class ManagedUserCreateForm(forms.ModelForm):
             "department",
         ]
         labels = {
-            "username": "Username",
             "full_name": "Nama lengkap",
             "nis": "NIS",
             "nip": "NIP",
@@ -139,6 +150,10 @@ class ManagedUserCreateForm(forms.ModelForm):
             "phone": "No. HP / Telepon",
             "student_class": "Kelas",
             "department": "Jurusan / Departemen",
+        }
+        help_texts = {
+            "nis": "Username dan password awal otomatis sama dengan NIS.",
+            "nip": "Username dan password awal otomatis sama dengan NIP.",
         }
 
     def __init__(self, *args, role=None, **kwargs):
@@ -155,13 +170,25 @@ class ManagedUserCreateForm(forms.ModelForm):
         for field in self.fields.values():
             field.widget.attrs.update({"class": INPUT_CLASS})
 
-    def clean_password2(self):
-        password1 = self.cleaned_data.get("password1")
-        password2 = self.cleaned_data.get("password2")
-        if password1 and password2 and password1 != password2:
-            raise ValidationError("Password tidak sama. Ulangi dengan benar.")
-        validate_password(password2)
-        return password2
+    def clean_nis(self):
+        """Normalisasi NIS sebagai string (leading zero dipertahankan)."""
+        value = self.cleaned_data.get("nis", "")
+        if not value or not str(value).strip():
+            return value
+        try:
+            return normalize_identifier(value)
+        except ValueError as exc:
+            raise ValidationError(str(exc))
+
+    def clean_nip(self):
+        """Normalisasi NIP sebagai string (leading zero dipertahankan)."""
+        value = self.cleaned_data.get("nip", "")
+        if not value or not str(value).strip():
+            return value
+        try:
+            return normalize_identifier(value)
+        except ValueError as exc:
+            raise ValidationError(str(exc))
 
     def clean(self):
         cleaned = super().clean()
@@ -169,12 +196,45 @@ class ManagedUserCreateForm(forms.ModelForm):
             self.managed_role, cleaned
         ).items():
             self.add_error(field, message)
+        # Duplikat: tolak sebelum membuat akun; jangan overwrite
+        # account existing. Username otomatis = identifier sehingga
+        # pengecekan username + NIS/NIP mencakup seluruh konflik.
+        if self.managed_role == User.Role.SISWA:
+            nis = cleaned.get("nis")
+            if nis and not self.errors.get("nis"):
+                if User.objects.filter(
+                    Q(username=nis) | Q(nis=nis)
+                ).exists():
+                    self.add_error(
+                        "nis",
+                        "NIS ini sudah digunakan oleh akun lain.",
+                    )
+        elif self.managed_role == User.Role.GURU:
+            nip = cleaned.get("nip")
+            if nip and not self.errors.get("nip"):
+                if User.objects.filter(
+                    Q(username=nip) | Q(nip=nip)
+                ).exists():
+                    self.add_error(
+                        "nip",
+                        "NIP ini sudah digunakan oleh akun lain.",
+                    )
         return cleaned
 
     def save(self, commit=True):
         user = super().save(commit=False)
+        if self.managed_role == User.Role.SISWA:
+            identifier = normalize_identifier(
+                self.cleaned_data["nis"]
+            )
+        else:
+            identifier = normalize_identifier(
+                self.cleaned_data["nip"]
+            )
+        user.username = identifier
         user.role = self.managed_role
-        user.set_password(self.cleaned_data["password1"])
+        user.set_password(identifier)
+        user.must_change_password = True
         if commit:
             user.save()  # User.save() menjalankan full_clean (FR-07).
         return user
