@@ -110,12 +110,36 @@ class ProvisionedUserManagementTests(TestCase):
                 "full_name": "Guru Nol Baru",
                 "email": "",
                 "phone": "",
+                # Field kelas/jurusan tidak tersedia untuk GURU:
+                # dikirim pun diabaikan.
+                "student_class": "XII-A",
                 "department": "Fisika",
             },
         )
         self.assertRedirects(response, reverse("accounts:profile"))
         self.guru.refresh_from_db()
-        self.assertEqual(self.guru.department, "Fisika")
+        self.assertEqual(self.guru.full_name, "Guru Nol Baru")
+        self.assertEqual(self.guru.department, "Matematika")
+        self.assertEqual(self.guru.student_class, None)
+
+    def test_profile_fields_per_role(self):
+        # Flag False agar GET benar-benar merender ProfileForm.
+        for account in (self.siswa, self.guru):
+            account.must_change_password = False
+            account.save(update_fields=["must_change_password", "updated_at"])
+        self.client.force_login(self.siswa)
+        response = self.client.get(reverse("accounts:profile"))
+        self.assertContains(response, 'name="student_class"')
+        self.assertContains(response, 'name="department"')
+        self.client.force_login(self.guru)
+        response = self.client.get(reverse("accounts:profile"))
+        self.assertNotContains(response, 'name="student_class"')
+        self.assertNotContains(response, 'name="department"')
+        self.client.force_login(self.pus)
+        response = self.client.get(reverse("accounts:profile"))
+        self.assertContains(response, 'name="full_name"')
+        self.assertNotContains(response, 'name="student_class"')
+        self.assertNotContains(response, 'name="department"')
 
     def test_activate_deactivate_imported_account(self):
         self.client.force_login(self.pus)

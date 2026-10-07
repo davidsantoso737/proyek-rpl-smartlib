@@ -63,8 +63,8 @@ class ProfileForm(forms.ModelForm):
     """Edit profil milik sendiri (FR-03).
 
     Username, role, dan NIS/NIP TIDAK ada di form sehingga tidak
-    dapat diubah via self-service. Kelas (Siswa) / Jurusan (Guru)
-    mengikuti field yang tersedia di model.
+    dapat diubah via self-service. Kelas dan Jurusan hanya untuk
+    SISWA; GURU dan PUSTAKAWAN hanya full_name, email, phone.
     """
 
     class Meta:
@@ -86,11 +86,9 @@ class ProfileForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        role = getattr(self.instance, "role", None)
-        if role == User.Role.SISWA:
-            del self.fields["department"]
-        elif role == User.Role.GURU:
+        if getattr(self.instance, "role", None) != User.Role.SISWA:
             del self.fields["student_class"]
+            del self.fields["department"]
         for field in self.fields.values():
             field.widget.attrs.update({"class": INPUT_CLASS})
 
