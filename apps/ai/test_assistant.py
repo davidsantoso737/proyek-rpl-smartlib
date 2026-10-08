@@ -194,3 +194,90 @@ class AssistantTests(TestCase):
         self.assertEqual(result["answer"], OUT_OF_SCOPE_FALLBACK)
         self.assertFalse(result["provider_used"])
         self.assertEqual(fake.calls, 0)
+
+    def test_out_of_scope_tugas_teknis_ditolak_default(self):
+        fake = FakeProvider("tidak boleh dipakai")
+        with mock.patch("apps.ai.services.get_provider", return_value=fake):
+            for question in (
+                "buatkan koding python",
+                "buatkan website landing page",
+                "tolong buatkan program kasir",
+                "tuliskan cerita horor untuk saya",
+                "bagaimana cara coding game?",
+                "buatkan coding python untuk menulis nama anda",
+            ):
+                with self.subTest(question=question):
+                    result = ask(self.siswa, question)
+                    self.assertEqual(result["answer"], OUT_OF_SCOPE_FALLBACK)
+                    self.assertFalse(result["provider_used"])
+        self.assertEqual(fake.calls, 0)
+
+    def test_kemampuan_lain_tetap_utuh(self):
+        fake = FakeProvider("tidak boleh dipakai")
+        with mock.patch("apps.ai.services.get_provider", return_value=fake):
+            self.assertEqual(
+                ask(self.siswa, "Halo!")["source"], "smalltalk"
+            )
+            self.assertIn(
+                "AI Assistant", ask(self.siswa, "Siapa anda?")["answer"]
+            )
+            result = ask(self.siswa, "Apakah ada buku Python?")
+            self.assertNotEqual(result["answer"], OUT_OF_SCOPE_FALLBACK)
+            self.assertTrue(result["provider_used"])
+        # Hanya pertanyaan perpustakaan yang memakai provider.
+        self.assertEqual(fake.calls, 1)
+
+    def test_identitas_memperkenalkan_diri(self):
+        fake = FakeProvider("tidak boleh dipakai")
+        with mock.patch("apps.ai.services.get_provider", return_value=fake):
+            for question in (
+                "Siapa anda?",
+                "Kamu siapa?",
+                "Siapa nama kamu?",
+                "Perkenalkan dirimu",
+                "Kamu itu apa?",
+            ):
+                with self.subTest(question=question):
+                    result = ask(self.siswa, question)
+        self.assertEqual(result["source"], "smalltalk")
+        self.assertIn("AI Assistant", result["answer"])
+        self.assertIn("Digital Library", result["answer"])
+        self.assertEqual(fake.calls, 0)
+
+    def test_typo_tetap_dipahami(self):
+        with mock.patch("apps.ai.services.get_provider", return_value=None):
+            for question in (
+                "Belajar Pithon",
+                "buk python",
+                "Belajar Pythoon?",
+                "Pithon",
+            ):
+                with self.subTest(question=question):
+                    result = ask(self.siswa, question)
+                    self.assertIn("Python", result["answer"])
+                    self.assertFalse(result["provider_used"])
+
+    def test_variasi_ejaan_ebook(self):
+        with mock.patch("apps.ai.services.get_provider", return_value=None):
+            for question in (
+                "apakah ada E-book Python?",
+                "cari ebook python",
+                "E-Book apa saja?",
+            ):
+                with self.subTest(question=question):
+                    result = ask(self.siswa, question)
+                    self.assertNotEqual(
+                        result["answer"],
+                        "Maaf, informasi tersebut belum tersedia "
+                        "dalam sistem perpustakaan.",
+                    )
+
+    def test_fakta_jumlah_dari_sistem(self):
+        with mock.patch("apps.ai.services.get_provider", return_value=None):
+            siswa = ask(self.siswa, "berapa jumlah siswa?")
+            self.assertRegex(siswa["answer"], r"\d+")
+            self.assertIn("siswa", siswa["answer"].lower())
+            buku = ask(self.siswa, "berapa banyak buku?")
+            self.assertIn("judul", buku["answer"].lower())
+            fitur = ask(self.siswa, "fitur apa saja yang tersedia?")
+            self.assertIn("katalog", fitur["answer"])
