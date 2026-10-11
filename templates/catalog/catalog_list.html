@@ -4,6 +4,154 @@
 
 {% block content %}
 
+{% if user.role == "PUSTAKAWAN" %}
+<div class="space-y-5">
+    <div class="rounded-xl border border-slate-200/80 bg-white px-4 sm:px-5 py-4 shadow-sm">
+        <form method="get" action="{% url 'catalog:catalog' %}" aria-label="Pencarian katalog" class="flex flex-col md:flex-row md:items-center gap-3">
+            <div class="relative flex-1 min-w-0">
+                <svg class="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+                <label class="sr-only" for="catalog-q">Cari katalog</label>
+                <input id="catalog-q" type="text" name="q" value="{{ q }}" placeholder="Cari judul, penulis, kategori, penerbit, ISBN..."
+                       class="w-full min-w-0 border border-slate-300 rounded-xl pl-9 pr-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-1 focus:border-blue-500">
+            </div>
+            <label class="sr-only" for="catalog-category">Filter kategori</label>
+            <select id="catalog-category" name="category"
+                    class="w-full md:w-auto md:max-w-56 min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-1 focus:border-blue-500">
+                <option value="">Semua kategori</option>
+                {% for category in categories %}
+                    <option value="{{ category.id }}" {% if category_id == category.id|stringformat:"s" %}selected{% endif %}>
+                        {{ category.name }}
+                    </option>
+                {% endfor %}
+            </select>
+            <div class="relative w-full md:w-auto" id="catalog-filter-wrap">
+                <button type="button" id="catalog-filter-btn" aria-expanded="false" aria-controls="catalog-filter-panel"
+                        class="inline-flex w-full md:w-auto items-center justify-center gap-2 min-h-[44px] rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-1">
+                    <svg class="h-[18px] w-[18px] shrink-0 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z"/></svg>
+                    Filter
+                    {% if kind %}<span class="h-2 w-2 rounded-full bg-blue-600" aria-hidden="true"></span><span class="sr-only">(filter jenis aktif)</span>{% endif %}
+                </button>
+                <div id="catalog-filter-panel" class="hidden absolute right-0 top-full z-20 mt-2 w-64 rounded-xl border border-slate-200/80 bg-white p-4 shadow-lg">
+                    <p class="text-xs font-semibold text-slate-500 mb-2" id="catalog-filter-caption">Jenis koleksi</p>
+                    <label class="sr-only" for="catalog-type">Filter tipe koleksi</label>
+                    <select id="catalog-type" name="type" aria-describedby="catalog-filter-caption"
+                            class="w-full min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-1 focus:border-blue-500">
+                        <option value="" {% if kind == "" %}selected{% endif %}>Fisik + E-Book</option>
+                        <option value="book" {% if kind == "book" %}selected{% endif %}>Buku Fisik</option>
+                        <option value="ebook" {% if kind == "ebook" %}selected{% endif %}>E-Book</option>
+                    </select>
+                    <p class="mt-2 text-xs text-slate-500">Pilih jenis, lalu tekan Cari.</p>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit"
+                        class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
+                    Cari
+                </button>
+                {% if q or category_id or kind %}
+                    <a href="{% url 'catalog:catalog' %}"
+                       class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+                        Reset
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <div>
+        <p class="text-[13px] text-slate-500">
+            Ditemukan <span class="font-semibold text-slate-900">{{ result_count }}</span> koleksi.
+        </p>
+
+        {% if page_obj.object_list %}
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 max-w-[1200px] mt-3">
+                {% for item in page_obj.object_list %}
+                    <article class="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden flex flex-col transition motion-safe:hover:-translate-y-0.5 hover:border-blue-200 hover:shadow">
+                        <div class="relative h-36 bg-slate-100 border-b border-slate-100">
+                            <div class="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-4 text-center" aria-hidden="true">
+                                <svg class="h-8 w-8 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10.5 5 8.5 4.5 4 4.5v13c4.5 0 6.5.5 8 2 1.5-1.5 3.5-2 8-2v-13c-4.5 0-6.5.5-8 2Z"/><path d="M12 6.5v13"/></svg>
+                                <p class="text-xs text-slate-500">Tanpa sampul</p>
+                            </div>
+                            {% if item.obj.cover_url %}
+                                <img src="{{ item.obj.cover_url }}" alt="Sampul {{ item.title }}" loading="lazy"
+                                     class="relative h-full w-full object-contain bg-slate-100" onerror="this.remove()">
+                            {% endif %}
+                            <span class="absolute left-3 top-3 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-white/95 text-slate-700 shadow-sm">
+                                {% if item.kind == "book" %}Buku Fisik{% else %}E-Book{% endif %}
+                            </span>
+                        </div>
+                        <div class="flex flex-1 flex-col p-4">
+                            <div class="flex-1">
+                                <h2 class="text-sm font-semibold text-slate-900 leading-snug line-clamp-2 break-words">
+                                    {{ item.title }}
+                                </h2>
+                                <p class="text-[13px] text-slate-500 mt-1 truncate">
+                                    {{ item.authors|join:", "|default:"Penulis tidak tercatat" }}
+                                </p>
+                                <p class="text-xs text-slate-500 mt-0.5 truncate">
+                                    {{ item.obj.category.name }}
+                                </p>
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                                {% if item.kind == "book" %}
+                                    {% if item.available > 0 %}
+                                        <span class="text-xs font-semibold text-emerald-700">{{ item.available }} dari {{ item.total }} tersedia</span>
+                                    {% else %}
+                                        <span class="text-xs font-semibold text-amber-700">Sedang tidak tersedia</span>
+                                    {% endif %}
+                                    <a href="{% url 'catalog:book_detail' item.obj.pk %}"
+                                       class="text-blue-600 hover:underline text-sm font-medium shrink-0">Detail</a>
+                                {% else %}
+                                    <span class="text-xs font-semibold text-emerald-700">Tersedia sebagai e-book</span>
+                                    <a href="{% url 'catalog:ebook_detail' item.obj.pk %}"
+                                       class="text-blue-600 hover:underline text-sm font-medium shrink-0">Detail</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+
+            {% include "partials/_pagination.html" %}
+        {% else %}
+            <div class="text-center py-12">
+                <p class="text-slate-900 font-semibold mb-1">Tidak ada koleksi yang cocok.</p>
+                <p class="text-slate-500 text-sm">Coba kata kunci lain atau ubah filter kategori dan tipe koleksi.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+<script>
+(function () {
+    var wrap = document.getElementById("catalog-filter-wrap");
+    if (!wrap) {
+        return;
+    }
+    var btn = document.getElementById("catalog-filter-btn");
+    var panel = document.getElementById("catalog-filter-panel");
+    function setPanel(open) {
+        panel.classList.toggle("hidden", !open);
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    btn.addEventListener("click", function (event) {
+        event.stopPropagation();
+        setPanel(panel.classList.contains("hidden"));
+    });
+    document.addEventListener("click", function (event) {
+        if (!wrap.contains(event.target)) {
+            setPanel(false);
+        }
+    });
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !panel.classList.contains("hidden")) {
+            setPanel(false);
+            btn.focus();
+        }
+    });
+})();
+</script>
+{% else %}
+
 <div class="mb-6">
     <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
         Katalog Koleksi
@@ -101,5 +249,6 @@
         {% endif %}
     </div>
 </div>
+{% endif %}
 
 {% endblock %}
