@@ -162,6 +162,13 @@ def guru_dashboard_view(request):
 
 @role_required(User.Role.PUSTAKAWAN)
 def pustakawan_dashboard_view(request):
+    try:
+        from apps.circulation.models import Loan
+        from apps.circulation.services import LOAN_ACTIVE
+
+        active_loans = Loan.objects.filter(status=LOAN_ACTIVE).count()
+    except Exception:
+        active_loans = 0
     return render(
         request,
         "accounts/dashboard.html",
@@ -171,6 +178,7 @@ def pustakawan_dashboard_view(request):
                 "Area administratif perpustakaan. "
                 "Pengelolaan lanjutan mengikuti requirement tiap modul."
             ),
+            "active_loans": active_loans,
         },
     )
 

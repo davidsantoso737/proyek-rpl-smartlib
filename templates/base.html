@@ -15,19 +15,52 @@
 
 <body class="min-h-screen flex flex-col bg-slate-100 text-slate-900 antialiased">
 
-    <header id="site-header" class="print:hidden sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
-        {% with current_url=request.resolver_match.url_name|default:"" current_ns=request.resolver_match.namespace|default:"" %}
+    {% with current_url=request.resolver_match.url_name|default:"" current_ns=request.resolver_match.namespace|default:"" %}
+    {% if user.is_authenticated and user.role == "PUSTAKAWAN" %}
+    <div class="w-full px-4 sm:px-6 lg:px-0">
+        <div class="items-start lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
+            <aside class="sticky top-0 hidden max-h-[100dvh] overflow-y-auto rounded-br-xl border border-t-0 border-slate-200/80 bg-white px-3 py-2 shadow-sm lg:block" aria-label="Panel navigasi pustakawan">
+                {% include "partials/_librarian_sidebar.html" %}
+            </aside>
+            <div class="min-w-0">
+    {% endif %}
+    <header id="site-header" class="print:hidden sticky top-0 z-30 {% if user.is_authenticated and user.role == 'PUSTAKAWAN' %}bg-white/95 backdrop-blur border border-t-0 border-slate-200/80 shadow-sm rounded-b-xl lg:border-l-0 lg:rounded-none{% else %}bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm{% endif %}">
+        {% if user.is_authenticated and user.role == "PUSTAKAWAN" %}
+        <div class="flex min-h-[68px] items-center justify-between gap-3 py-2 lg:px-8">
+            <div class="flex items-center">
+                <button id="nav-toggle" type="button"
+                        class="lg:hidden inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-700 hover:bg-slate-100"
+                        aria-expanded="false" aria-controls="mobile-nav" aria-label="Buka menu navigasi">
+                    <svg id="nav-icon-open" class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16"/></svg>
+                    <svg id="nav-icon-close" class="hidden h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+                </button>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <a href="{% url 'notifications:list' %}"
+                   class="relative inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-700 hover:bg-slate-100"
+                   aria-label="Notifikasi{% if unread_notifications %}, {{ unread_notifications }} belum dibaca{% endif %}">
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+                    {% if unread_notifications %}<span class="absolute right-1 top-1 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ unread_notifications }}</span>{% endif %}
+                </a>
+                <a href="{% url 'accounts:profile' %}"
+                   class="flex items-center gap-2.5 min-h-[44px] rounded-xl py-1.5 pl-1.5 pr-1.5 sm:pr-3 hover:bg-slate-100">
+                    <span class="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white" aria-hidden="true">{{ user.full_name|default:user.username|slice:":1"|upper }}</span>
+                    <span class="hidden sm:block leading-tight text-left">
+                        <span class="block text-sm font-medium text-slate-900">{{ user.full_name }}</span>
+                        <span class="block text-xs text-slate-500">Pustakawan</span>
+                    </span>
+                </a>
+            </div>
+        </div>
+        <div id="mobile-nav" class="hidden lg:hidden border-t border-slate-200">
+            <nav aria-label="Navigasi seluler" class="py-3 max-h-[calc(100dvh-6rem)] overflow-y-auto">
+                {% include "partials/_librarian_sidebar.html" %}
+            </nav>
+        </div>
+        {% else %}
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-2 flex items-center justify-between gap-3">
-            <a href="{% if user.is_authenticated %}{% url 'accounts:dashboard' %}{% else %}{% url 'accounts:login' %}{% endif %}"
-               class="flex items-center gap-2.5 shrink-0">
-                <span class="flex items-center justify-center w-9 h-9 rounded-xl bg-blue-600 text-white text-lg font-bold shadow">
-                    D
-                </span>
-                <span class="leading-tight">
-                    <span class="block font-bold text-slate-900">Digital Library</span>
-                    <span class="block text-xs text-slate-500">Perpustakaan Sekolah</span>
-                </span>
-            </a>
+            {% if user.is_authenticated %}{% url 'accounts:dashboard' as brand_href %}{% else %}{% url 'accounts:login' as brand_href %}{% endif %}
+            {% include "partials/_brand.html" with href=brand_href %}
 
             {% if user.is_authenticated %}
             <nav aria-label="Navigasi utama" class="hidden xl:flex items-center gap-1 text-sm">
@@ -185,7 +218,8 @@
             </a>
             {% endif %}
         </div>
-        {% if user.is_authenticated %}
+        {% endif %}
+        {% if user.is_authenticated and user.role != "PUSTAKAWAN" %}
         <div id="mobile-nav" class="hidden xl:hidden border-t border-slate-200 bg-white">
             <nav aria-label="Navigasi seluler" class="max-w-6xl mx-auto px-4 sm:px-6 py-3 space-y-5 max-h-[calc(100dvh-4rem)] overflow-y-auto">
                 <div class="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-700 w-fit">
@@ -341,7 +375,7 @@
         {% endwith %}
     </header>
 
-    <main class="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <main class="{% if user.is_authenticated and user.role == 'PUSTAKAWAN' %}w-full flex-1 py-6 sm:py-8 lg:px-8{% else %}flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8{% endif %}">
         {% if messages %}
             <div class="mb-6 space-y-2">
                 {% for message in messages %}
@@ -355,12 +389,20 @@
         {% block content %}
         {% endblock %}
     </main>
+    {% if user.is_authenticated and user.role == "PUSTAKAWAN" %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
+    {% if user.is_authenticated and user.role == "PUSTAKAWAN" %}
+    {% else %}
     <footer class="print:hidden border-t border-slate-200 bg-white">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-xs text-slate-500">
             Digital Library &mdash; Sistem Perpustakaan Sekolah
         </div>
     </footer>
+    {% endif %}
 
 <script>
 (function () {
