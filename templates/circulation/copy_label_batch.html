@@ -4,26 +4,22 @@
 
 {% block content %}
 
-<div class="mb-4">
-    <a href="{% url 'catalog:manage_books' %}" class="text-sm text-blue-600 hover:underline font-medium">
-        &larr; Kembali ke kelola koleksi
-    </a>
-</div>
+{% url 'catalog:manage_books' as back_url %}
+{% include "partials/_back_link.html" with href=back_url label="Kembali ke kelola koleksi" %}
 
-<div class="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
-    <div class="border-b border-slate-100 px-6 sm:px-8 py-6">
-        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-            Cetak Label Massal
-        </h1>
+<div class="manage-form rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+    <div class="px-4 sm:px-5 pt-4 sm:pt-5">
+        <h1 class="text-xl font-semibold text-slate-900">Cetak Label Massal</h1>
         <p class="text-slate-500 text-sm mt-1">
             Saring per buku, pilih eksemplar, cetak semuanya dalam satu halaman.
         </p>
     </div>
 
-    <div class="p-6 sm:p-8 space-y-6">
-        <form method="get" action="{% url 'circulation:copy_label_batch' %}" class="flex flex-col sm:flex-row gap-3">
-            <select name="book"
-                    class="flex-1 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+    <div class="px-4 sm:px-5 py-4 space-y-4">
+        <form method="get" action="{% url 'circulation:copy_label_batch' %}" class="flex flex-col sm:flex-row gap-2">
+            <label class="sr-only" for="batch-book">Pilih buku</label>
+            <select id="batch-book" name="book"
+                    class="flex-1 min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 <option value="">Pilih buku...</option>
                 {% for book in books %}
                     <option value="{{ book.pk }}" {% if selected_book and selected_book.pk == book.pk %}selected{% endif %}>
@@ -39,21 +35,21 @@
 
         {% if selected_book %}
             <form method="get" action="{% url 'circulation:copy_label_print' %}">
-                <h2 class="font-semibold text-slate-900 mb-3">
+                <h2 class="text-base font-semibold text-slate-900 mb-1">
                     {{ selected_book.title }} ({{ copies|length }} eksemplar)
                 </h2>
                 {% if copies %}
-                    <div class="space-y-2 mb-4">
+                    <div class="space-y-2 mb-4 max-h-96 overflow-y-auto pr-1">
                         {% for copy in copies %}
-                            <label class="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-2.5 text-sm cursor-pointer hover:bg-slate-50">
-                                <input type="checkbox" name="copy" value="{{ copy.pk }}" checked class="accent-blue-600">
-                                <span class="font-medium">{{ copy.copy_code }}</span>
+                            <label class="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-2.5 text-sm cursor-pointer transition hover:bg-slate-50">
+                                <input type="checkbox" name="copy" value="{{ copy.pk }}" checked class="h-4 w-4 shrink-0 accent-blue-600">
+                                <span class="font-medium text-slate-900">{{ copy.copy_code }}</span>
                                 <span class="text-slate-500">{{ copy.status }} &middot; {{ copy.location }}</span>
                             </label>
                         {% endfor %}
                     </div>
                     <button type="submit"
-                            class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
+                            class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
                         Cetak terpilih
                     </button>
                 {% else %}

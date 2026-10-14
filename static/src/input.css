@@ -22,6 +22,23 @@
   outline-offset: 2px;
 }
 
+/* Phase 6H: single focus signal on manage forms. INPUT_CLASS already
+   paints a 2px blue-500 ring (3.68:1 on white, clears the 3:1 indicator
+   bar), so the global outline is dropped inside .manage-form to avoid a
+   stacked ring-plus-outline. Checkboxes and radios are excluded: their
+   plain widgets carry no ring, so they keep the global outline.
+   Keyboard focus stays clearly visible via the ring; nothing outside
+   .manage-form is affected.
+   Phase 6H follow-up: a global outline removal was audited and rejected.
+   Hand-written text controls live in 15+ templates (their classes sit on
+   continuation lines, so absence of ring utilities cannot be proven by a
+   line scan); the safe system stays ring on styled fields plus the
+   global outline fallback everywhere else. */
+.manage-form :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus-visible {
+  outline: none;
+  outline-offset: 0;
+}
+
 /* Typography guard: pin the entire application to the sans stack
    explicitly (same stack as Tailwind preflight). Unlayered author CSS
    wins over layered utilities, so no utility or build artifact can

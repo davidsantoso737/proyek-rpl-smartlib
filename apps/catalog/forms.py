@@ -46,6 +46,7 @@ class BookForm(forms.ModelForm):
             "cover_url": "URL sampul",
             "is_active": "Aktif di katalog",
         }
+        widgets = {"description": forms.Textarea(attrs={"rows": 4})}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -195,6 +196,7 @@ class EbookForm(forms.ModelForm):
             "version": "Versi",
             "is_active": "Aktif di katalog",
         }
+        widgets = {"description": forms.Textarea(attrs={"rows": 4})}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

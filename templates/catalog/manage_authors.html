@@ -4,39 +4,51 @@
 
 {% block content %}
 
-{% url 'catalog:manage_books' as back_url %}
-{% include "partials/_back_link.html" with href=back_url label="Kembali ke kelola koleksi" %}
-
-<div class="mb-6">
-    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">Penulis</h1>
-    <p class="text-slate-500 text-sm mt-1">
-        Daftar penulis koleksi. Penulis yang masih dipakai buku tidak dapat dihapus.
-    </p>
+<div class="mb-4">
+    <a href="{% url 'catalog:manage_books' %}"
+       class="inline-flex items-center gap-2 min-h-[44px] rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50">
+        <svg class="h-[18px] w-[18px] shrink-0 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/></svg>
+        Kembali ke kelola koleksi
+    </a>
 </div>
 
-<div class="space-y-6">
-    <div class="grid gap-6 md:grid-cols-2">
-    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
-        <div class="space-y-2">
-            {% for author in authors %}
-                <div class="flex items-center justify-between gap-2 rounded-xl border border-slate-200 px-4 py-2.5">
-                    <span class="text-sm font-medium">{{ author.name }}</span>
-                    <form method="post" action="{% url 'catalog:manage_author_delete' author.pk %}" class="inline">
-                        {% csrf_token %}
-                        <button type="submit" onclick="return confirm('Hapus penulis ini?')"
-                                class="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-medium transition">
-                            Hapus
-                        </button>
-                    </form>
-                </div>
-            {% empty %}
-                <p class="text-sm text-slate-500">Belum ada penulis.</p>
-            {% endfor %}
-        </div>
-    </div>
+<h1 class="text-xl font-semibold text-slate-900 mb-4">Penulis</h1>
 
-    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6 h-fit">
-        <h2 class="text-base font-semibold text-slate-900 mb-3">Tambah penulis</h2>
+<div class="grid items-start gap-4 lg:grid-cols-5">
+    <section class="lg:col-span-3 rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden" aria-labelledby="author-list-heading">
+        <div class="px-4 sm:px-5 py-3.5 border-b border-slate-200/80">
+            <div class="flex items-center gap-2">
+                <svg class="h-[18px] w-[18px] shrink-0 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <h2 id="author-list-heading" class="text-sm font-semibold text-slate-900">
+                    Daftar penulis
+                    <span class="ml-1 font-medium text-slate-500">{{ authors|length }}</span>
+                </h2>
+            </div>
+            <p class="mt-1 text-xs text-slate-500">Penulis yang masih dipakai koleksi tidak dapat dihapus.</p>
+        </div>
+        {% if authors %}
+            <ul class="divide-y divide-slate-100">
+                {% for author in authors %}
+                    <li class="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 transition hover:bg-slate-50/60">
+                        <span class="min-w-0 flex-1 text-sm font-medium text-slate-800">{{ author.name }}</span>
+                        <form method="post" action="{% url 'catalog:manage_author_delete' author.pk %}" class="inline shrink-0">
+                            {% csrf_token %}
+                            <button type="submit" onclick="return confirm('Hapus penulis ini?')" title="Hapus"
+                                    aria-label="Hapus penulis {{ author.name }}"
+                                    class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 text-red-700 transition">
+                                <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>
+                            </button>
+                        </form>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="px-4 sm:px-5 py-8 text-center text-sm text-slate-500">Belum ada penulis.</p>
+        {% endif %}
+    </section>
+
+    <section class="lg:col-span-2 h-fit rounded-xl border border-slate-200/80 bg-white shadow-sm p-4 sm:p-5" aria-labelledby="author-add-heading">
+        <h2 id="author-add-heading" class="text-base font-semibold text-slate-900 mb-3">Tambah penulis</h2>
         <form method="post" action="{% url 'catalog:manage_authors' %}" class="space-y-4">
             {% csrf_token %}
             {% for field in form %}
@@ -52,12 +64,13 @@
             {% endfor %}
             <div class="flex flex-wrap items-center gap-3 pt-1">
                 <button type="submit"
-                        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm">
+                        class="inline-flex items-center gap-1.5 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition shadow-sm">
+                    <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5v15m7.5-7.5h-15"/></svg>
                     Tambah
                 </button>
             </div>
         </form>
-    </div>
+    </section>
 </div>
 
 {% endblock %}

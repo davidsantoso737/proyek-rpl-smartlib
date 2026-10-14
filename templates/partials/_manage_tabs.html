@@ -1,0 +1,25 @@
+{# SmartLib partial: collection-management tab group. #}
+{# Param: active ("books" or "ebooks"). Segmented control reusing the #}
+{# sidebar active language (blue-50 surface, blue-700 semibold text, #}
+{# aria-current) so the current page reads beyond color alone. #}
+{# Used by manage_book_list.html and manage_ebook_list.html only. #}
+<nav aria-label="Navigasi kelola koleksi" class="flex gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1">
+    <a href="{% url 'catalog:manage_books' %}"
+       class="whitespace-nowrap inline-flex items-center min-h-[44px] rounded-lg px-3.5 text-sm {% if active == 'books' %}bg-white font-semibold text-blue-700 shadow-sm{% else %}font-medium text-slate-600 hover:text-slate-900{% endif %}"
+       {% if active == "books" %}aria-current="page"{% endif %}>
+        Kelola Koleksi
+    </a>
+    <a href="{% url 'catalog:manage_ebooks' %}"
+       class="whitespace-nowrap inline-flex items-center min-h-[44px] rounded-lg px-3.5 text-sm {% if active == 'ebooks' %}bg-white font-semibold text-blue-700 shadow-sm{% else %}font-medium text-slate-600 hover:text-slate-900{% endif %}"
+       {% if active == "ebooks" %}aria-current="page"{% endif %}>
+        Kelola E-Book
+    </a>
+    <a href="{% url 'catalog:manage_categories' %}"
+       class="whitespace-nowrap inline-flex items-center min-h-[44px] rounded-lg px-3.5 text-sm font-medium text-slate-600 hover:text-slate-900">
+        Kategori
+    </a>
+    <a href="{% url 'catalog:manage_authors' %}"
+       class="whitespace-nowrap inline-flex items-center min-h-[44px] rounded-lg px-3.5 text-sm font-medium text-slate-600 hover:text-slate-900">
+        Penulis
+    </a>
+</nav>
