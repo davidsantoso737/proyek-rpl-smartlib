@@ -22,21 +22,26 @@
   outline-offset: 2px;
 }
 
-/* Phase 6H: single focus signal on manage forms. INPUT_CLASS already
-   paints a 2px blue-500 ring (3.68:1 on white, clears the 3:1 indicator
-   bar), so the global outline is dropped inside .manage-form to avoid a
-   stacked ring-plus-outline. Checkboxes and radios are excluded: their
-   plain widgets carry no ring, so they keep the global outline.
-   Keyboard focus stays clearly visible via the ring; nothing outside
-   .manage-form is affected.
-   Phase 6H follow-up: a global outline removal was audited and rejected.
-   Hand-written text controls live in 15+ templates (their classes sit on
-   continuation lines, so absence of ring utilities cannot be proven by a
-   line scan); the safe system stays ring on styled fields plus the
-   global outline fallback everywhere else. */
-.manage-form :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus-visible {
+/* Focus standard (audit-017): ONE indicator per control family.
+   Proven by full-template scan: every text-like control (text, search,
+   number, date, url, email, tel, password, file, select, textarea)
+   already carries a 2px blue-500 ring utility (3.68:1 on white, no
+   layout shift since it is box-shadow), so the global outline is
+   dropped for exactly those controls to end the stacked ring-plus-
+   outline that looked like a thick blue frame on keyboard focus.
+   Buttons, links, checkboxes, and radios keep the global outline
+   above: their native indicators must not be removed. */
+:is(input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="image"]):not([type="hidden"]), select, textarea):focus-visible {
   outline: none;
   outline-offset: 0;
+}
+
+/* Third-party scanner carve-out: controls injected by the QR library
+   inside #qr-reader carry no project ring utility, so they keep the
+   global outline and never lose keyboard visibility. */
+#qr-reader :is(input, select, textarea, button):focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 2px;
 }
 
 /* Typography guard: pin the entire application to the sans stack

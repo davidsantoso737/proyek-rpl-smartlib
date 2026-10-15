@@ -147,5 +147,15 @@ class OpnameTests(TestCase):
         response = self.client.get(
             reverse("inventory:opname_detail", args=[opname.pk])
         )
+        # Alur per-buku: tanpa buku terpilih, daftar global disembunyikan.
+        self.assertContains(response, "Pilih buku untuk mulai memeriksa.")
+        self.assertNotContains(response, "OP-002")
+        from apps.catalog.models import BookCopy
+
+        book_pk = BookCopy.objects.get(copy_code="OP-001").book_id
+        response = self.client.get(
+            reverse("inventory:opname_detail", args=[opname.pk]),
+            {"book": book_pk},
+        )
         self.assertContains(response, "OP-001")
         self.assertContains(response, "OP-002")

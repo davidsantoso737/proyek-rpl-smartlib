@@ -87,13 +87,80 @@ class OpenAICompatibleProvider(AIProvider):
             raise AIProviderError(AIProviderError.MALFORMED) from exc
 
 
+class NodeProvider(AIProvider):
+    """Adapter layanan Node.js ai-node/ (gateway pemanggilan provider).
+
+    Django tetap membangun system prompt + konteks dan memegang fallback;
+    Node hanya meneruskan ke provider eksternal. Gagal/tidak terjangkau
+    -> AIProviderError seperti adapter langsung, sehingga alur fallback
+    di services.ask() tidak berubah.
+    """
+
+    def __init__(self, node_url, shared_secret, timeout):
+        self.node_url = node_url.rstrip("/")
+        self.shared_secret = shared_secret
+        self.timeout = timeout
+
+    def complete(self, system_prompt, user_text, context):
+        payload = {
+            "systemPrompt": system_prompt,
+            "userText": user_text,
+            "context": context,
+        }
+        request = urllib.request.Request(
+            f"{self.node_url}/api/complete",
+            data=json.dumps(payload, default=str).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "X-AI-Node-Secret": self.shared_secret,
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as resp:
+                status = getattr(resp, "status", 200)
+                body = resp.read().decode("utf-8")
+        except socket.timeout as exc:
+            raise AIProviderError(AIProviderError.TIMEOUT) from exc
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429:
+                raise AIProviderError(AIProviderError.RATE_LIMITED) from exc
+            if exc.code in (408, 504):
+                raise AIProviderError(AIProviderError.TIMEOUT) from exc
+            raise AIProviderError(AIProviderError.UNAVAILABLE) from exc
+        except (urllib.error.URLError, OSError, ValueError) as exc:
+            raise AIProviderError(AIProviderError.UNAVAILABLE) from exc
+        if status == 429:
+            raise AIProviderError(AIProviderError.RATE_LIMITED)
+        if status in (408, 504):
+            raise AIProviderError(AIProviderError.TIMEOUT)
+        if status != 200:
+            raise AIProviderError(AIProviderError.UNAVAILABLE)
+        try:
+            data = json.loads(body)
+            text = data["text"]
+            if not isinstance(text, str) or not text.strip():
+                raise AIProviderError(AIProviderError.MALFORMED)
+            return text.strip()
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            raise AIProviderError(AIProviderError.MALFORMED) from exc
+
+
 def get_provider():
     """Bangun adapter dari konfigurasi; None bila API key belum diisi.
 
-    Tanpa API key tidak ada API call apa pun (mode lokal).
+    Tanpa API key tidak ada API call apa pun (mode lokal). Bila layanan
+    Node dikonfigurasi (AI_NODE_URL + secret), ia dipakai sebagai jalur
+    pemanggilan provider; bila tidak, jalur langsung yang lama dipakai.
     """
     from django.conf import settings
 
+    node_url = (settings.AI_NODE_URL or "").strip()
+    node_secret = (settings.AI_NODE_SHARED_SECRET or "").strip()
+    if node_url and node_secret:
+        return NodeProvider(
+            node_url, node_secret, settings.AI_NODE_TIMEOUT_SECONDS
+        )
     base_url = (settings.AI_PROVIDER_BASE_URL or "").strip()
     api_key = (settings.AI_API_KEY or "").strip()
     model = (settings.AI_MODEL or "").strip()

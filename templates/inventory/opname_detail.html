@@ -9,8 +9,8 @@
 {% include "partials/_back_link.html" with href=back_url label="Kembali ke daftar opname" %}
 
 <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-            <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+        <div class="min-w-0">
+            <h1 class="text-xl font-semibold text-slate-900">
                 Opname #{{ opname.pk }}
             </h1>
             <p class="text-slate-500 text-sm mt-1">
@@ -19,28 +19,66 @@
             </p>
         </div>
         {% if is_running %}
-            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-700">Berjalan</span>
+            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700">Berjalan</span>
         {% else %}
-            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-100 text-emerald-700">Selesai</span>
+            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700">Selesai</span>
         {% endif %}
 </div>
 
-<div class="space-y-6">
-    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6 space-y-6">
-        <div class="grid grid-cols-3 gap-3 text-center">
-            <div class="rounded-xl bg-slate-50 border border-slate-200 p-4">
-                <p class="text-2xl font-bold text-slate-900">{{ expected_count }}</p>
-                <p class="text-xs text-slate-500">Ekspektasi</p>
+<div class="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+    <div class="px-4 sm:px-5 py-4 space-y-4">
+        <section aria-labelledby="opname-book-heading">
+            <h2 id="opname-book-heading" class="text-sm font-semibold text-slate-900 mb-1">Buku yang diperiksa</h2>
+            {% if selected_book %}
+                <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3">
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium text-slate-900">{{ selected_book.title }}</p>
+                        <p class="text-xs text-slate-500 mt-0.5">{{ expected_count }} eksemplar dalam cakupan buku ini.</p>
+                    </div>
+                    <a href="{% url 'inventory:opname_detail' opname.pk %}"
+                       class="inline-flex items-center min-h-[44px] rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium px-4 transition">
+                        Ganti buku
+                    </a>
+                </div>
+            {% else %}
+                <form method="get" action="{% url 'inventory:opname_detail' opname.pk %}" class="flex flex-col sm:flex-row gap-2">
+                    <label class="sr-only" for="opname-book">Pilih buku</label>
+                    <select id="opname-book" name="book"
+                            class="flex-1 min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Pilih buku untuk diperiksa...</option>
+                        {% for book in books %}
+                            <option value="{{ book.pk }}">{{ book.title }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit"
+                            class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 py-2.5 min-h-[44px] rounded-xl transition shadow-sm">
+                        Tampilkan
+                    </button>
+                </form>
+            {% endif %}
+        </section>
+
+        <section aria-label="Ringkasan progres" class="border-t border-slate-200/80 pt-4">
+            <div class="grid grid-cols-3 gap-3 text-center">
+                <div class="rounded-xl bg-white border border-slate-200/80 p-3 sm:p-4">
+                    <p class="text-2xl font-semibold text-slate-900">{{ expected_count }}</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Ekspektasi</p>
+                </div>
+                <div class="rounded-xl bg-white border border-slate-200/80 p-3 sm:p-4">
+                    <p class="text-2xl font-semibold text-emerald-700">{{ found|length }}</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Ditemukan</p>
+                </div>
+                <div class="rounded-xl bg-white border border-slate-200/80 p-3 sm:p-4">
+                    <p class="text-2xl font-semibold text-amber-700">{{ missing|length }}</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Belum ditemukan</p>
+                </div>
             </div>
-            <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-4">
-                <p class="text-2xl font-bold text-emerald-700">{{ found|length }}</p>
-                <p class="text-xs text-slate-500">Ditemukan</p>
-            </div>
-            <div class="rounded-xl bg-red-50 border border-red-200 p-4">
-                <p class="text-2xl font-bold text-red-700">{{ missing|length }}</p>
-                <p class="text-xs text-slate-500">Belum ditemukan</p>
-            </div>
-        </div>
+            {% if selected_book %}
+                <p class="mt-2 text-xs text-slate-500">
+                    Cakupan buku ini. Sesi keseluruhan: {{ session_expected }} ekspektasi &middot; {{ session_found }} ditemukan.
+                </p>
+            {% endif %}
+        </section>
 
         {% if is_running %}
             {% if error %}
@@ -49,7 +87,7 @@
                 </p>
             {% endif %}
 
-            <form method="post" action="{% url 'inventory:opname_detail' opname.pk %}" id="opname-form" class="space-y-4">
+            <form method="post" action="{% url 'inventory:opname_detail' opname.pk %}{% if selected_book %}?book={{ selected_book.pk }}{% endif %}" id="opname-form" class="space-y-3">
                 {% csrf_token %}
                 <div>
                     <label for="code-input" class="block text-sm font-medium text-slate-700 mb-1.5">
@@ -60,7 +98,7 @@
                                placeholder="Contoh: COPY-001"
                                class="flex-1 min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         <button type="submit"
-                                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
+                                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 min-h-[44px] rounded-xl transition shadow-sm">
                             Tandai ditemukan
                         </button>
                     </div>
@@ -72,55 +110,65 @@
             <form method="post" action="{% url 'inventory:opname_complete' opname.pk %}">
                 {% csrf_token %}
                 <button type="submit" onclick="return confirm('Selesaikan sesi opname ini?')"
-                        class="w-full sm:w-auto bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
+                        class="w-full sm:w-auto bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-6 py-2.5 min-h-[44px] rounded-xl transition shadow-sm">
                     Selesaikan opname
                 </button>
             </form>
         {% endif %}
 
-        <div class="grid gap-6 md:grid-cols-2">
-            <div>
-                <h2 class="text-base font-semibold text-slate-900 mb-3">Ditemukan ({{ found|length }})</h2>
-                {% if found %}
-                    <div class="rounded-xl border border-emerald-200 overflow-x-auto" tabindex="0" role="region" aria-label="Tabel eksemplar ditemukan, dapat digeser horizontal">
-                        <table class="w-full text-sm">
-                            <tbody class="divide-y divide-slate-100">
-                                {% for copy in found %}
-                                    <tr>
-                                        <td class="px-4 py-2 font-medium">{{ copy.copy_code }}</td>
-                                        <td class="px-4 py-2 text-slate-600">{{ copy.book.title }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+        <section aria-label="Hasil pemeriksaan" class="border-t border-slate-200/80 pt-4">
+            {% if selected_book %}
+                <div class="grid items-start gap-4 md:grid-cols-2">
+                    <div>
+                        <h2 class="text-sm font-semibold text-slate-900 mb-2">Ditemukan ({{ found|length }})</h2>
+                        {% if found %}
+                            <div class="rounded-xl border border-slate-200/80 overflow-x-auto" tabindex="0" role="region" aria-label="Tabel eksemplar ditemukan, dapat digeser horizontal">
+                                <table class="w-full text-sm">
+                                    <tbody class="divide-y divide-slate-100">
+                                        {% for copy in found %}
+                                            <tr class="hover:bg-slate-50/60">
+                                                <td class="px-4 py-2.5 font-medium text-slate-900 whitespace-nowrap">{{ copy.copy_code }}</td>
+                                                <td class="px-4 py-2.5 text-slate-600">{{ copy.book.title }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="text-[13px] text-slate-500">Belum ada yang dipindai pada buku ini.</p>
+                        {% endif %}
                     </div>
-                {% else %}
-                    <p class="text-sm text-slate-500">Belum ada yang dipindai.</p>
-                {% endif %}
-            </div>
-            <div>
-                <h2 class="text-base font-semibold text-slate-900 mb-3">Belum ditemukan ({{ missing|length }})</h2>
-                {% if missing %}
-                    <div class="rounded-xl border border-red-200 overflow-x-auto" tabindex="0" role="region" aria-label="Tabel eksemplar belum ditemukan, dapat digeser horizontal">
-                        <table class="w-full text-sm">
-                            <tbody class="divide-y divide-slate-100">
-                                {% for copy in missing|slice:":200" %}
-                                    <tr>
-                                        <td class="px-4 py-2 font-medium">{{ copy.copy_code }}</td>
-                                        <td class="px-4 py-2 text-slate-600">{{ copy.book.title }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <div>
+                        <h2 class="text-sm font-semibold text-slate-900 mb-2">Belum ditemukan ({{ missing|length }})</h2>
+                        {% if missing %}
+                            <div class="rounded-xl border border-slate-200/80 overflow-x-auto" tabindex="0" role="region" aria-label="Tabel eksemplar belum ditemukan, dapat digeser horizontal">
+                                <table class="w-full text-sm">
+                                    <tbody class="divide-y divide-slate-100">
+                                        {% for copy in missing|slice:":200" %}
+                                            <tr class="hover:bg-slate-50/60">
+                                                <td class="px-4 py-2.5 font-medium text-slate-900 whitespace-nowrap">{{ copy.copy_code }}</td>
+                                                <td class="px-4 py-2.5 text-slate-600">{{ copy.book.title }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% if missing|length > 200 %}
+                                <p class="text-xs text-slate-500 mt-1">…dan {{ missing|length|add:"-200" }} lainnya.</p>
+                            {% endif %}
+                        {% else %}
+                            <p class="text-[13px] text-slate-500">Semua {{ expected_count }} eksemplar buku ini sudah diperiksa.</p>
+                        {% endif %}
                     </div>
-                    {% if missing|length > 200 %}
-                        <p class="text-xs text-slate-500 mt-1">…dan {{ missing|length|add:"-200" }} lainnya.</p>
-                    {% endif %}
-                {% else %}
-                    <p class="text-sm text-slate-500">Semua eksemplar ditemukan.</p>
-                {% endif %}
-            </div>
-        </div>
+                </div>
+            {% else %}
+                <div class="py-6 px-4 text-center">
+                    <svg class="mx-auto h-8 w-8 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5C10.5 5 8.5 4.5 4 4.5v13c4.5 0 6.5.5 8 2 1.5-1.5 3.5-2 8-2v-13c-4.5 0-6.5.5-8 2Z"/><path d="M12 6.5v13"/></svg>
+                    <p class="mt-2 text-sm font-semibold text-slate-900">Pilih buku untuk mulai memeriksa.</p>
+                    <p class="mt-0.5 text-[13px] text-slate-500">Daftar dan progres di bawah mengikuti buku yang dipilih; pemindaian tetap mencatat ke sesi ini.</p>
+                </div>
+            {% endif %}
+        </section>
     </div>
 </div>
 

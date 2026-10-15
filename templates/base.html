@@ -192,11 +192,6 @@
                    {% if current_ns == "notifications" %}aria-current="page"{% endif %}>
                     Notifikasi{% if unread_notifications %}<span class="ml-1.5 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ unread_notifications }}</span>{% endif %}
                 </a>
-                <a href="{% url 'ai:assistant' %}"
-                   class="whitespace-nowrap inline-flex items-center min-h-[44px] rounded-xl px-2.5 py-2 font-medium {% if current_ns == "ai" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                   {% if current_ns == "ai" %}aria-current="page"{% endif %}>
-                    AI Assistant
-                </a>
                 <form method="post" action="{% url 'accounts:logout' %}" class="inline">
                     {% csrf_token %}
                     <button type="submit"
@@ -355,11 +350,6 @@
                            {% if current_ns == "notifications" %}aria-current="page"{% endif %}>
                             Notifikasi{% if unread_notifications %}<span class="ml-1.5 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ unread_notifications }}</span>{% endif %}
                         </a>
-                        <a href="{% url 'ai:assistant' %}"
-                           class="flex items-center min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if current_ns == "ai" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if current_ns == "ai" %}aria-current="page"{% endif %}>
-                            AI Assistant
-                        </a>
                         <form method="post" action="{% url 'accounts:logout' %}">
                             {% csrf_token %}
                             <button type="submit"
@@ -484,6 +474,152 @@
     });
 })();
 </script>
+
+{% if user.is_authenticated %}
+<div id="ai-popup-root">
+    <button id="ai-fab" type="button"
+            aria-label="Buka AI Assistant" aria-expanded="false" aria-controls="ai-popup-panel"
+            class="print:hidden fixed bottom-5 right-4 sm:bottom-6 sm:right-6 z-40 inline-flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition">
+        <svg id="ai-fab-icon-open" class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5M21 12a9 9 0 01-13.2 7.9L3 21l1.2-4.7A9 9 0 1121 12z"/></svg>
+        <svg id="ai-fab-icon-close" class="hidden h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+
+    <section id="ai-popup-panel" role="dialog" aria-label="AI Assistant"
+             class="hidden print:hidden fixed bottom-24 right-4 sm:right-6 z-40 w-[calc(100vw-2rem)] max-w-sm overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+        <div class="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+            <div>
+                <p class="font-semibold text-slate-900 text-sm">AI Assistant</p>
+                <p class="text-xs text-slate-500">Koleksi, peminjaman, e-book, denda</p>
+            </div>
+            <button id="ai-popup-close" type="button" aria-label="Tutup AI Assistant"
+                    class="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+        </div>
+        <div id="ai-popup-log" role="log" aria-live="polite" aria-label="Riwayat percakapan"
+             class="space-y-3 overflow-y-auto p-4 h-[min(24rem,50dvh)]">
+            <div class="rounded-xl bg-slate-100 px-4 py-2.5 text-sm text-slate-700 max-w-[85%]">
+                Halo! Ada yang bisa saya bantu seputar perpustakaan?
+            </div>
+        </div>
+        <form id="ai-popup-form" class="border-t border-slate-100 p-3">
+            <div class="flex gap-2">
+                <input type="text" id="ai-popup-input" name="question" autocomplete="off" maxlength="500"
+                       placeholder="Tulis pertanyaan..." aria-label="Tulis pertanyaan untuk AI Assistant" aria-describedby="ai-popup-count"
+                       class="flex-1 min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <button type="submit" id="ai-popup-send"
+                        class="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm disabled:opacity-50">
+                    Kirim
+                </button>
+            </div>
+            <p id="ai-popup-count" class="mt-1.5 text-right text-xs text-slate-400">0/500</p>
+            <p id="ai-popup-error" class="hidden mt-1 text-xs text-red-600" role="alert"></p>
+        </form>
+    </section>
+</div>
+
+<script>
+(function () {
+    var fab = document.getElementById("ai-fab");
+    var panel = document.getElementById("ai-popup-panel");
+    var closeBtn = document.getElementById("ai-popup-close");
+    var form = document.getElementById("ai-popup-form");
+    var input = document.getElementById("ai-popup-input");
+    var sendButton = document.getElementById("ai-popup-send");
+    var count = document.getElementById("ai-popup-count");
+    var errorBox = document.getElementById("ai-popup-error");
+    var log = document.getElementById("ai-popup-log");
+    var iconOpen = document.getElementById("ai-fab-icon-open");
+    var iconClose = document.getElementById("ai-fab-icon-close");
+    if (!fab || !panel) {
+        return;
+    }
+
+    function setOpen(open) {
+        panel.classList.toggle("hidden", !open);
+        fab.setAttribute("aria-expanded", open ? "true" : "false");
+        fab.setAttribute("aria-label", open ? "Tutup AI Assistant" : "Buka AI Assistant");
+        iconOpen.classList.toggle("hidden", open);
+        iconClose.classList.toggle("hidden", !open);
+        if (open) {
+            input.focus();
+        } else {
+            fab.focus();
+        }
+    }
+
+    fab.addEventListener("click", function () {
+        setOpen(panel.classList.contains("hidden"));
+    });
+    closeBtn.addEventListener("click", function () {
+        setOpen(false);
+    });
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !panel.classList.contains("hidden")) {
+            setOpen(false);
+        }
+    });
+
+    input.addEventListener("input", function () {
+        count.textContent = input.value.length + "/500";
+    });
+
+    function bubble(text, mine) {
+        var div = document.createElement("div");
+        div.className = mine
+            ? "rounded-xl bg-blue-600 text-white px-4 py-2.5 text-sm max-w-[85%] ml-auto whitespace-pre-line"
+            : "rounded-xl bg-slate-100 px-4 py-2.5 text-sm text-slate-700 max-w-[85%] whitespace-pre-line";
+        div.textContent = text;
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+        return div;
+    }
+
+    function csrfToken() {
+        var match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
+        return match ? decodeURIComponent(match[1]) : "";
+    }
+
+    form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        var question = input.value.trim();
+        if (!question) {
+            return;
+        }
+        errorBox.classList.add("hidden");
+        errorBox.textContent = "";
+        bubble(question, true);
+        input.value = "";
+        count.textContent = "0/500";
+        sendButton.disabled = true;
+        var loading = bubble("Mengetik...", false);
+        try {
+            var body = new URLSearchParams({ question: question });
+            var response = await fetch("{% url 'ai:assistant_ask' %}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRFToken": csrfToken(),
+                },
+                body: body.toString(),
+            });
+            if (!response.ok) {
+                throw new Error("http-" + response.status);
+            }
+            var data = await response.json();
+            loading.textContent = data.answer || "Maaf, tidak ada jawaban.";
+        } catch (err) {
+            loading.textContent = "Maaf, terjadi gangguan. Silakan coba lagi.";
+            input.value = question;
+            count.textContent = input.value.length + "/500";
+        } finally {
+            sendButton.disabled = false;
+            input.focus();
+        }
+    });
+})();
+</script>
+{% endif %}
 
 </body>
 </html>

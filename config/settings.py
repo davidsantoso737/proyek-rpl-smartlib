@@ -41,6 +41,16 @@ AI_MODEL = os.getenv("AI_MODEL", "")
 AI_TIMEOUT_SECONDS = float(os.getenv("AI_TIMEOUT_SECONDS", "15"))
 AI_MAX_CONTEXT_ITEMS = int(os.getenv("AI_MAX_CONTEXT_ITEMS", "8"))
 
+# Node.js AI gateway (opsional, default mati): bila AI_NODE_URL dan
+# AI_NODE_SHARED_SECRET diisi, pemanggilan provider dialihkan lewat
+# layanan ai-node/ di localhost. Tanpa keduanya, perilaku lama
+# (langsung ke provider) dipakai apa adanya.
+AI_NODE_URL = os.getenv("AI_NODE_URL", "").rstrip("/")
+AI_NODE_SHARED_SECRET = os.getenv("AI_NODE_SHARED_SECRET", "")
+AI_NODE_TIMEOUT_SECONDS = float(
+    os.getenv("AI_NODE_TIMEOUT_SECONDS", str(AI_TIMEOUT_SECONDS))
+)
+
 
 # Application definition
 

@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from apps.accounts.authorization import role_required
@@ -46,10 +47,24 @@ def opname_start_view(request):
 
 @role_required(User.Role.PUSTAKAWAN)
 def opname_detail_view(request, pk):
-    """Sesi berjalan: scan QR, tandai, bandingkan (FR-87 – FR-89)."""
+    """Sesi berjalan: scan QR, tandai, bandingkan (FR-87 – FR-89).
+
+    Filter "?book=" murni tampilan: membatasi daftar dan statistik yang
+    dirender ke satu buku tanpa mengubah definisi sesi, validasi scan,
+    maupun penyelesaian. Lihat audit-016.
+    """
+    from apps.catalog.models import Book
+
     opname = get_object_or_404(
         StockOpname.objects.select_related("started_by"), pk=pk
     )
+    books = Book.objects.filter(copies__isnull=False).distinct().order_by(
+        "title"
+    )
+    selected_book = None
+    book_param = (request.GET.get("book") or "").strip()
+    if book_param.isdigit():
+        selected_book = Book.objects.filter(pk=int(book_param)).first()
     error = ""
     if request.method == "POST" and opname.status == OPNAME_RUNNING:
         try:
@@ -61,8 +76,21 @@ def opname_detail_view(request, pk):
                 request,
                 f"{item.book_copy.copy_code} tercatat DITEMUKAN.",
             )
-            return redirect("inventory:opname_detail", pk=pk)
+            detail_url = reverse("inventory:opname_detail", kwargs={"pk": pk})
+            if selected_book is not None:
+                detail_url += "?book=%d" % selected_book.pk
+            return redirect(detail_url)
     summary = summarize(opname)
+    found_all = summary["found"]
+    missing_all = summary["missing"]
+    if selected_book is not None:
+        found = [c for c in found_all if c.book_id == selected_book.pk]
+        missing = [c for c in missing_all if c.book_id == selected_book.pk]
+        scoped_expected = len(found) + len(missing)
+    else:
+        found = found_all
+        missing = missing_all
+        scoped_expected = summary["expected_count"]
     return render(
         request,
         "inventory/opname_detail.html",
@@ -72,7 +100,13 @@ def opname_detail_view(request, pk):
             "code": request.POST.get("code", "") if error else "",
             "is_running": opname.status == OPNAME_RUNNING,
             "is_done": opname.status == OPNAME_DONE,
-            **summary,
+            "expected_count": scoped_expected,
+            "found": found,
+            "missing": missing,
+            "session_expected": summary["expected_count"],
+            "session_found": len(found_all),
+            "books": books,
+            "selected_book": selected_book,
         },
     )
 
