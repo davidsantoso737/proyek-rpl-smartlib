@@ -3,7 +3,7 @@ from django import forms
 from .services import REPORTS, category_choices
 
 INPUT_CLASS = (
-    "border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white "
+    "w-full min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white "
     "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 )
 
