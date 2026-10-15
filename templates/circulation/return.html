@@ -6,7 +6,7 @@
 {% block content %}
 
 <div class="mb-6">
-    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+    <h1 class="text-xl font-semibold text-slate-900">
         Pengembalian Buku
     </h1>
     <p class="text-slate-500 text-sm mt-1">
@@ -14,15 +14,15 @@
     </p>
 </div>
 
-<div class="space-y-6">
-    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6 space-y-6">
+<div class="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+    <div class="px-4 sm:px-5 py-4 space-y-4">
         {% if error %}
             <p role="alert" class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm">
                 {{ error }}
             </p>
         {% endif %}
 
-        <form method="post" action="{% url 'circulation:return' %}" id="return-form" class="space-y-4">
+        <form method="post" action="{% url 'circulation:return' %}" id="return-form" class="space-y-3">
             {% csrf_token %}
             <div>
                 <label for="code-input" class="block text-sm font-medium text-slate-700 mb-1.5">
@@ -33,7 +33,7 @@
                            placeholder="Contoh: COPY-001"
                            class="flex-1 min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <button type="submit"
-                            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 min-h-[44px] rounded-xl transition shadow-sm">
                         Cari
                     </button>
                 </div>
@@ -43,11 +43,11 @@
         {% include "partials/_scanner.html" with input_id="code-input" form_id="return-form" hint="Arahkan QR Identitas eksemplar ke kamera. Bisa pindai ulang tanpa memuat halaman." msg_scanning="Arahkan QR Identitas ke kamera..." msg_reading="QR terbaca: {code}. Mencari data..." msg_nolib="Library pemindai gagal dimuat. Ketik kode secara manual." msg_stopped="Kamera dimatikan. Anda tetap dapat mengetik kode manual." msg_denied="Izin kamera ditolak. Aktifkan izin kamera pada browser lalu coba lagi, atau ketik kode manual." msg_secure="Kamera membutuhkan koneksi aman (HTTPS atau localhost). Ketik kode secara manual." msg_unavailable="Kamera tidak dapat digunakan di perangkat ini. Ketik kode secara manual." %}
 
         {% if found %}
-            <div class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-5">
-                <h2 class="text-base font-semibold text-slate-900 mb-3">
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 sm:p-5">
+                <h2 class="text-base font-semibold text-slate-900">
                     {{ found.copy.copy_code }} &middot; {{ found.copy.book.title }}
                 </h2>
-                <dl class="text-sm space-y-1.5 mb-4">
+                <dl class="text-sm mt-2 mb-4 space-y-1.5">
                     <div class="flex justify-between gap-4">
                         <dt class="text-slate-500">Peminjam</dt>
                         <dd class="font-medium text-right">{{ found.loan.user.full_name }} ({{ found.loan.user.username }})</dd>
@@ -77,7 +77,7 @@
                         </label>
                     </div>
                     <button type="submit"
-                            class="w-full sm:w-auto bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
+                            class="w-full sm:w-auto bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-6 py-2.5 min-h-[44px] rounded-xl transition shadow-sm">
                         Konfirmasi pengembalian
                     </button>
                 </form>

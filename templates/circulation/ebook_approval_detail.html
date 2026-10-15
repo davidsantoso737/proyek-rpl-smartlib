@@ -8,7 +8,7 @@
 {% include "partials/_back_link.html" with href=back_url label="Kembali ke persetujuan e-book" %}
 
 <div class="mb-6">
-    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+    <h1 class="text-xl font-semibold text-slate-900">
         {{ loan.ebook.title }}
     </h1>
     <p class="text-slate-500 text-sm mt-1">
@@ -18,50 +18,51 @@
     </p>
 </div>
 
-<div class="space-y-6">
-    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6 space-y-6">
-        <dl class="text-sm space-y-2">
-            <div class="flex justify-between gap-4">
-                <dt class="text-slate-500">Format / ukuran</dt>
-                <dd class="font-medium text-right uppercase">{{ loan.ebook.file_type }} &middot; {{ loan.ebook.file_size }} byte</dd>
-            </div>
-            <div class="flex justify-between gap-4">
-                <dt class="text-slate-500">Durasi akses bila disetujui</dt>
-                <dd class="font-medium text-right">Mengikuti konfigurasi aktif</dd>
-            </div>
-        </dl>
+<div class="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+    <dl class="text-sm px-4 sm:px-5 py-4 space-y-2">
+        <div class="flex justify-between gap-4">
+            <dt class="text-slate-500">Format / ukuran</dt>
+            <dd class="font-medium text-right uppercase">{{ loan.ebook.file_type }} &middot; {{ loan.ebook.file_size }} byte</dd>
+        </div>
+        <div class="flex justify-between gap-4">
+            <dt class="text-slate-500">Durasi akses bila disetujui</dt>
+            <dd class="font-medium text-right">Mengikuti konfigurasi aktif</dd>
+        </div>
+    </dl>
 
-        {% if loan.status == "PENDING_APPROVAL" %}
-            <form method="post" action="{% url 'circulation:ebook_approve' loan.pk %}">
-                {% csrf_token %}
-                <button type="submit" onclick="return confirm('Setujui dan mulai akses e-book?')"
-                        class="w-full sm:w-auto bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
-                    Setujui &amp; mulai akses
+    {% if loan.status == "PENDING_APPROVAL" %}
+        <form method="post" action="{% url 'circulation:ebook_approve' loan.pk %}"
+              class="flex flex-wrap items-center gap-2 border-t border-slate-200/80 px-4 sm:px-5 py-4">
+            {% csrf_token %}
+            <button type="submit" onclick="return confirm('Setujui dan mulai akses e-book?')"
+                    class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-6 py-2.5 min-h-[44px] rounded-xl transition shadow-sm">
+                Setujui &amp; mulai akses
+            </button>
+        </form>
+
+        <form method="post" action="{% url 'circulation:ebook_reject' loan.pk %}"
+              class="border-t border-slate-200/80 px-4 sm:px-5 py-4">
+            {% csrf_token %}
+            <h2 class="text-base font-semibold text-slate-900 mb-1">Tolak pengajuan</h2>
+            <p class="text-[13px] text-slate-500 mb-3">Alasan wajib diisi dan akan diteruskan ke pemohon.</p>
+            <div class="flex flex-col sm:flex-row gap-3">
+                <input type="text" name="reason" placeholder="Alasan penolakan (wajib)..."
+                       class="flex-1 min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500">
+                <button type="submit" onclick="return confirm('Tolak pengajuan ini?')"
+                        class="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2.5 min-h-[44px] rounded-xl transition shadow-sm">
+                    Tolak
                 </button>
-            </form>
-
-            <form method="post" action="{% url 'circulation:ebook_reject' loan.pk %}"
-                  class="border-t border-slate-100 pt-6">
-                {% csrf_token %}
-                <div class="flex flex-col sm:flex-row gap-3">
-                    <input type="text" name="reason" placeholder="Alasan penolakan (wajib)..."
-                           class="flex-1 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500">
-                    <button type="submit" onclick="return confirm('Tolak pengajuan ini?')"
-                            class="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
-                        Tolak
-                    </button>
-                </div>
-            </form>
-        {% elif loan.status == "APPROVED" %}
-            <p class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-xl text-sm">
-                Disetujui {{ loan.approved_at|date:"d M Y H:i" }}; akses s/d {{ loan.expires_at|date:"d M Y H:i" }}.
-            </p>
-        {% else %}
-            <p class="bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm">
-                Pengajuan ini berstatus {{ loan.status }}.
-            </p>
-        {% endif %}
-    </div>
+            </div>
+        </form>
+    {% elif loan.status == "APPROVED" %}
+        <p class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-xl text-sm m-4 sm:m-5">
+            Disetujui {{ loan.approved_at|date:"d M Y H:i" }}; akses s/d {{ loan.expires_at|date:"d M Y H:i" }}.
+        </p>
+    {% else %}
+        <p class="bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm m-4 sm:m-5">
+            Pengajuan ini berstatus {{ loan.status }}.
+        </p>
+    {% endif %}
 </div>
 
 {% endblock %}

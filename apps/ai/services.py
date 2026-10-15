@@ -4,18 +4,26 @@ Alur: klasifikasi lokal -> retrieval resmi -> konteks minimal ->
 satu panggilan provider (bila dikonfigurasi). Modul ini HANYA membaca:
 katalog, peminjaman milik sendiri, dan kebijakan publik. Dilarang
 mengimpor service mutasi (loan/approval/denda/inventory).
+
+Konteks personal (data_saya): seluruh query dibatasi pada request.user
+yang terautentikasi. Identitas tidak pernah diambil dari isi pesan.
 """
 
+import logging
 import re
 from collections import Counter
 from difflib import SequenceMatcher
 
 from django.db.models import Q
+from django.utils import timezone
 
 from apps.catalog.models import Author, Book, Category, Ebook
-from apps.circulation.models import EbookLoan, Loan
+from apps.circulation.models import EbookLoan, Loan, LoanItem
+from apps.notifications.models import Notification
 
 from .providers import AIProviderError, get_provider
+
+logger = logging.getLogger(__name__)
 
 MAX_QUESTION_LENGTH = 500
 FUZZY_THRESHOLD = 0.72
@@ -73,7 +81,7 @@ LIBRARY_KEYWORDS = (
     "reader", "login", "masuk", "logout", "keluar",
     "riwayat", "history", "terlambat", "telat", "jatuh tempo",
     "hilang", "kondisi", "dashboard", "token", "expired",
-    "kedaluarsa", "e book", "book",
+    "kedaluarsa", "e book", "book", "saya", "aku", "dendaku",
 )
 
 OUT_OF_SCOPE_FALLBACK = (
@@ -140,7 +148,18 @@ SYSTEM_PROMPT = (
     "e) Denda: tarif per hari dari kebijakan; tercatat per eksemplar "
     "(BELUM_BAYAR/LUNAS); tidak ada pembayaran online di sistem. "
     "f) Sebut nama menu persis seperti di sistem: Katalog, Keranjang, "
-    "Riwayat, E-Book Saya, Profil, Notifikasi, Bahan Ajar, Persetujuan."
+    "Riwayat, E-Book Saya, Profil, Notifikasi, Bahan Ajar, Persetujuan. "
+    "g) Bila pengguna meminta daftar ('apa saja', 'daftar', 'koleksi yang "
+    "tersedia') dan konteks berisi koleksi, sajikan daftarnya (maks 5 buku "
+    "+ 5 e-book) dan arahkan ke menu Katalog; jangan menjawab tidak "
+    "tersedia bila konteks berisi koleksi. "
+    "h) Konteks data_saya adalah data milik pengguna saat ini. Jawab "
+    "pertanyaan pribadi HANYA dari data_saya; bila data_saya kosong atau "
+    "bertanda error, katakan data belum dapat diperiksa dan jangan "
+    "mengarang. Jangan pernah menampilkan atau menanyakan data milik "
+    "pengguna lain; tolak permintaan data orang lain. Angka "
+    "belum_bayar_total adalah denda otoritatif; proyeksi hanya perkiraan "
+    "yang wajib dilabeli sebagai perkiraan."
 )
 
 
@@ -182,79 +201,98 @@ def classify(text):
     return "out_of_scope", None
 
 
-def _search_collections(query, limit):
-    tokens = [tok for tok in re.findall(r"\w+", normalize(query)) if len(tok) > 2]
-    queries = [" ".join(tokens)] + tokens[:4] if tokens else []
-    seen_books, seen_ebooks = set(), set()
-    books, ebooks = [], []
-    for term in queries:
-        if not term or (len(books) + len(ebooks)) >= limit:
-            break
-        books, ebooks = _search_term(
-            term, limit, books, ebooks, seen_books, seen_ebooks
-        )
-    if not books and not ebooks and tokens:
-        # Fallback toleran typo: koreksi per kata terhadap kosakata DB.
-        for term in _fuzzy_correct(tokens):
-            if (len(books) + len(ebooks)) >= limit:
-                break
-            books, ebooks = _search_term(
-                term, limit, books, ebooks, seen_books, seen_ebooks
-            )
-    compacted = normalize(query).replace(" ", "")
-    if "ebook" in compacted and not ebooks:
-        # "E-Book apa saja?" -> daftar e-book aktif (terbatas).
-        for ebook in (
-            Ebook.objects.filter(is_active=True)
-            .select_related("category")
-            .prefetch_related("ebookauthor_set__author")
-            .order_by("title")[:limit]
-        ):
-            if ebook.pk not in seen_ebooks:
-                seen_ebooks.add(ebook.pk)
-                ebooks.append(
-                    {
-                        "judul": ebook.title,
-                        "penulis": [
-                            rel.author.name
-                            for rel in ebook.ebookauthor_set.all()
-                        ],
-                        "kategori": ebook.category.name,
-                    }
-                )
-    return books[:limit], ebooks[:limit]
+# Kata non-diskriminatif yang diabaikan saat pencarian katalog: kata tanya,
+# kata tugas ("cari", "tampilkan"), dan kata generik ("buku", "koleksi").
+# Tanpa ini, "buku apa saja yang ada?" mencari "apa"/"saja"/"buku" dan
+# mengembalikan judul yang kebetulan mengandung "apa" (mis. "Siapa").
+SEARCH_STOPWORDS = frozenset(
+    {
+        "apa", "apakah", "saja", "yang", "ada", "adakah", "dan", "atau",
+        "di", "ke", "dari", "untuk", "dengan", "adalah", "ialah", "ini",
+        "itu", "tersebut", "saya", "aku", "kami", "kita", "kamu", "anda",
+        "kau", "bagaimana", "gimana", "cara", "tolong", "mohon", "cari",
+        "carikan", "tunjukkan", "tunjukan", "tampilkan", "lihat", "liat",
+        "daftar", "semua", "seluruh", "list", "koleksi", "koleksinya",
+        "buku", "ebook", "book", "judul", "tentang", "mengenai",
+        "punya", "dimiliki", "milik", "tersedia", "terdapat", "sedia",
+        "bisa", "dapat", "ingin", "mau", "minta", "coba", "kasih",
+        "berikan", "beri", "seputar", "dalam", "pada", "secara", "sih",
+        "dong", "deh", "kah", "pun", "nya", "lagi", "juga", "sudah",
+        "belum", "pernah", "akan", "sedang", "oleh", "para", "sebagai",
+        "apa2", "aja",
+    }
+)
+
+# Niat "tampilkan daftar" — bukan judul spesifik. Bila pencarian berisi
+# tidak menghasilkan apa pun, jawab dengan daftar koleksi aktif.
+_LISTING_PATTERNS = (
+    r"\bapa\s*saja\b",
+    r"\bapakah\s+ada\b",
+    r"\bdaftar\b",
+    r"\blist\b",
+    r"\bsemua\b",
+    r"\bseluruh\b",
+    r"\btampilkan\b",
+    r"\btunjukkan\b",
+    r"\btunjukan\b",
+    r"\byang\s+ada\b",
+    r"\byang\s+tersedia\b",
+    r"\bkoleksi\b",
+)
 
 
-def _search_term(term, limit, books, ebooks, seen_books, seen_ebooks):
-    for book in (
-        Book.objects.filter(
-            is_active=True
-        )
+def _content_tokens(query):
+    """Token bermakna untuk pencarian (stopwords dibuang)."""
+    return [
+        tok
+        for tok in re.findall(r"\w+", normalize(query))
+        if len(tok) > 2 and tok not in SEARCH_STOPWORDS
+    ]
+
+
+def _is_listing_intent(normalized):
+    """Benar bila pengguna meminta daftar, atau tak ada token bermakna
+    tersisa (mis. 'buku?' — sudah terklasifikasi library)."""
+    if any(re.search(p, normalized) for p in _LISTING_PATTERNS):
+        return True
+    return not _content_tokens(normalized)
+
+
+def _book_payload(book):
+    available = sum(
+        1 for copy in book.copies.all() if copy.status == "TERSEDIA"
+    )
+    return {
+        "judul": book.title,
+        "penulis": [rel.author.name for rel in book.bookauthor_set.all()],
+        "kategori": book.category.name,
+        "tersedia": available,
+    }
+
+
+def _ebook_payload(ebook):
+    return {
+        "judul": ebook.title,
+        "penulis": [rel.author.name for rel in ebook.ebookauthor_set.all()],
+        "kategori": ebook.category.name,
+    }
+
+
+def _query_books(term, cap=20):
+    return (
+        Book.objects.filter(is_active=True)
         .filter(
             Q(title__icontains=term)
             | Q(bookauthor__author__name__icontains=term)
             | Q(category__name__icontains=term)
         )
         .select_related("category")
-        .prefetch_related("bookauthor_set__author", "copies")[:limit]
-    ):
-        if book.pk not in seen_books:
-            seen_books.add(book.pk)
-            available = sum(
-                1 for copy in book.copies.all() if copy.status == "TERSEDIA"
-            )
-            books.append(
-                {
-                    "judul": book.title,
-                    "penulis": [
-                        rel.author.name
-                        for rel in book.bookauthor_set.all()
-                    ],
-                    "kategori": book.category.name,
-                    "tersedia": available,
-                }
-            )
-    for ebook in (
+        .prefetch_related("bookauthor_set__author", "copies")[:cap]
+    )
+
+
+def _query_ebooks(term, cap=20):
+    return (
         Ebook.objects.filter(is_active=True)
         .filter(
             Q(title__icontains=term)
@@ -262,21 +300,87 @@ def _search_term(term, limit, books, ebooks, seen_books, seen_ebooks):
             | Q(category__name__icontains=term)
         )
         .select_related("category")
-        .prefetch_related("ebookauthor_set__author")[:limit]
-    ):
-        if ebook.pk not in seen_ebooks:
-            seen_ebooks.add(ebook.pk)
-            ebooks.append(
-                {
-                    "judul": ebook.title,
-                    "penulis": [
-                        rel.author.name
-                        for rel in ebook.ebookauthor_set.all()
-                    ],
-                    "kategori": ebook.category.name,
-                }
-            )
+        .prefetch_related("ebookauthor_set__author")[:cap]
+    )
+
+
+def _ranked_search(content_tokens, limit):
+    """Pencarian berperingkat: tiap token bermakna = 1 suara (frasa utuh
+    yang cocok ikut dihitung), urut skor tertinggi lalu judul.
+
+    Menggantikan pencarian berurutan depan-ke-belakang sehingga 'buku
+    sejarah indonesia untuk pelajaran' tidak didominasi kata depan.
+    """
+    terms = list(dict.fromkeys(content_tokens))
+    if len(terms) > 1:
+        terms = [" ".join(content_tokens)] + terms
+    book_scores, book_rows = Counter(), {}
+    ebook_scores, ebook_rows = Counter(), {}
+    for term in terms:
+        for book in _query_books(term):
+            book_scores[book.pk] += 1
+            if book.pk not in book_rows:
+                book_rows[book.pk] = _book_payload(book)
+        for ebook in _query_ebooks(term):
+            ebook_scores[ebook.pk] += 1
+            if ebook.pk not in ebook_rows:
+                ebook_rows[ebook.pk] = _ebook_payload(ebook)
+    ranked_books = sorted(
+        book_rows, key=lambda pk: (-book_scores[pk], book_rows[pk]["judul"].lower())
+    )
+    ranked_ebooks = sorted(
+        ebook_rows,
+        key=lambda pk: (-ebook_scores[pk], ebook_rows[pk]["judul"].lower()),
+    )
+    return (
+        [book_rows[pk] for pk in ranked_books[:limit]],
+        [ebook_rows[pk] for pk in ranked_ebooks[:limit]],
+    )
+
+
+def _listing_collections(normalized, compacted, limit):
+    """Daftar koleksi aktif untuk niat listing ('apa saja', 'daftar',
+    'koleksi ... yang tersedia'). Arah mengikuti jenis yang disebut:
+    e-book saja, buku saja, atau keduanya."""
+    mentions_ebook = "ebook" in compacted
+    mentions_book = "buku" in normalized
+    want_books = not mentions_ebook or mentions_book
+    want_ebooks = mentions_ebook or not mentions_book
+    books, ebooks = [], []
+    if want_books:
+        for book in (
+            Book.objects.filter(is_active=True)
+            .select_related("category")
+            .prefetch_related("bookauthor_set__author", "copies")
+            .order_by("title")[:limit]
+        ):
+            books.append(_book_payload(book))
+    if want_ebooks:
+        for ebook in (
+            Ebook.objects.filter(is_active=True)
+            .select_related("category")
+            .prefetch_related("ebookauthor_set__author")
+            .order_by("title")[:limit]
+        ):
+            ebooks.append(_ebook_payload(ebook))
     return books, ebooks
+
+
+def _search_collections(query, limit):
+    normalized = normalize(query)
+    content = _content_tokens(query)
+    books, ebooks = _ranked_search(content, limit) if content else ([], [])
+    if not books and not ebooks and content:
+        # Fallback toleran typo: koreksi per kata terhadap kosakata DB.
+        corrected = _fuzzy_correct(content)
+        if corrected:
+            books, ebooks = _ranked_search(corrected, limit)
+    from_listing = False
+    if not books and not ebooks and _is_listing_intent(normalized):
+        compacted = normalized.replace(" ", "")
+        books, ebooks = _listing_collections(normalized, compacted, limit)
+        from_listing = True
+    return books[:limit], ebooks[:limit], from_listing
 
 
 def _vocabulary():
@@ -761,14 +865,576 @@ def workflow_answer(normalized, policy):
     return builder(policy)
 
 
+# --- Konteks personal: data milik pengguna yang login (read-only) ---
+#
+# Seluruh query dibatasi request.user. Identitas tidak pernah diambil dari
+# isi pesan. Pertanyaan lanjutan ("kapan harus dikembalikan") dijawab dari
+# query baru (database = sumber kebenaran), bukan dari memori percakapan.
+
+PERSONAL_ERROR_FALLBACK = (
+    "Maaf, data pribadi Anda belum dapat diperiksa saat ini. "
+    "Silakan coba lagi atau buka menu Riwayat, E-Book Saya, dan Notifikasi."
+)
+
+OTHER_USER_REFUSAL = (
+    "Maaf, saya hanya dapat menampilkan data milik akun Anda sendiri. "
+    "Saya tidak dapat menampilkan data pengguna lain."
+)
+
+PERSONAL_DATE_FMT = "%d %b %Y"
+PERSONAL_LIST_MAX = 10
+
+_OTHER_PERSON_PATTERNS = (
+    r"\b(teman|temen|dia|mereka|orang lain|siswa lain|guru lain)\b",
+    r"\bnis\b\s*\d|\bnip\b\s*\d",
+    r"\b(siswa|guru|anak)\s+(lain|bernama)\b",
+    r"\bmilik\b.*\b(dia|mereka|teman|orang lain)\b",
+    r"\bpunya\b.*\b(dia|mereka|teman)\b",
+)
+
+_LOAN_STATUS_LABELS = {
+    "PENDING_APPROVAL": "Menunggu persetujuan",
+    "APPROVED": "Disetujui (menunggu pengambilan)",
+    "ACTIVE": "Dipinjam aktif",
+    "COMPLETED": "Selesai",
+    "REJECTED": "Ditolak",
+}
+
+
+_SELF_WORDS = re.compile(r"\b(saya|aku|dendaku)\b")
+
+_DATA_TOPIC_WORDS = re.compile(
+    r"\b(denda|pinjaman|peminjaman|dipinjam|meminjam|pinjam|riwayat|"
+    r"notif|buku|e\s*book|profil|kembali|tempo|terlambat|transaksi|"
+    r"siswa|guru|data)\b"
+)
+
+_COLLECTIVE_SCOPE = re.compile(
+    r"\b(semua|seluruh|daftar|list)\b"
+)
+
+
+def _mentions_other_person(normalized):
+    if any(
+        re.search(pattern, normalized) for pattern in _OTHER_PERSON_PATTERNS
+    ):
+        return True
+    # Cakupan kolektif tanpa rujukan diri ("semua data denda siswa")
+    # berarti meminta data orang lain.
+    if (
+        _COLLECTIVE_SCOPE.search(normalized)
+        and _DATA_TOPIC_WORDS.search(normalized)
+        and not _SELF_WORDS.search(normalized)
+    ):
+        return True
+    return False
+
+
+def _has_data_topic(normalized):
+    return bool(_DATA_TOPIC_WORDS.search(normalized))
+
+
+# Kata mekanisme: pertanyaan "bagaimana cara/kerja" dijawab panduan sistem,
+# bukan data pribadi ("bagaimana status e-book saya" tetap personal).
+_MECHANISM_PATTERN = re.compile(
+    r"\b(cara|prosedur|alur|langkah|bedanya|perbedaan)\b|"
+    r"bagaimana .{0,20}(cara|dihitung|bekerja|kerja|dilakukan)|"
+    r"gimana cara"
+)
+
+
+def _rupiah(value):
+    """Format Rp15.000 (tanpa desimal bila bulat)."""
+    from decimal import Decimal, InvalidOperation
+
+    try:
+        amount = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return f"Rp{value}"
+    if amount == amount.to_integral_value():
+        grouped = f"{int(amount):,}".replace(",", ".")
+        return f"Rp{grouped}"
+    grouped = f"{amount:,.2f}".replace(",", "X").replace(".", ",").replace(
+        "X", "."
+    )
+    return f"Rp{grouped}"
+
+
+def _fmt_date(value):
+    if not value:
+        return "-"
+    try:
+        return value.strftime(PERSONAL_DATE_FMT)
+    except (AttributeError, ValueError):
+        return "-"
+
+
+def _my_active_loan_rows(user, today):
+    """Item BELUM_KEMBALI pada loan ACTIVE milik user (sumber kebenaran)."""
+    loans = (
+        Loan.objects.filter(user=user, status="ACTIVE")
+        .prefetch_related("items__book_copy__book")
+        .order_by("-requested_at")
+    )
+    rows = []
+    for loan in loans:
+        for item in loan.items.all():
+            if item.returned_at is not None:
+                continue
+            due = item.due_at or loan.due_at
+            late = max(0, (today - due.date()).days) if due else 0
+            rows.append(
+                {
+                    "judul": item.book_copy.book.title,
+                    "kode": item.book_copy.copy_code,
+                    "jatuh_tempo": _fmt_date(due),
+                    "terlambat_hari": late,
+                    "proyeksi_denda": str(item.fine_rate_per_day * late),
+                }
+            )
+    return rows
+
+
+def _my_fine_summary(user):
+    """Total + rincian denda BELUM_BAYAR (otoritatif, tercatat saat return)."""
+    from decimal import Decimal
+
+    items = (
+        LoanItem.objects.filter(
+            loan__user=user,
+            fine_status="BELUM_BAYAR",
+            fine_amount__gt=0,
+        )
+        .select_related("book_copy__book", "loan")
+        .order_by("-updated_at")
+    )
+    rows = [
+        {
+            "judul": item.book_copy.book.title,
+            "kode": item.book_copy.copy_code,
+            "jumlah": str(item.fine_amount),
+        }
+        for item in items[:PERSONAL_LIST_MAX]
+    ]
+    total = sum((item.fine_amount for item in items), Decimal("0"))
+    return {"total": str(total), "jumlah_item": items.count(), "rincian": rows}
+
+
+def _my_history_rows(user, limit=5):
+    loans = (
+        Loan.objects.filter(user=user)
+        .prefetch_related("items__book_copy__book")
+        .order_by("-requested_at")[:limit]
+    )
+    rows = []
+    for loan in loans:
+        rows.append(
+            {
+                "id": loan.pk,
+                "status": _LOAN_STATUS_LABELS.get(loan.status, loan.status),
+                "tanggal": _fmt_date(loan.requested_at),
+                "judul": sorted(
+                    {item.book_copy.book.title for item in loan.items.all()}
+                )[:5],
+            }
+        )
+    return rows
+
+
+def _my_loan_counts(user):
+    active_items = LoanItem.objects.filter(
+        loan__user=user, loan__status="ACTIVE", returned_at__isnull=True
+    ).count()
+    completed = Loan.objects.filter(user=user, status="COMPLETED").count()
+    pending = Loan.objects.filter(user=user, status="PENDING_APPROVAL").count()
+    return {
+        "aktif_belum_kembali": active_items,
+        "selesai": completed,
+        "menunggu": pending,
+    }
+
+
+def _my_ebook_summary(user, now):
+    pending, active, expired = [], [], []
+    loans = (
+        EbookLoan.objects.filter(user=user)
+        .select_related("ebook")
+        .order_by("-requested_at")[:PERSONAL_LIST_MAX]
+    )
+    for loan in loans:
+        if loan.status == "PENDING_APPROVAL":
+            pending.append({"judul": loan.ebook.title})
+        elif (
+            loan.status == "APPROVED"
+            and loan.started_at is not None
+            and loan.started_at <= now
+            and loan.expires_at is not None
+            and loan.expires_at > now
+        ):
+            active.append(
+                {
+                    "judul": loan.ebook.title,
+                    "berlaku_sampai": _fmt_date(loan.expires_at),
+                    "sisa_hari": max(
+                        0, (loan.expires_at.date() - now.date()).days
+                    ),
+                }
+            )
+        elif loan.status in ("APPROVED", "REJECTED"):
+            expired.append(
+                {
+                    "judul": loan.ebook.title,
+                    "status": "kedaluwarsa, ajukan ulang bila perlu"
+                    if loan.status == "APPROVED"
+                    else "ditolak",
+                }
+            )
+    return {"menunggu": pending, "aktif": active, "riwayat": expired}
+
+
+def _my_notification_summary(user):
+    unread = Notification.objects.filter(user=user, is_read=False).count()
+    latest = Notification.objects.filter(user=user).order_by("-created_at")[:3]
+    return {
+        "belum_dibaca": unread,
+        "terbaru": [
+            {"judul": notif.title, "tanggal": _fmt_date(notif.created_at)}
+            for notif in latest
+        ],
+    }
+
+
+def _my_profile_row(user):
+    identifier = ""
+    if user.role == "SISWA":
+        identifier = f"NIS {user.nis or '-'}"
+    elif user.role == "GURU":
+        identifier = f"NIP {user.nip or '-'}"
+    return {
+        "nama": user.full_name,
+        "role": user.get_role_display(),
+        "identitas": identifier,
+        "kelas": user.student_class or "-",
+    }
+
+
+def build_personal_context(user):
+    """Satu paket data milik user (JSON-serializable, tanpa data sensitif).
+
+    Tidak memuat password/hash/token. Raise bila query gagal agar pemanggil
+    menjawab graceful, bukan mengarang.
+    """
+    now = timezone.now()
+    today = now.date()
+    active_rows = _my_active_loan_rows(user, today)
+    late_rows = [row for row in active_rows if row["terlambat_hari"] > 0]
+    return {
+        "profil": _my_profile_row(user),
+        "pinjaman_aktif": active_rows,
+        "terlambat": late_rows,
+        "denda": _my_fine_summary(user),
+        "hitungan": _my_loan_counts(user),
+        "riwayat": _my_history_rows(user),
+        "ebook": _my_ebook_summary(user, now),
+        "notifikasi": _my_notification_summary(user),
+    }
+
+
+_PERSONAL_INTENTS = (
+    ("denda", re.compile(
+        r"(\bdenda\b|\bbelum bayar\b|\bbayar denda\b|\bdendaku\b|"
+        r"\btunggakan\b)"
+    )),
+    ("jatuh_tempo", re.compile(
+        r"(jatuh tempo|kapan.*kembali|kapan.*dikembalikan|"
+        r"harus dikembalikan|batas.*(kembali|pinjam|tempo)|"
+        r"\btenggat\b|\bdeadline\b)"
+    )),
+    ("terlambat", re.compile(
+        r"(terlambat|\btelat\b|lewat.*(tempo|jatuh)|\boverdue\b)"
+    )),
+    ("riwayat", re.compile(
+        r"(\briwayat\b|\bhistory\b|\bhistoris\b|pernah.*pinjam|"
+        r"semua.*dikembalikan|dikembalikan.*semua|"
+        r"transaksi.*saya|status.*peminjaman)"
+    )),
+    ("pinjaman", re.compile(
+        r"((pinjam|dipinjam|peminjaman).*(saya|aku|ku\b)|"
+        r"buku.*(saya|aku).*(pinjam|dipinjam)|"
+        r"sedang.*(pinjam|dipinjam)|"
+        r"jumlah.*(buku|pinjam)|berapa.*buku.*pinjam|"
+        r"\bbelum\b.*\bkembali\b)"
+    )),
+    ("notifikasi", re.compile(
+        r"(\bnotif\b|pemberitahuan|perhatian|"
+        r"perlu.*(diperhatikan|perhatian|perhatikan)|"
+        r"penting.*(saya|aku))"
+    )),
+    ("ebook_saya", re.compile(
+        r"(e\s*book.*(saya|aku|ku|status|berlaku|kedaluwarsa|berakhir|"
+        r"aktif)|masa.*akses)"
+    )),
+    ("profil", re.compile(
+        r"(profil.*(saya|aku|ku)|data.*(saya|aku|diri)|akun.*(saya|aku)|"
+        r"nama.*saya|\bsaya\b.*\b(kelas|jurusan|nis|nip)\b)"
+    )),
+)
+
+
+def _mentions_other_person_explicit(normalized):
+    """Sinyal eksplisit orang lain (tanpa aturan kolektif)."""
+    return any(
+        re.search(pattern, normalized) for pattern in _OTHER_PERSON_PATTERNS
+    )
+
+
+def match_personal(normalized):
+    """Nama intent personal, 'refused' untuk data orang lain, atau None.
+
+    Aturan kolektif ("semua data denda") hanya menjadi penolakan bila ada
+    intent personal yang cocok, agar "tampilkan semua buku" (katalog)
+    tidak ikut ditolak.
+    """
+    for name, pattern in _PERSONAL_INTENTS:
+        if pattern.search(normalized):
+            if _mentions_other_person(normalized):
+                return "refused"
+            return name
+    if _mentions_other_person_explicit(
+        normalized
+    ) and _has_data_topic(normalized):
+        return "refused"
+    return None
+
+
+def _render_denda(personal):
+    from decimal import Decimal
+
+    total = Decimal(personal["denda"]["total"])
+    lines = []
+    if total > 0:
+        lines.append(
+            f"Denda Anda yang belum dibayar: {_rupiah(total)} "
+            f"({personal['denda']['jumlah_item']} item)."
+        )
+        for item in personal["denda"]["rincian"]:
+            lines.append(
+                f"- {item['judul']} (kode {item['kode']}): "
+                f"{_rupiah(item['jumlah'])}."
+            )
+    else:
+        lines.append("Tidak ada denda tercatat yang belum dibayar.")
+    late = personal["terlambat"]
+    if late:
+        proj = sum(Decimal(row["proyeksi_denda"]) for row in late)
+        lines.append(
+            f"Catatan: {len(late)} buku terlambat dan belum dikembalikan "
+            f"dengan proyeksi denda {_rupiah(proj)}. Ini perkiraan memakai "
+            "tarif saat pinjam; denda resmi tercatat saat pengembalian."
+        )
+    lines.append("Rincian lengkap ada di menu Riwayat per pengajuan.")
+    return "\n".join(lines)
+
+
+def _render_pinjaman(personal):
+    rows = personal["pinjaman_aktif"]
+    if not rows:
+        return (
+            "Tidak ada buku fisik yang sedang Anda pinjam. "
+            "Pengajuan yang menunggu persetujuan bisa dipantau di menu "
+            "Riwayat."
+        )
+    lines = [f"Anda sedang meminjam {len(rows)} buku:"]
+    for row in rows:
+        suffix = (
+            f", TERLAMBAT {row['terlambat_hari']} hari"
+            if row["terlambat_hari"] > 0
+            else ""
+        )
+        lines.append(
+            f"- {row['judul']} (kode {row['kode']}), jatuh tempo "
+            f"{row['jatuh_tempo']}{suffix}."
+        )
+    return "\n".join(lines)
+
+
+def _render_jatuh_tempo(personal):
+    rows = personal["pinjaman_aktif"]
+    ebooks = personal["ebook"]["aktif"]
+    if not rows and not ebooks:
+        return (
+            "Tidak ada pinjaman aktif atau akses e-book aktif, sehingga "
+            "tidak ada jatuh tempo yang perlu diperhatikan."
+        )
+    lines = []
+    for row in rows:
+        lines.append(
+            f"- {row['judul']}: jatuh tempo {row['jatuh_tempo']}."
+        )
+    for ebook in ebooks:
+        lines.append(
+            f"- {ebook['judul']} [e-book]: akses berlaku sampai "
+            f"{ebook['berlaku_sampai']}."
+        )
+    return "\n".join(lines)
+
+
+def _render_terlambat(personal):
+    late = personal["terlambat"]
+    if not late:
+        return (
+            "Tidak ada buku yang terlambat. Kembalikan sebelum jatuh tempo "
+            "agar terhindar dari denda."
+        )
+    lines = ["Buku yang sudah melewati jatuh tempo:"]
+    for row in late:
+        lines.append(
+            f"- {row['judul']} (kode {row['kode']}): terlambat "
+            f"{row['terlambat_hari']} hari, jatuh tempo {row['jatuh_tempo']}."
+        )
+    lines.append("Segera kembalikan ke perpustakaan.")
+    return "\n".join(lines)
+
+
+def _render_riwayat(personal):
+    rows = personal["riwayat"]
+    counts = personal["hitungan"]
+    if not rows:
+        return (
+            "Anda belum memiliki riwayat peminjaman. "
+            "Mulai dari menu Katalog."
+        )
+    lines = ["Riwayat peminjaman terakhir Anda:"]
+    for row in rows:
+        titles = ", ".join(row["judul"]) or "-"
+        lines.append(
+            f"- Pengajuan #{row['id']} ({row['tanggal']}): {row['status']}, "
+            f"{titles}."
+        )
+    if counts["aktif_belum_kembali"] == 0 and counts["selesai"] > 0:
+        lines.append("Semua buku yang Anda pinjam sudah dikembalikan.")
+    elif counts["aktif_belum_kembali"] > 0:
+        lines.append(
+            f"Masih ada {counts['aktif_belum_kembali']} buku yang belum "
+            "dikembalikan."
+        )
+    return "\n".join(lines)
+
+
+def _render_notifikasi(personal):
+    notif = personal["notifikasi"]
+    counts = personal["hitungan"]
+    late = len(personal["terlambat"])
+    lines = []
+    if notif["belum_dibaca"] > 0:
+        lines.append(
+            f"Ada {notif['belum_dibaca']} notifikasi belum dibaca."
+        )
+        for item in notif["terbaru"]:
+            lines.append(f"- {item['judul']} ({item['tanggal']}).")
+    else:
+        lines.append("Tidak ada notifikasi yang belum dibaca.")
+    if counts["menunggu"] > 0:
+        lines.append(
+            f"{counts['menunggu']} pengajuan fisik menunggu persetujuan."
+        )
+    if personal["ebook"]["menunggu"]:
+        lines.append(
+            f"{len(personal['ebook']['menunggu'])} pengajuan e-book "
+            "menunggu persetujuan."
+        )
+    if late > 0:
+        lines.append(f"{late} buku melewati jatuh tempo.")
+    lines.append("Buka menu Notifikasi untuk detailnya.")
+    return "\n".join(lines)
+
+
+def _render_ebook_saya(personal):
+    ebook = personal["ebook"]
+    lines = []
+    if ebook["aktif"]:
+        lines.append("Akses e-book aktif Anda:")
+        for item in ebook["aktif"]:
+            lines.append(
+                f"- {item['judul']}: berlaku sampai "
+                f"{item['berlaku_sampai']} "
+                f"({item['sisa_hari']} hari lagi). Buka lewat menu "
+                "E-Book Saya lalu Baca."
+            )
+    if ebook["menunggu"]:
+        lines.append("Menunggu persetujuan pustakawan:")
+        for item in ebook["menunggu"]:
+            lines.append(f"- {item['judul']}.")
+    if not ebook["aktif"] and not ebook["menunggu"]:
+        lines.append(
+            "Tidak ada akses e-book aktif. Ajukan dari detail e-book di "
+            "menu Katalog."
+        )
+    for item in ebook["riwayat"][:3]:
+        lines.append(f"- {item['judul']} [e-book]: {item['status']}.")
+    return "\n".join(lines)
+
+
+def _render_profil(personal):
+    profile = personal["profil"]
+    parts = f"Nama: {profile['nama']}, peran: {profile['role']}"
+    if profile["identitas"]:
+        parts += f", {profile['identitas']}"
+    if profile["kelas"] != "-":
+        parts += f", kelas: {profile['kelas']}"
+    return (
+        f"Data akun Anda: {parts}. "
+        "Ubah data via menu Profil; username, peran, dan NIS/NIP tidak "
+        "bisa diubah sendiri."
+    )
+
+
+_PERSONAL_RENDERERS = {
+    "denda": _render_denda,
+    "pinjaman": _render_pinjaman,
+    "jatuh_tempo": _render_jatuh_tempo,
+    "terlambat": _render_terlambat,
+    "riwayat": _render_riwayat,
+    "notifikasi": _render_notifikasi,
+    "ebook_saya": _render_ebook_saya,
+    "profil": _render_profil,
+}
+
+
+def render_personal_answer(intent, personal):
+    """Jawaban deterministik dari data_saya (tanpa provider)."""
+    if personal.get("refused"):
+        return OTHER_USER_REFUSAL
+    if personal.get("error"):
+        return PERSONAL_ERROR_FALLBACK
+    renderer = _PERSONAL_RENDERERS.get(intent)
+    if renderer is None:
+        return PERSONAL_ERROR_FALLBACK
+    return renderer(personal)
+
+
 def retrieve_context(user, question, limit=8):
     """Konteks minimal, authorization-aware: hanya data milik/boleh dilihat user."""
     from django.conf import settings
 
     limit = min(limit, settings.AI_MAX_CONTEXT_ITEMS)
-    books, ebooks = _search_collections(question, limit)
+    normalized = normalize(question)
+    books, ebooks, from_listing = _search_collections(question, limit)
     policy = _policy_context()
-    guide = workflow_answer(normalize(question), policy)
+    guide = workflow_answer(normalized, policy)
+    personal_intent = match_personal(normalized)
+    data_saya = None
+    if personal_intent is not None:
+        if _mentions_other_person(normalized):
+            data_saya = {"refused": True}
+        else:
+            try:
+                data_saya = build_personal_context(user)
+            except Exception:
+                logger.exception(
+                    "AI personal context gagal untuk user_id=%s", user.pk
+                )
+                data_saya = {"error": True}
     return {
         "koleksi_fisik": books,
         "ebook": ebooks,
@@ -776,7 +1442,48 @@ def retrieve_context(user, question, limit=8):
         "kebijakan": policy,
         "fakta_sistem": _system_facts(),
         "panduan_alur": guide,
+        "is_listing": from_listing or not _content_tokens(question),
+        "personal_intent": personal_intent,
+        "data_saya": data_saya,
     }
+
+
+LISTING_DISPLAY_MAX = 5
+
+
+def _listing_answer(books, ebooks):
+    """Sajian daftar koleksi untuk niat listing (dibatasi + arahan Katalog)."""
+    if not books and not ebooks:
+        return NO_DATA_FALLBACK
+    if books and ebooks:
+        header = "Berikut koleksi yang tersedia di perpustakaan:"
+    elif books:
+        header = "Berikut buku fisik yang tersedia di perpustakaan:"
+    else:
+        header = "Berikut e-book yang tersedia di perpustakaan:"
+    lines = [header]
+    for book in books[:LISTING_DISPLAY_MAX]:
+        authors = ", ".join(book["penulis"]) or "penulis tidak tercatat"
+        lines.append(
+            f"- {book['judul']} ({authors}, {book['kategori']}) — "
+            f"{book['tersedia']} eksemplar tersedia."
+        )
+    for ebook in ebooks[:LISTING_DISPLAY_MAX]:
+        authors = ", ".join(ebook["penulis"]) or "penulis tidak tercatat"
+        lines.append(
+            f"- {ebook['judul']} [e-book] ({authors}, {ebook['kategori']})."
+        )
+    if len(books) + len(ebooks) > 2 * LISTING_DISPLAY_MAX:
+        lines.append(
+            "Masih banyak koleksi lain — lihat selengkapnya di menu Katalog "
+            "atau sebutkan judul/penulis/kategori yang dicari."
+        )
+    else:
+        lines.append(
+            "Untuk mencari yang spesifik, sebutkan judul, penulis, atau "
+            "kategori, atau buka menu Katalog."
+        )
+    return "\n".join(lines)
 
 
 def build_local_answer(question, context):
@@ -788,7 +1495,14 @@ def build_local_answer(question, context):
     )
     books = context.get("koleksi_fisik", [])
     ebooks = context.get("ebook", [])
-    if guide is not None:
+    personal = context.get("data_saya")
+    intent = context.get("personal_intent") or match_personal(normalized)
+    if guide is not None and (
+        personal is None or _MECHANISM_PATTERN.search(normalized)
+    ):
+        # Panduan prosedural diutamakan untuk pertanyaan mekanisme
+        # ("bagaimana denda dihitung"); data pribadi diutamakan bila
+        # pertanyaan menyangkut milik pengguna ("kelas saya?").
         # Panduan prosedural diutamakan; lampirkan koleksi terkait bila ada
         # agar kemampuan pencarian katalog tetap terasa pada pertanyaan
         # seperti "cara pinjam buku Python?".
@@ -807,11 +1521,16 @@ def build_local_answer(question, context):
                 related
             )
         return guide
+    if personal is not None and intent is not None:
+        # Pertanyaan data milik sendiri: jawab dari query baru milik user.
+        return render_personal_answer(intent, personal)
     facts = context.get("fakta_sistem") or {}
     if facts:
         factual = _facts_answer(normalized, facts)
         if factual is not None:
             return factual
+    if context.get("is_listing", _is_listing_intent(normalized)):
+        return _listing_answer(books, ebooks)
     if not books and not ebooks:
         return NO_DATA_FALLBACK
     lines = ["Berdasarkan katalog perpustakaan:"]

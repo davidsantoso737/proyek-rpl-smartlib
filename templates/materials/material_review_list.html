@@ -5,7 +5,7 @@
 {% block content %}
 
 <div class="mb-6">
-    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+    <h1 class="text-xl font-semibold text-slate-900">
         Verifikasi Bahan Ajar
     </h1>
     <p class="text-slate-500 text-sm mt-1">
@@ -13,66 +13,89 @@
     </p>
 </div>
 
-<div class="space-y-6">
-    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6 space-y-8">
-        <div>
-            <h2 class="text-base font-semibold text-slate-900 mb-3">Menunggu verifikasi ({{ pending.count }})</h2>
-            {% if pending %}
-                <div class="space-y-2">
-                    {% for material in pending %}
+<div class="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+    <section aria-labelledby="review-pending-heading">
+        <div class="flex items-center gap-2 px-4 sm:px-5 py-3.5 border-b border-slate-200/80">
+            <h2 id="review-pending-heading" class="text-sm font-semibold text-slate-900">Menunggu verifikasi</h2>
+            {% if pending.count %}
+                <span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ pending.count }}</span>
+            {% else %}
+                <span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-slate-100 px-1.5 text-xs font-semibold text-slate-600">0</span>
+            {% endif %}
+        </div>
+        {% if pending %}
+            <ul class="divide-y divide-slate-100">
+                {% for material in pending %}
+                    <li>
                         <a href="{% url 'materials:review_detail' material.pk %}"
-                           class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-4">
-                            <div>
-                                <p class="font-semibold text-slate-900">{{ material.title }}</p>
-                                <p class="text-xs text-slate-500">{{ material.uploaded_by.full_name }}</p>
+                           class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 sm:px-5 py-3.5 transition hover:bg-slate-50/60">
+                            <div class="min-w-0">
+                                <p class="font-medium text-slate-900">{{ material.title }}</p>
+                                <p class="text-xs text-slate-500 mt-0.5">{{ material.uploaded_by.full_name }}</p>
                             </div>
-                            <span class="px-4 py-2 rounded-xl bg-slate-100 text-slate-800 text-sm font-medium">Periksa</span>
+                            <span class="flex items-center gap-2">
+                                <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Menunggu</span>
+                                <span class="inline-flex items-center min-h-[40px] rounded-lg bg-slate-100 px-3.5 text-sm font-medium text-slate-800">Periksa</span>
+                            </span>
                         </a>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <p class="text-sm text-slate-500">Tidak ada antrean verifikasi.</p>
-            {% endif %}
-        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <div class="py-8 px-4 text-center">
+                <svg class="mx-auto h-8 w-8 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.5 2.5 2.5 4.5-5.5"/></svg>
+                <p class="mt-2 text-sm font-semibold text-slate-900">Tidak ada antrean verifikasi.</p>
+            </div>
+        {% endif %}
+    </section>
 
-        <div class="border-t border-slate-100 pt-6">
-            <h2 class="text-base font-semibold text-slate-900 mb-3">Permintaan penghapusan ({{ deletions.count }})</h2>
-            {% if deletions %}
-                <div class="space-y-2">
-                    {% for deletion in deletions %}
-                        <div class="rounded-xl border border-slate-200 p-4">
-                            <p class="font-semibold text-slate-900">{{ deletion.material.title }}</p>
-                            <p class="text-xs text-slate-500 mt-0.5">
-                                {{ deletion.requested_by.full_name }} &middot; alasan: {{ deletion.reason }}
-                            </p>
-                            <div class="flex flex-wrap gap-2 mt-3">
-                                <form method="post" action="{% url 'materials:deletion_review' deletion.pk %}" class="inline">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="decision" value="approve">
-                                    <button type="submit" onclick="return confirm('Setujui penghapusan bahan ajar ini? File akan dihapus.')"
-                                            class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition">
-                                        Setujui hapus
-                                    </button>
-                                </form>
-                                <form method="post" action="{% url 'materials:deletion_review' deletion.pk %}" class="inline-flex flex-1 min-w-52 gap-2">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="decision" value="reject">
-                                    <input type="text" name="note" placeholder="Catatan (opsional)..."
-                                           class="flex-1 min-w-0 border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    <button type="submit"
-                                            class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
-                                        Tolak
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    {% endfor %}
-                </div>
+    <section aria-labelledby="review-deletion-heading" class="border-t border-slate-200/80">
+        <div class="flex items-center gap-2 px-4 sm:px-5 py-3.5 border-b border-slate-200/80">
+            <h2 id="review-deletion-heading" class="text-sm font-semibold text-slate-900">Permintaan penghapusan</h2>
+            {% if deletions.count %}
+                <span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ deletions.count }}</span>
             {% else %}
-                <p class="text-sm text-slate-500">Tidak ada permintaan penghapusan.</p>
+                <span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-slate-100 px-1.5 text-xs font-semibold text-slate-600">0</span>
             {% endif %}
         </div>
-    </div>
+        {% if deletions %}
+            <ul class="divide-y divide-slate-100">
+                {% for deletion in deletions %}
+                    <li class="px-4 sm:px-5 py-3.5">
+                        <p class="font-medium text-slate-900">{{ deletion.material.title }}</p>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            {{ deletion.requested_by.full_name }} &middot; alasan: {{ deletion.reason }}
+                        </p>
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            <form method="post" action="{% url 'materials:deletion_review' deletion.pk %}" class="inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="decision" value="approve">
+                                <button type="submit" onclick="return confirm('Setujui penghapusan bahan ajar ini? File akan dihapus.')"
+                                        class="px-4 py-2 min-h-[44px] rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition">
+                                    Setujui hapus
+                                </button>
+                            </form>
+                            <form method="post" action="{% url 'materials:deletion_review' deletion.pk %}" class="inline-flex flex-1 min-w-52 gap-2">
+                                {% csrf_token %}
+                                <input type="hidden" name="decision" value="reject">
+                                <input type="text" name="note" placeholder="Catatan (opsional)..."
+                                       class="flex-1 min-w-0 border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <button type="submit"
+                                        class="px-4 py-2 min-h-[44px] rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+                                    Tolak
+                                </button>
+                            </form>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <div class="py-8 px-4 text-center">
+                <svg class="mx-auto h-8 w-8 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                <p class="mt-2 text-sm font-semibold text-slate-900">Tidak ada permintaan penghapusan.</p>
+            </div>
+        {% endif %}
+    </section>
 </div>
 
 {% endblock %}
