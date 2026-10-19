@@ -1,7 +1,10 @@
+from decimal import Decimal
+
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
+from django.db.models import Count, Q, Sum
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.clickjacking import xframe_options_sameorigin
@@ -15,10 +18,12 @@ from apps.accounts.authorization import (
 from .models import EbookLoan, Loan, LoanItem
 from .services import (
     EBOOK_PENDING,
+    FINE_UNPAID,
     LOAN_APPROVED,
     LOAN_PENDING,
     ApprovalError,
     EbookLoanError,
+    FinePaymentError,
     LoanRequestError,
     PickupTokenError,
     ReturnError,
@@ -30,6 +35,7 @@ from .services import (
     cart_clear,
     cart_copies,
     cart_remove,
+    confirm_fine_payment,
     get_active_ebook_loan,
     get_cart_ids,
     lookup_return,
@@ -399,11 +405,42 @@ def return_history_view(request):
         .select_related("loan__user", "book_copy__book", "processed_by")
         .order_by("-returned_at")
     )
+    summary = items.aggregate(
+        total=Count("pk"),
+        with_fine=Count("pk", filter=Q(fine_amount__gt=0)),
+        unpaid=Count(
+            "pk", filter=Q(fine_status=FINE_UNPAID, fine_amount__gt=0)
+        ),
+        unpaid_amount=Sum(
+            "fine_amount",
+            filter=Q(fine_status=FINE_UNPAID, fine_amount__gt=0),
+        ),
+    )
+    summary["unpaid_amount"] = summary["unpaid_amount"] or Decimal("0")
     paginator = Paginator(items, 15)
     page_obj = paginator.get_page(request.GET.get("page"))
     return render(
-        request, "circulation/return_history.html", {"page_obj": page_obj}
+        request,
+        "circulation/return_history.html",
+        {"page_obj": page_obj, "summary": summary},
     )
+
+
+@role_required(User.Role.PUSTAKAWAN)
+@require_POST
+def fine_payment_confirm_view(request, pk):
+    """Konfirmasi manual pembayaran denda pengembalian (FR-47)."""
+    try:
+        item = confirm_fine_payment(pk)
+    except FinePaymentError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(
+            request,
+            f"Denda Rp{item.fine_amount} pada eksemplar "
+            f"{item.book_copy.copy_code} ditandai lunas.",
+        )
+    return redirect("circulation:return_history")
 
 
 # --- E-book (FR-54 – FR-63) ---

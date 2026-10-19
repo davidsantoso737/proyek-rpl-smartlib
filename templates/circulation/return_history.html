@@ -4,59 +4,96 @@
 
 {% block content %}
 
+<div class="mx-auto max-w-5xl">
+
+{% url 'circulation:return' as back_url %}
+{% include "partials/_back_link.html" with href=back_url label="Kembali ke Pengembalian Buku" %}
+
 <div class="mb-6">
-    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+    <h1 class="text-2xl font-bold text-slate-900 sm:text-3xl">
         Riwayat Pengembalian
     </h1>
     <p class="text-slate-500 text-sm mt-1">
-        Seluruh eksemplar yang telah kembali, termasuk denda dan statusnya.
+        Transaksi pengembalian buku yang telah dikonfirmasi, termasuk denda dan status pembayarannya.
     </p>
 </div>
 
-<div class="space-y-6">
-    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
-        {% if page_obj.object_list %}
-            <div class="rounded-xl border border-slate-200 overflow-x-auto" tabindex="0" role="region" aria-label="Tabel riwayat pengembalian, dapat digeser horizontal">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="bg-slate-50 text-left text-slate-500">
-                            <th scope="col" class="px-4 py-2.5 font-medium">Kembali</th>
-                            <th scope="col" class="px-4 py-2.5 font-medium">Kode</th>
-                            <th scope="col" class="px-4 py-2.5 font-medium">Peminjam</th>
-                            <th scope="col" class="px-4 py-2.5 font-medium">Terlambat</th>
-                            <th scope="col" class="px-4 py-2.5 font-medium">Denda</th>
-                            <th scope="col" class="px-4 py-2.5 font-medium">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        {% for item in page_obj.object_list %}
-                            <tr class="hover:bg-slate-50/60">
-                                <td class="px-4 py-2.5 whitespace-nowrap">{{ item.returned_at|date:"d M Y H:i" }}</td>
-                                <td class="px-4 py-2.5 font-medium">{{ item.book_copy.copy_code }}</td>
-                                <td class="px-4 py-2.5">{{ item.loan.user.full_name }}</td>
-                                <td class="px-4 py-2.5">{{ item.late_day }} hari</td>
-                                <td class="px-4 py-2.5">Rp{{ item.fine_amount }}</td>
-                                <td class="px-4 py-2.5">
-                                    {% if item.return_status == "HILANG" %}
-                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-red-100 text-red-700">Hilang</span>
-                                    {% else %}
-                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-100 text-emerald-700">Kembali</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+<section aria-label="Ringkasan pengembalian" class="mb-6">
+    <dl class="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-slate-200/80 bg-slate-100 shadow-sm sm:grid-cols-4">
+        <div class="bg-white p-4 sm:p-5">
+            <dt class="text-xs font-medium text-slate-500">Transaksi pengembalian</dt>
+            <dd class="mt-1 text-xl font-semibold text-slate-900">{{ summary.total }}</dd>
+        </div>
+        <div class="bg-white p-4 sm:p-5">
+            <dt class="text-xs font-medium text-slate-500">Transaksi berdenda</dt>
+            <dd class="mt-1 text-xl font-semibold text-slate-900">{{ summary.with_fine }}</dd>
+        </div>
+        <div class="bg-white p-4 sm:p-5">
+            <dt class="text-xs font-medium text-slate-500">Denda belum lunas</dt>
+            <dd class="mt-1 text-xl font-semibold {% if summary.unpaid %}text-amber-700{% else %}text-slate-900{% endif %}">{{ summary.unpaid }}</dd>
+        </div>
+        <div class="bg-white p-4 sm:p-5">
+            <dt class="text-xs font-medium text-slate-500">Total denda belum dibayar</dt>
+            <dd class="mt-1 text-xl font-semibold break-words {% if summary.unpaid %}text-amber-700{% else %}text-slate-900{% endif %}">Rp{{ summary.unpaid_amount }}</dd>
+        </div>
+    </dl>
+</section>
 
-            {% include "partials/_pagination.html" %}
-        {% else %}
-            <div class="text-center py-12">
-                <p class="text-slate-900 font-semibold mb-1">Belum ada pengembalian tercatat.</p>
-                <p class="text-slate-500 text-sm">Catat pengembalian pertama melalui halaman pengembalian.</p>
-            </div>
-        {% endif %}
+{% if page_obj.object_list %}
+    <ul class="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+        {% for item in page_obj.object_list %}
+            <li class="px-4 py-4 sm:px-5">
+                <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                    <div class="min-w-0">
+                        <h2 class="text-sm font-semibold leading-snug text-slate-900 break-words">
+                            {{ item.book_copy.book.title }}
+                        </h2>
+                        <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                            <span class="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-medium text-slate-700">{{ item.book_copy.copy_code }}</span>
+                            <span class="break-words">{{ item.loan.user.full_name }}</span>
+                            <span>Kembali {{ item.returned_at|date:"d M Y H:i" }}</span>
+                        </p>
+                    </div>
+                    <div class="flex shrink-0 items-center">
+                        {% include "partials/_return_status_badge.html" with status=item.return_status %}
+                    </div>
+                </div>
+
+                <div class="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+                    {% if item.fine_amount %}
+                        <span class="text-sm font-medium text-slate-900">Denda Rp{{ item.fine_amount }}</span>
+                        <span class="text-xs text-slate-500">Terlambat {{ item.late_day }} hari</span>
+                    {% endif %}
+                    {% include "partials/_fine_status_badge.html" with amount=item.fine_amount status=item.fine_status %}
+                    {% if item.fine_status == "BELUM_BAYAR" and item.fine_amount %}
+                        <form method="post" action="{% url 'circulation:fine_payment_confirm' item.pk %}" class="w-full sm:ml-auto sm:w-auto">
+                            {% csrf_token %}
+                            <button type="submit"
+                                    onclick="return confirm('Tandai denda eksemplar {{ item.book_copy.copy_code }} sebesar Rp{{ item.fine_amount }} sebagai lunas?')"
+                                    class="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50 sm:w-auto">
+                                <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12.5 11 14.5 15.5 9.5"/><circle cx="12" cy="12" r="8.5"/></svg>
+                                Konfirmasi Denda Dibayar
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </li>
+        {% endfor %}
+    </ul>
+
+    {% include "partials/_pagination.html" %}
+{% else %}
+    <div class="flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:gap-4 sm:p-6">
+        <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+        </span>
+        <div class="min-w-0">
+            <p class="text-sm font-semibold text-slate-900">Belum ada pengembalian tercatat</p>
+            <p class="text-[13px] text-slate-500">Catat pengembalian pertama melalui halaman Pengembalian Buku.</p>
+        </div>
     </div>
+{% endif %}
+
 </div>
 
 {% endblock %}

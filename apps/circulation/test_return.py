@@ -9,9 +9,11 @@ from django.utils import timezone
 from apps.catalog.models import Book, BookCopy, Category
 from apps.circulation.models import Loan, LoanItem
 from apps.circulation.services import (
+    FinePaymentError,
     ReturnError,
     activate_handover,
     approve_loan,
+    confirm_fine_payment,
     lookup_return,
     process_return,
     request_loan,
@@ -330,4 +332,106 @@ class ReturnTests(TestCase):
         self.assertEqual(
             self.client.get(reverse("circulation:copy_label_batch")).status_code,
             403,
+        )
+
+    # --- konfirmasi pembayaran denda (FR-47) ---
+
+    def _unpaid_fine_item(self):
+        loan = self._active_loan()
+        past_due = timezone.now() - datetime.timedelta(days=2, hours=1)
+        LoanItem.objects.filter(loan=loan).update(due_at=past_due)
+        Loan.objects.filter(pk=loan.pk).update(due_at=past_due)
+        item = process_return("RT-001", self.pus, "BAIK")
+        self.assertEqual(item.fine_status, "BELUM_BAYAR")
+        self.assertEqual(item.fine_amount, Decimal("2000"))
+        return item
+
+    def test_confirm_fine_payment_menandai_lunas_tanpa_ubah_nominal(self):
+        item = self._unpaid_fine_item()
+        result = confirm_fine_payment(item.pk)
+        result.refresh_from_db()
+        self.assertEqual(result.fine_status, "LUNAS")
+        self.assertIsNotNone(result.fine_paid_at)
+        # Nominal denda, status pengembalian, dan status peminjaman tidak berubah.
+        self.assertEqual(result.fine_amount, Decimal("2000"))
+        self.assertEqual(result.return_status, "KEMBALI")
+        self.assertEqual(result.loan.status, "COMPLETED")
+
+    def test_confirm_fine_payment_idempoten_tidak_catat_ganda(self):
+        item = self._unpaid_fine_item()
+        confirm_fine_payment(item.pk)
+        item.refresh_from_db()
+        paid_at = item.fine_paid_at
+        with self.assertRaises(FinePaymentError):
+            confirm_fine_payment(item.pk)
+        item.refresh_from_db()
+        self.assertEqual(item.fine_paid_at, paid_at)
+
+    def test_confirm_fine_payment_tanpa_denda_ditolak(self):
+        loan = self._active_loan()
+        process_return("RT-001", self.pus, "BAIK")
+        item = LoanItem.objects.get(loan=loan, book_copy=self.copy1)
+        self.assertEqual(item.fine_amount, 0)
+        with self.assertRaises(FinePaymentError):
+            confirm_fine_payment(item.pk)
+
+    def test_confirm_fine_payment_transaksi_tidak_ditemukan(self):
+        with self.assertRaises(FinePaymentError):
+            confirm_fine_payment(99999999)
+
+    def test_fine_payment_view_hanya_pustakawan_dan_post(self):
+        item = self._unpaid_fine_item()
+        url = reverse("circulation:fine_payment_confirm", args=[item.pk])
+        self.assertEqual(self.client.get(url).status_code, 302)
+        self.client.force_login(self.siswa)
+        self.assertEqual(self.client.post(url).status_code, 403)
+        self.client.force_login(self.guru)
+        self.assertEqual(self.client.post(url).status_code, 403)
+        self.client.force_login(self.pus)
+        self.assertEqual(self.client.get(url).status_code, 405)
+
+    def test_fine_payment_view_berhasil_mengubah_status(self):
+        item = self._unpaid_fine_item()
+        self.client.force_login(self.pus)
+        url = reverse("circulation:fine_payment_confirm", args=[item.pk])
+        response = self.client.post(url)
+        self.assertRedirects(response, reverse("circulation:return_history"))
+        item.refresh_from_db()
+        self.assertEqual(item.fine_status, "LUNAS")
+        self.assertIsNotNone(item.fine_paid_at)
+
+    def test_fine_payment_view_lunas_ganda_tidak_mengubah_data(self):
+        item = self._unpaid_fine_item()
+        self.client.force_login(self.pus)
+        url = reverse("circulation:fine_payment_confirm", args=[item.pk])
+        self.client.post(url)
+        item.refresh_from_db()
+        paid_at = item.fine_paid_at
+        response = self.client.post(url, follow=True)
+        self.assertEqual(response.status_code, 200)
+        item.refresh_from_db()
+        self.assertEqual(item.fine_status, "LUNAS")
+        self.assertEqual(item.fine_paid_at, paid_at)
+
+    def test_return_history_menampilkan_aksi_konfirmasi_denda(self):
+        item = self._unpaid_fine_item()
+        self.client.force_login(self.pus)
+        response = self.client.get(reverse("circulation:return_history"))
+        self.assertContains(response, "Belum dibayar")
+        self.assertContains(response, "Konfirmasi Denda Dibayar")
+        self.assertContains(
+            response,
+            reverse("circulation:fine_payment_confirm", args=[item.pk]),
+        )
+        confirm_fine_payment(item.pk)
+        response = self.client.get(reverse("circulation:return_history"))
+        self.assertContains(response, "Lunas")
+        self.assertNotContains(response, "Konfirmasi Denda Dibayar")
+
+    def test_return_page_menyediakan_link_riwayat(self):
+        self.client.force_login(self.pus)
+        response = self.client.get(reverse("circulation:return"))
+        self.assertContains(response, "Riwayat Pengembalian")
+        self.assertContains(
+            response, reverse("circulation:return_history")
         )

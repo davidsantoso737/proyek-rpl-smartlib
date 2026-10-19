@@ -8,174 +8,215 @@
 
 {% if user.role == "PUSTAKAWAN" %}
 <div class="space-y-5">
-    <section class="rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm" aria-labelledby="lib-attention-title">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h2 id="lib-attention-title" class="text-base font-semibold text-slate-900">Perlu perhatian</h2>
-                {% if pending_total %}
-                    <p class="mt-1 text-sm text-slate-500">Ada {{ pending_total }} hal menunggu aksi: {{ pending_loans }} pengajuan pinjam, {{ pending_ebooks }} e-book, {{ pending_materials }} verifikasi materi, {{ pending_deletions }} permintaan hapus.</p>
-                {% else %}
-                    <p class="mt-1 text-sm text-slate-500">
-                        Semua pengajuan sudah diproses. Tidak ada antrean yang menunggu.
-                    </p>
-                {% endif %}
+    <section aria-label="Ringkasan koleksi dan sirkulasi">
+        <div class="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+            <div class="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-[13px] font-medium text-slate-500">Judul buku</p>
+                        <p class="mt-1 text-[26px] font-semibold leading-8 text-slate-900">{{ total_books }}</p>
+                    </div>
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700" aria-hidden="true">
+                        <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V6a2 2 0 0 1 2-2h13v13H6a2 2 0 0 0-2 2Z"/><path d="M4 19a2 2 0 0 0 2 2h13"/><path d="M9 8h6"/></svg>
+                    </span>
+                </div>
+                <p class="mt-2 text-xs text-slate-500">Koleksi fisik terdaftar</p>
             </div>
-            {% if pending_total %}
-                <a href="{% url 'circulation:approval_list' %}"
-                   class="inline-flex min-h-[44px] items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">
-                    Buka persetujuan
-                </a>
-            {% endif %}
+            <div class="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-[13px] font-medium text-slate-500">Eksemplar fisik</p>
+                        <p class="mt-1 text-[26px] font-semibold leading-8 text-slate-900">{{ total_copies }}</p>
+                    </div>
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700" aria-hidden="true">
+                        <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 16 9 5 9-5"/></svg>
+                    </span>
+                </div>
+                <p class="mt-2 text-xs text-slate-500">{{ copies_available }} tersedia</p>
+            </div>
+            <div class="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-[13px] font-medium text-slate-500">E-book</p>
+                        <p class="mt-1 text-[26px] font-semibold leading-8 text-slate-900">{{ total_ebooks }}</p>
+                    </div>
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700" aria-hidden="true">
+                        <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M10 18.5h4"/></svg>
+                    </span>
+                </div>
+                <p class="mt-2 text-xs text-slate-500">{{ active_ebooks }} akses aktif</p>
+            </div>
+            <div class="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-[13px] font-medium text-slate-500">Peminjaman aktif</p>
+                        <p class="mt-1 text-[26px] font-semibold leading-8 text-slate-900">{{ active_loans|default:0 }}</p>
+                    </div>
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700" aria-hidden="true">
+                        <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10.5 5 8.5 4.5 4 4.5v13c4.5 0 6.5.5 8 2 1.5-1.5 3.5-2 8-2v-13c-4.5 0-6.5.5-8 2Z"/><path d="M12 6.5v13"/></svg>
+                    </span>
+                </div>
+                <p class="mt-2 text-xs text-slate-500">Buku fisik sedang dipinjam</p>
+            </div>
         </div>
-        {% if pending_total %}
-            <div class="mt-3 flex flex-wrap gap-2">
-                <a href="{% url 'circulation:ebook_approval_list' %}"
-                   class="inline-flex min-h-[44px] items-center rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-200">
-                    E-Approval ({{ pending_ebooks }})
-                </a>
-                <a href="{% url 'materials:review_list' %}"
-                   class="inline-flex min-h-[44px] items-center rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-200">
-                    Verifikasi ({{ pending_materials|add:pending_deletions }})
-                </a>
-            </div>
-        {% endif %}
     </section>
 
-    <div class="grid gap-3.5 grid-cols-2 lg:grid-cols-3 min-[1440px]:grid-cols-5">
-        <a href="{% url 'circulation:approval_list' %}"
-           class="group rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow">
-            <div class="flex items-start justify-between gap-3">
+    <div class="grid items-start gap-4 xl:grid-cols-3">
+        <section class="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm xl:col-span-2" aria-labelledby="lib-trend-title">
+            <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 border-b border-slate-200/80 px-4 py-4 sm:px-5">
                 <div class="min-w-0">
-                    <p class="text-[13px] font-medium text-slate-500">Pengajuan pinjam</p>
-                    <p class="mt-1 text-[26px] font-semibold leading-8 text-slate-900">{{ pending_loans }}</p>
+                    <h2 id="lib-trend-title" class="text-base font-semibold text-slate-900">Tren peminjaman &amp; pengembalian</h2>
+                    <p class="mt-0.5 text-[13px] text-slate-500">Enam bulan terakhir berdasarkan tanggal pengajuan pinjam dan tanggal pengembalian.</p>
                 </div>
-                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition group-hover:bg-blue-50 group-hover:text-blue-700" aria-hidden="true">
-                    <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-5l-2 3h-6l-2-3H2"/><path d="M5.5 5.5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.5A2 2 0 0 0 16.7 4H7.3a2 2 0 0 0-1.8 1.5Z"/></svg>
-                </span>
+                <a href="{% url 'reports:report' %}"
+                   class="inline-flex min-h-[44px] items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:border-blue-200 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500">
+                    Lihat laporan
+                </a>
             </div>
-            <p class="mt-2 text-xs text-slate-500">Menunggu persetujuan</p>
-        </a>
-        <a href="{% url 'circulation:ebook_approval_list' %}"
-           class="group rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow">
-            <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                    <p class="text-[13px] font-medium text-slate-500">E-Book</p>
-                    <p class="mt-1 text-[26px] font-semibold leading-8 text-slate-900">{{ pending_ebooks }}</p>
+            {% if trend_max %}
+                <div class="px-4 py-4 sm:px-5 sm:py-5">
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
+                        <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-blue-600" aria-hidden="true"></span>Peminjaman ({{ trend_loan_total }})</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-blue-300" aria-hidden="true"></span>Pengembalian ({{ trend_return_total }})</span>
+                        <span class="ml-auto text-slate-400">Skala 0&ndash;{{ trend_max }}</span>
+                    </div>
+                    <div class="mt-4 grid grid-cols-6 items-end gap-1.5 sm:gap-4">
+                        {% for month in trend_months %}
+                            <div class="flex flex-col items-center gap-1.5">
+                                <div class="flex h-28 w-full items-end justify-center gap-1 sm:h-36">
+                                    {% if month.loans %}
+                                        <div class="w-2.5 rounded-t-sm bg-blue-600 sm:w-4" style="height: {{ month.loans_pct }}%" title="Peminjaman {{ month.label }}: {{ month.loans }}" aria-hidden="true"></div>
+                                    {% else %}
+                                        <div class="h-[3px] w-2.5 rounded-t-sm bg-slate-100 sm:w-4" aria-hidden="true"></div>
+                                    {% endif %}
+                                    {% if month.returns %}
+                                        <div class="w-2.5 rounded-t-sm bg-blue-300 sm:w-4" style="height: {{ month.returns_pct }}%" title="Pengembalian {{ month.label }}: {{ month.returns }}" aria-hidden="true"></div>
+                                    {% else %}
+                                        <div class="h-[3px] w-2.5 rounded-t-sm bg-slate-100 sm:w-4" aria-hidden="true"></div>
+                                    {% endif %}
+                                </div>
+                                <span class="text-xs font-medium text-slate-600">{{ month.label }}</span>
+                                <span class="sr-only">{{ month.label }}: {{ month.loans }} peminjaman, {{ month.returns }} pengembalian.</span>
+                            </div>
+                        {% endfor %}
+                    </div>
                 </div>
-                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition group-hover:bg-blue-50 group-hover:text-blue-700" aria-hidden="true">
-                    <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M10 18.5h4"/></svg>
-                </span>
-            </div>
-            <p class="mt-2 text-xs text-slate-500">Menunggu persetujuan</p>
-        </a>
-        <a href="{% url 'materials:review_list' %}"
-           class="group rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow">
-            <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                    <p class="text-[13px] font-medium text-slate-500">Verifikasi materi</p>
-                    <p class="mt-1 text-[26px] font-semibold leading-8 text-slate-900">{{ pending_materials }}</p>
+            {% else %}
+                <div class="px-4 py-8 text-center sm:px-5">
+                    <p class="text-sm font-semibold text-slate-900">Belum ada aktivitas sirkulasi.</p>
+                    <p class="mt-1 text-xs text-slate-500">Tren akan muncul setelah ada pengajuan peminjaman atau pengembalian.</p>
                 </div>
-                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition group-hover:bg-blue-50 group-hover:text-blue-700" aria-hidden="true">
-                    <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.5 2.5 2.5 4.5-5.5"/></svg>
-                </span>
-            </div>
-            <p class="mt-2 text-xs text-slate-500">Menunggu verifikasi</p>
-        </a>
-        <a href="{% url 'materials:review_list' %}"
-           class="group rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow">
-            <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                    <p class="text-[13px] font-medium text-slate-500">Permintaan hapus</p>
-                    <p class="mt-1 text-[26px] font-semibold leading-8 text-slate-900">{{ pending_deletions }}</p>
+            {% endif %}
+        </section>
+
+        <section class="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5" aria-labelledby="lib-copies-title">
+            <h2 id="lib-copies-title" class="text-base font-semibold text-slate-900">Ketersediaan eksemplar</h2>
+            <p class="mt-0.5 text-[13px] text-slate-500">Sebaran status dari {{ copy_status_total }} eksemplar fisik.</p>
+            {% if copy_status_total %}
+                <ul class="mt-4 space-y-3">
+                    {% for row in copy_status_rows %}
+                        <li>
+                            <div class="flex items-baseline justify-between gap-2 text-sm">
+                                <span class="text-slate-600">{{ row.label }}</span>
+                                <span class="font-semibold text-slate-900">{{ row.value }}</span>
+                            </div>
+                            <div class="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-100" role="img" aria-label="{{ row.label }}: {{ row.value }} dari {{ copy_status_total }} eksemplar">
+                                <div class="h-full rounded-full {% if row.tone == 'emerald' %}bg-emerald-500{% elif row.tone == 'blue' %}bg-blue-500{% elif row.tone == 'amber' %}bg-amber-500{% else %}bg-rose-500{% endif %}" style="width: {{ row.pct }}%"></div>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="mt-4 rounded-lg bg-slate-50 px-4 py-6 text-center">
+                    <p class="text-xs font-semibold text-slate-700">Belum ada eksemplar terdaftar.</p>
+                    <p class="mt-0.5 text-xs text-slate-500">Tambahkan eksemplar melalui Kelola koleksi.</p>
                 </div>
-                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition group-hover:bg-blue-50 group-hover:text-blue-700" aria-hidden="true">
-                    <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
-                </span>
-            </div>
-            <p class="mt-2 text-xs text-slate-500">Menunggu keputusan</p>
-        </a>
-        <div class="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
-            <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                    <p class="text-[13px] font-medium text-slate-500">Peminjaman aktif</p>
-                    <p class="mt-1 text-[26px] font-semibold leading-8 text-slate-900">{{ active_loans|default:0 }}</p>
-                </div>
-                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500" aria-hidden="true">
-                    <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10.5 5 8.5 4.5 4 4.5v13c4.5 0 6.5.5 8 2 1.5-1.5 3.5-2 8-2v-13c-4.5 0-6.5.5-8 2Z"/><path d="M12 6.5v13"/></svg>
-                </span>
-            </div>
-            <p class="mt-2 text-xs text-slate-500">Sedang dipinjam</p>
-        </div>
+            {% endif %}
+        </section>
     </div>
 
     <div class="grid items-start gap-4 xl:grid-cols-3">
         <section class="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm xl:col-span-2" aria-labelledby="lib-queue-title">
             <div class="border-b border-slate-200/80 px-4 py-4 sm:px-5">
-                <h2 id="lib-queue-title" class="text-base font-semibold text-slate-900">Antrean operasional</h2>
-                <p class="mt-0.5 text-[13px] text-slate-500">Antrean nyata yang menunggu tindakan, langsung ke halaman kerjanya.</p>
+                <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+                    <div class="min-w-0">
+                        <h2 id="lib-queue-title" class="text-base font-semibold text-slate-900">Antrean operasional</h2>
+                        <p class="mt-0.5 text-[13px] text-slate-500">Pengajuan dan permintaan yang menunggu tindakan Anda.</p>
+                    </div>
+                    {% if pending_total %}
+                        <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">{{ pending_total }} menunggu</span>
+                    {% else %}
+                        <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">Bersih</span>
+                    {% endif %}
+                </div>
+                {% if pending_total %}
+                    <p class="mt-2 text-[13px] text-slate-500">Ada {{ pending_total }} hal menunggu aksi: {{ pending_loans }} pengajuan pinjam, {{ pending_ebooks }} e-book, {{ pending_materials }} verifikasi materi, {{ pending_deletions }} permintaan hapus.</p>
+                {% else %}
+                    <p class="mt-2 text-[13px] text-slate-500">Semua pengajuan sudah diproses. Tidak ada antrean yang menunggu.</p>
+                {% endif %}
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-slate-200/80 text-left">
-                            <th scope="col" class="px-4 py-3 text-xs font-semibold text-slate-500 sm:px-5">Antrean</th>
-                            <th scope="col" class="px-4 py-3 text-xs font-semibold text-slate-500">Menunggu</th>
-                            <th scope="col" class="px-4 py-3 text-xs font-semibold text-slate-500">Status</th>
+                            <th scope="col" class="px-3 py-3 text-xs font-semibold text-slate-500 sm:px-5">Antrean</th>
+                            <th scope="col" class="px-3 py-3 text-xs font-semibold text-slate-500 sm:px-4">Menunggu</th>
+                            <th scope="col" class="px-3 py-3 text-xs font-semibold text-slate-500 sm:px-4">Status</th>
                             <th scope="col" class="px-4 py-3 text-right text-xs font-semibold text-slate-500 sm:px-5">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         <tr>
-                            <td class="px-4 py-3 sm:px-5">
+                            <td class="px-3 py-3 sm:px-5">
                                 <p class="font-medium text-slate-800">Persetujuan peminjaman</p>
                                 <p class="mt-0.5 text-xs text-slate-500">Sirkulasi</p>
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-3 py-3 sm:px-4">
                                 {% if pending_loans %}<span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ pending_loans }}</span>{% else %}<span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-slate-100 px-1.5 text-xs font-semibold text-slate-600">0</span>{% endif %}
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-3 py-3 sm:px-4">
                                 {% if pending_loans %}<span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Perlu tindakan</span>{% else %}<span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">Bersih</span>{% endif %}
                             </td>
-                            <td class="px-4 py-3 text-right sm:px-5"><a href="{% url 'circulation:approval_list' %}" class="font-medium text-blue-600 hover:text-blue-700 hover:underline">Buka</a></td>
+                            <td class="px-3 py-3 text-right sm:px-5"><a href="{% url 'circulation:approval_list' %}" class="inline-flex min-h-[44px] items-center font-medium text-blue-600 hover:text-blue-700 hover:underline">Buka</a></td>
                         </tr>
                         <tr>
-                            <td class="px-4 py-3 sm:px-5">
+                            <td class="px-3 py-3 sm:px-5">
                                 <p class="font-medium text-slate-800">E-Approval e-book</p>
                                 <p class="mt-0.5 text-xs text-slate-500">Sirkulasi</p>
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-3 py-3 sm:px-4">
                                 {% if pending_ebooks %}<span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ pending_ebooks }}</span>{% else %}<span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-slate-100 px-1.5 text-xs font-semibold text-slate-600">0</span>{% endif %}
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-3 py-3 sm:px-4">
                                 {% if pending_ebooks %}<span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Perlu tindakan</span>{% else %}<span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">Bersih</span>{% endif %}
                             </td>
-                            <td class="px-4 py-3 text-right sm:px-5"><a href="{% url 'circulation:ebook_approval_list' %}" class="font-medium text-blue-600 hover:text-blue-700 hover:underline">Buka</a></td>
+                            <td class="px-3 py-3 text-right sm:px-5"><a href="{% url 'circulation:ebook_approval_list' %}" class="inline-flex min-h-[44px] items-center font-medium text-blue-600 hover:text-blue-700 hover:underline">Buka</a></td>
                         </tr>
                         <tr>
-                            <td class="px-4 py-3 sm:px-5">
+                            <td class="px-3 py-3 sm:px-5">
                                 <p class="font-medium text-slate-800">Verifikasi materi</p>
                                 <p class="mt-0.5 text-xs text-slate-500">Koleksi</p>
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-3 py-3 sm:px-4">
                                 {% if pending_materials %}<span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ pending_materials }}</span>{% else %}<span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-slate-100 px-1.5 text-xs font-semibold text-slate-600">0</span>{% endif %}
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-3 py-3 sm:px-4">
                                 {% if pending_materials %}<span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Perlu tindakan</span>{% else %}<span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">Bersih</span>{% endif %}
                             </td>
-                            <td class="px-4 py-3 text-right sm:px-5"><a href="{% url 'materials:review_list' %}" class="font-medium text-blue-600 hover:text-blue-700 hover:underline">Buka</a></td>
+                            <td class="px-3 py-3 text-right sm:px-5"><a href="{% url 'materials:review_list' %}" class="inline-flex min-h-[44px] items-center font-medium text-blue-600 hover:text-blue-700 hover:underline">Buka</a></td>
                         </tr>
                         <tr>
-                            <td class="px-4 py-3 sm:px-5">
+                            <td class="px-3 py-3 sm:px-5">
                                 <p class="font-medium text-slate-800">Permintaan hapus materi</p>
                                 <p class="mt-0.5 text-xs text-slate-500">Koleksi</p>
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-3 py-3 sm:px-4">
                                 {% if pending_deletions %}<span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ pending_deletions }}</span>{% else %}<span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-slate-100 px-1.5 text-xs font-semibold text-slate-600">0</span>{% endif %}
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-3 py-3 sm:px-4">
                                 {% if pending_deletions %}<span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Perlu tindakan</span>{% else %}<span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">Bersih</span>{% endif %}
                             </td>
-                            <td class="px-4 py-3 text-right sm:px-5"><a href="{% url 'materials:review_list' %}" class="font-medium text-blue-600 hover:text-blue-700 hover:underline">Buka</a></td>
+                            <td class="px-3 py-3 text-right sm:px-5"><a href="{% url 'materials:review_list' %}" class="inline-flex min-h-[44px] items-center font-medium text-blue-600 hover:text-blue-700 hover:underline">Buka</a></td>
                         </tr>
                     </tbody>
                 </table>
@@ -211,34 +252,6 @@
                         </a>
                     </li>
                 </ul>
-            </section>
-
-            <section class="rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm" aria-labelledby="lib-account-title">
-                <h2 id="lib-account-title" class="text-base font-semibold text-slate-900">Akun saya</h2>
-                <dl class="mt-3 space-y-1.5 text-sm">
-                    <div class="flex justify-between gap-2">
-                        <dt class="text-slate-500">Username</dt>
-                        <dd class="font-medium text-slate-900">{{ user.username }}</dd>
-                    </div>
-                    <div class="flex justify-between gap-2">
-                        <dt class="text-slate-500">Nama</dt>
-                        <dd class="font-medium text-slate-900 text-right">{{ user.full_name }}</dd>
-                    </div>
-                    <div class="flex justify-between gap-2">
-                        <dt class="text-slate-500">Role</dt>
-                        <dd class="font-medium text-slate-900">{{ user.get_role_display }}</dd>
-                    </div>
-                </dl>
-                <div class="mt-4 flex flex-wrap gap-2">
-                    <a href="{% url 'accounts:profile' %}"
-                       class="inline-flex min-h-[44px] items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">
-                        Lihat / ubah profil
-                    </a>
-                    <a href="{% url 'accounts:password_change' %}"
-                       class="inline-flex min-h-[44px] items-center rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-200">
-                        Ubah password
-                    </a>
-                </div>
             </section>
         </div>
     </div>

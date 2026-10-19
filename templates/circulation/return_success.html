@@ -4,43 +4,71 @@
 
 {% block content %}
 
-<div class="max-w-xl mx-auto bg-white rounded-2xl border border-slate-100 overflow-hidden">
-    <div class="p-6 sm:p-8 text-center">
-        <div class="mx-auto mb-4 flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 text-2xl font-bold">
-            &#10003;
+<div class="mx-auto max-w-xl">
+    <div class="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+
+        <div class="border-b border-slate-100 p-6 text-center sm:p-8">
+            <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+            </div>
+            <h1 class="text-xl font-bold text-slate-900 sm:text-2xl">
+                Pengembalian tercatat
+            </h1>
+            <p class="mt-1 text-sm text-slate-500">
+                Eksemplar {{ item.book_copy.copy_code }} &middot; {{ item.book_copy.book.title }}
+            </p>
         </div>
-        <h1 class="text-2xl font-bold text-slate-900 mb-2">
-            Pengembalian tercatat
-        </h1>
-        <p class="text-slate-500 text-sm mb-5">
-            Eksemplar {{ item.book_copy.copy_code }} ({{ item.book_copy.book.title }})
-            milik {{ item.loan.user.full_name }}.
-        </p>
-        <dl class="text-sm text-left bg-slate-50 rounded-xl p-4 space-y-1.5 mb-6">
-            <div class="flex justify-between gap-4">
+
+        <dl class="divide-y divide-slate-100 text-sm">
+            <div class="flex justify-between gap-4 px-6 py-3 sm:px-8">
+                <dt class="text-slate-500">Peminjam</dt>
+                <dd class="text-right font-medium text-slate-900">{{ item.loan.user.full_name }} ({{ item.loan.user.username }})</dd>
+            </div>
+            <div class="flex justify-between gap-4 px-6 py-3 sm:px-8">
                 <dt class="text-slate-500">Waktu kembali</dt>
-                <dd class="font-medium">{{ item.returned_at|date:"d M Y H:i" }}</dd>
+                <dd class="text-right font-medium text-slate-900">{{ item.returned_at|date:"d M Y H:i" }}</dd>
             </div>
-            <div class="flex justify-between gap-4">
+            <div class="flex justify-between gap-4 px-6 py-3 sm:px-8">
                 <dt class="text-slate-500">Keterlambatan</dt>
-                <dd class="font-medium">{{ item.late_day }} hari</dd>
+                <dd class="text-right font-medium text-slate-900">{{ item.late_day }} hari</dd>
             </div>
-            <div class="flex justify-between gap-4">
-                <dt class="text-slate-500">Denda</dt>
-                <dd class="font-medium">Rp{{ item.fine_amount }} ({{ item.fine_status }})</dd>
-            </div>
-            <div class="flex justify-between gap-4">
+            <div class="flex justify-between gap-4 px-6 py-3 sm:px-8">
                 <dt class="text-slate-500">Status eksemplar</dt>
-                <dd class="font-medium">{{ item.copy_refreshed_status }}</dd>
+                <dd class="text-right font-medium text-slate-900">
+                    {% if item.copy_refreshed_status == "TERSEDIA" %}Tersedia{% elif item.copy_refreshed_status == "DIPINJAM" %}Dipinjam{% elif item.copy_refreshed_status == "HILANG" %}Hilang{% else %}{{ item.copy_refreshed_status }}{% endif %}
+                </dd>
             </div>
         </dl>
-        <div class="flex flex-wrap justify-center gap-2">
+
+        <div class="border-t border-slate-100 px-6 py-4 sm:px-8">
+            <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    {% if item.fine_amount %}
+                        <span class="text-sm font-semibold text-slate-900">Denda Rp{{ item.fine_amount }}</span>
+                    {% endif %}
+                    {% include "partials/_fine_status_badge.html" with amount=item.fine_amount status=item.fine_status %}
+                </div>
+                {% if item.fine_status == "BELUM_BAYAR" and item.fine_amount %}
+                    <form method="post" action="{% url 'circulation:fine_payment_confirm' item.pk %}" class="w-full sm:w-auto">
+                        {% csrf_token %}
+                        <button type="submit"
+                                onclick="return confirm('Tandai denda eksemplar {{ item.book_copy.copy_code }} sebesar Rp{{ item.fine_amount }} sebagai lunas?')"
+                                class="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50 sm:w-auto">
+                            <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12.5 11 14.5 15.5 9.5"/><circle cx="12" cy="12" r="8.5"/></svg>
+                            Konfirmasi Denda Dibayar
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="flex flex-wrap gap-2 border-t border-slate-100 p-4 sm:p-5">
             <a href="{% url 'circulation:return' %}"
-               class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
+               class="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:flex-none">
                 Pengembalian berikutnya
             </a>
             <a href="{% url 'circulation:return_history' %}"
-               class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+               class="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 sm:flex-none">
                 Riwayat pengembalian
             </a>
         </div>

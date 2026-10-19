@@ -4,73 +4,70 @@
 
 {% block content %}
 
-<div class="mb-4">
-    <a href="{% url 'catalog:manage_books' %}"
-       class="inline-flex items-center gap-2 min-h-[44px] rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50">
-        <svg class="h-[18px] w-[18px] shrink-0 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/></svg>
-        Kembali ke kelola koleksi
-    </a>
-</div>
+<div class="mx-auto max-w-3xl">
 
-<h1 class="text-xl font-semibold text-slate-900 mb-4">Kategori</h1>
+    {% url 'catalog:manage_books' as back_url %}
+    {% include "partials/_back_link.html" with href=back_url label="Kembali ke kelola koleksi" %}
 
-<div class="grid items-start gap-4 lg:grid-cols-5">
-    <section class="lg:col-span-3 rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden" aria-labelledby="category-list-heading">
-        <div class="px-4 sm:px-5 py-3.5 border-b border-slate-200/80">
-            <div class="flex items-center gap-2">
-                <svg class="h-[18px] w-[18px] shrink-0 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V6a2 2 0 0 1 2-2h13v13H6a2 2 0 0 0-2 2Z"/><path d="M4 19a2 2 0 0 0 2 2h13"/><path d="M9 8h6"/></svg>
-                <h2 id="category-list-heading" class="text-sm font-semibold text-slate-900">
-                    Daftar kategori
-                    <span class="ml-1 font-medium text-slate-500">{{ categories|length }}</span>
-                </h2>
+    <div class="mb-6">
+        <h1 class="text-xl font-semibold text-slate-900">Kategori</h1>
+        <p class="text-slate-500 text-sm mt-1">Kelola kategori koleksi dan tambahkan kategori baru.</p>
+    </div>
+
+    <section aria-labelledby="category-add-heading" class="mb-6 rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
+        <h2 id="category-add-heading" class="text-sm font-semibold text-slate-900">Tambah kategori</h2>
+        <form method="post" action="{% url 'catalog:manage_categories' %}" class="mt-3">
+            {% csrf_token %}
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <label for="{{ form.name.id_for_label }}" class="shrink-0 text-sm font-medium text-slate-700 sm:w-32">{{ form.name.label }}</label>
+                <div class="min-w-0 sm:w-72">
+                    {{ form.name }}
+                    {% for error in form.name.errors %}
+                        <p class="text-red-700 text-sm mt-1">{{ error }}</p>
+                    {% endfor %}
+                </div>
+                <button type="submit"
+                        class="inline-flex min-h-[44px] w-full shrink-0 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:w-auto">
+                    <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                    Tambah kategori
+                </button>
             </div>
+        </form>
+    </section>
+
+    <section aria-labelledby="category-list-heading" class="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+        <div class="border-b border-slate-200/80 px-4 py-3.5 sm:px-5">
+            <h2 id="category-list-heading" class="text-sm font-semibold text-slate-900">
+                Daftar kategori
+                <span class="ml-1 font-medium text-slate-500">{{ categories|length }}</span>
+            </h2>
             <p class="mt-1 text-xs text-slate-500">Kategori yang dipakai koleksi tidak dapat dihapus.</p>
         </div>
         {% if categories %}
             <ul class="divide-y divide-slate-100">
                 {% for category in categories %}
-                    <li class="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 transition hover:bg-slate-50/60">
-                        <span class="min-w-0 flex-1 text-sm font-medium text-slate-800">{{ category.name }}</span>
-                        <form method="post" action="{% url 'catalog:manage_category_delete' category.pk %}" class="inline shrink-0">
+                    <li class="flex items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50/60 sm:px-5">
+                        <span class="min-w-0 flex-1 break-words text-sm font-medium text-slate-800">{{ category.name }}</span>
+                        <form method="post" action="{% url 'catalog:manage_category_delete' category.pk %}" class="shrink-0">
                             {% csrf_token %}
                             <button type="submit" onclick="return confirm('Hapus kategori ini?')" title="Hapus"
                                     aria-label="Hapus kategori {{ category.name }}"
-                                    class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 text-red-700 transition">
-                                <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>
+                                    class="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg bg-red-50 px-3 text-sm font-medium text-red-700 transition hover:bg-red-100">
+                                <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>
+                                Hapus
                             </button>
                         </form>
                     </li>
                 {% endfor %}
             </ul>
         {% else %}
-            <p class="px-4 sm:px-5 py-8 text-center text-sm text-slate-500">Belum ada kategori.</p>
+            <div class="px-4 py-8 text-center sm:px-5">
+                <p class="text-sm font-semibold text-slate-900">Belum ada kategori</p>
+                <p class="mt-1 text-sm text-slate-500">Tambahkan kategori pertama melalui form di atas.</p>
+            </div>
         {% endif %}
     </section>
 
-    <section class="lg:col-span-2 h-fit rounded-xl border border-slate-200/80 bg-white shadow-sm p-4 sm:p-5" aria-labelledby="category-add-heading">
-        <h2 id="category-add-heading" class="text-base font-semibold text-slate-900 mb-3">Tambah kategori</h2>
-        <form method="post" action="{% url 'catalog:manage_categories' %}" class="space-y-4">
-            {% csrf_token %}
-            {% for field in form %}
-                <div>
-                    <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1.5">
-                        {{ field.label }}
-                    </label>
-                    {{ field }}
-                    {% for error in field.errors %}
-                        <p class="text-red-700 text-sm mt-1">{{ error }}</p>
-                    {% endfor %}
-                </div>
-            {% endfor %}
-            <div class="flex flex-wrap items-center gap-3 pt-1">
-                <button type="submit"
-                        class="inline-flex items-center gap-1.5 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition shadow-sm">
-                    <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5v15m7.5-7.5h-15"/></svg>
-                    Tambah
-                </button>
-            </div>
-        </form>
-    </section>
 </div>
 
 {% endblock %}

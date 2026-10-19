@@ -56,6 +56,11 @@ urlpatterns = [
         name="return_history",
     ),
     path(
+        "pengembalian/riwayat/<int:pk>/denda/konfirmasi/",
+        views.fine_payment_confirm_view,
+        name="fine_payment_confirm",
+    ),
+    path(
         "identitas/<int:pk>/",
         views.copy_identity_qr_view,
         name="copy_identity_qr",

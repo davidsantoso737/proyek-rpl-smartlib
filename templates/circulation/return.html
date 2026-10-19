@@ -5,13 +5,20 @@
 
 {% block content %}
 
-<div class="mb-6">
-    <h1 class="text-xl font-semibold text-slate-900">
-        Pengembalian Buku
-    </h1>
-    <p class="text-slate-500 text-sm mt-1">
-        Pindai QR Identitas eksemplar atau ketik kode eksemplar, periksa data peminjaman, lalu konfirmasi.
-    </p>
+<div class="mb-6 flex flex-wrap items-start justify-between gap-3">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900 sm:text-3xl">
+            Pengembalian Buku
+        </h1>
+        <p class="text-slate-500 text-sm mt-1">
+            Pindai QR Identitas eksemplar atau ketik kode eksemplar, periksa data peminjaman, lalu konfirmasi.
+        </p>
+    </div>
+    <a href="{% url 'circulation:return_history' %}"
+       class="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 sm:w-auto">
+        <svg class="h-[18px] w-[18px] shrink-0 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v5h5"/></svg>
+        Riwayat Pengembalian
+    </a>
 </div>
 
 <div class="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">

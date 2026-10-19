@@ -1,0 +1,10 @@
+{# Presentation-only return status badge (never changes backend values). #}
+{# Params: status (raw LoanItem.return_status value, e.g. KEMBALI/HILANG). #}
+{# Distinguishes the physical return condition from the fine status. #}
+{% if status == "HILANG" %}
+    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">Hilang</span>
+{% elif status == "KEMBALI" %}
+    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">Kembali</span>
+{% else %}
+    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{{ status }}</span>
+{% endif %}

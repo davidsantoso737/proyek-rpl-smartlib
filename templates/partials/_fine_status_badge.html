@@ -1,0 +1,14 @@
+{# Presentation-only fine payment badge (never changes backend values). #}
+{# Params: amount (LoanItem.fine_amount), status (LoanItem.fine_status). #}
+{# A zero amount means there is no fine, regardless of the stored status. #}
+{% if amount %}
+    {% if status == "LUNAS" %}
+        <span class="inline-flex items-center whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">Lunas</span>
+    {% elif status == "BELUM_BAYAR" %}
+        <span class="inline-flex items-center whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">Belum dibayar</span>
+    {% else %}
+        <span class="inline-flex items-center whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{{ status }}</span>
+    {% endif %}
+{% else %}
+    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">Tidak ada denda</span>
+{% endif %}

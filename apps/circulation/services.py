@@ -504,6 +504,10 @@ class ReturnError(LoanRequestError):
     """Kegagalan lookup/validasi pengembalian."""
 
 
+class FinePaymentError(LoanRequestError):
+    """Kegagalan konfirmasi pembayaran denda pengembalian."""
+
+
 def _find_active_item(copy_code):
     """Cari (copy, item, loan) untuk kode identitas; tanpa lock."""
     code = (copy_code or "").strip()
@@ -646,6 +650,37 @@ def process_return(code, librarian, condition="BAIK", lost=False):
                 )
             _notify(loan.user, "LOAN_RETURNED", "Buku dikembalikan", message, loan)
     item.copy_refreshed_status = copy.status
+    return item
+
+
+def confirm_fine_payment(item_id):
+    """Tandai denda pengembalian lunas secara manual (FR-47, BR-43 – BR-49).
+
+    Hanya mencatat bahwa pustakawan telah menerima pembayaran: mengubah
+    fine_status menjadi LUNAS dan mengisi fine_paid_at. Nominal denda,
+    status pengembalian, dan status peminjaman tidak disentuh. Transaksi
+    yang sudah lunas atau tanpa denda ditolak agar tidak tercatat ganda.
+    """
+    with transaction.atomic():
+        try:
+            item = LoanItem.objects.select_for_update().get(pk=item_id)
+        except (LoanItem.DoesNotExist, TypeError, ValueError):
+            raise FinePaymentError("Transaksi pengembalian tidak ditemukan.")
+        if item.returned_at is None:
+            raise FinePaymentError(
+                "Transaksi ini belum dikembalikan sehingga belum memiliki denda."
+            )
+        if item.fine_amount <= 0:
+            raise FinePaymentError("Transaksi ini tidak memiliki denda.")
+        if item.fine_status == FINE_PAID:
+            raise FinePaymentError(
+                "Denda transaksi ini sudah ditandai lunas sebelumnya."
+            )
+        item.fine_status = FINE_PAID
+        item.fine_paid_at = timezone.now()
+        item.save(
+            update_fields=["fine_status", "fine_paid_at", "updated_at"]
+        )
     return item
 
 

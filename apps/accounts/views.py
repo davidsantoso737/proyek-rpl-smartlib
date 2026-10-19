@@ -6,9 +6,11 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Count, Q
+from django.db.models.functions import TruncMonth
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
@@ -280,27 +282,169 @@ def guru_dashboard_view(request):
     return render(request, "accounts/dashboard.html", context)
 
 
+MONTH_LABELS = [
+    "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
+    "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
+]
+
+
+def _six_month_keys():
+    """(tahun, bulan) enam bulan terakhir, urut lama ke baru."""
+    now = timezone.now()
+    year, month = now.year, now.month
+    keys = []
+    for _ in range(6):
+        keys.append((year, month))
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+    return list(reversed(keys))
+
+
+def _librarian_dashboard_stats():
+    """Agregat read-only untuk dashboard pustakawan.
+
+    Definisi mengikuti tabel yang sudah ada: judul buku = baris Book,
+    eksemplar = baris BookCopy per status, e-book = baris Ebook,
+    peminjaman aktif = Loan berstatus ACTIVE. Tren memakai tanggal
+    pengajuan (Loan.requested_at) dan pengembalian (LoanItem.returned_at)
+    agar konsisten dengan Laporan Peminjaman/Pengembalian.
+    """
+    from apps.catalog.availability import STATUS_TERSEDIA
+    from apps.catalog.models import Book, BookCopy, Ebook
+    from apps.circulation.models import EbookLoan, Loan, LoanItem
+    from apps.circulation.services import EBOOK_APPROVED, LOAN_ACTIVE
+
+    now = timezone.now()
+    stats = {
+        "total_books": 0,
+        "total_copies": 0,
+        "copies_available": 0,
+        "total_ebooks": 0,
+        "active_loans": 0,
+        "active_ebooks": 0,
+        "copy_status_total": 0,
+        "copy_status_rows": [],
+        "trend_months": [],
+        "trend_max": 0,
+        "trend_loan_total": 0,
+        "trend_return_total": 0,
+    }
+
+    stats["total_books"] = Book.objects.count()
+    stats["total_ebooks"] = Ebook.objects.count()
+    stats["active_loans"] = Loan.objects.filter(status=LOAN_ACTIVE).count()
+    stats["active_ebooks"] = EbookLoan.objects.filter(
+        status=EBOOK_APPROVED,
+        started_at__lte=now,
+        expires_at__gt=now,
+    ).count()
+
+    copy_rows = list(
+        BookCopy.objects.values("status").annotate(total=Count("pk"))
+    )
+    copy_counts = {row["status"]: row["total"] for row in copy_rows}
+    total_copies = sum(copy_counts.values())
+    stats["total_copies"] = total_copies
+    stats["copies_available"] = copy_counts.get(STATUS_TERSEDIA, 0)
+    stats["copy_status_total"] = total_copies
+    for code, label, tone in (
+        (STATUS_TERSEDIA, "Tersedia", "emerald"),
+        ("DIPINJAM", "Dipinjam", "blue"),
+        ("RUSAK", "Rusak", "amber"),
+        ("HILANG", "Hilang", "rose"),
+    ):
+        value = copy_counts.get(code, 0)
+        pct = round(value * 100 / total_copies) if total_copies else 0
+        if value and not pct:
+            pct = 1
+        stats["copy_status_rows"].append(
+            {
+                "label": label,
+                "value": value,
+                "pct": pct,
+                "tone": tone,
+            }
+        )
+
+    keys = _six_month_keys()
+    start = timezone.now().replace(
+        year=keys[0][0],
+        month=keys[0][1],
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+    loan_map = {
+        (row["month"].year, row["month"].month): row["total"]
+        for row in Loan.objects.filter(requested_at__gte=start)
+        .annotate(month=TruncMonth("requested_at"))
+        .values("month")
+        .annotate(total=Count("pk"))
+    }
+    return_map = {
+        (row["month"].year, row["month"].month): row["total"]
+        for row in LoanItem.objects.filter(returned_at__gte=start)
+        .annotate(month=TruncMonth("returned_at"))
+        .values("month")
+        .annotate(total=Count("pk"))
+    }
+    months = []
+    for year, month in keys:
+        months.append(
+            {
+                "label": MONTH_LABELS[month - 1],
+                "loans": loan_map.get((year, month), 0),
+                "returns": return_map.get((year, month), 0),
+            }
+        )
+    peak = max(
+        [row["loans"] for row in months]
+        + [row["returns"] for row in months]
+        + [0]
+    )
+    for row in months:
+        row["loans_pct"] = round(row["loans"] * 100 / peak) if peak else 0
+        row["returns_pct"] = round(row["returns"] * 100 / peak) if peak else 0
+        if row["loans"] and not row["loans_pct"]:
+            row["loans_pct"] = 1
+        if row["returns"] and not row["returns_pct"]:
+            row["returns_pct"] = 1
+    stats["trend_months"] = months
+    stats["trend_max"] = peak
+    stats["trend_loan_total"] = sum(row["loans"] for row in months)
+    stats["trend_return_total"] = sum(row["returns"] for row in months)
+    return stats
+
+
 @role_required(User.Role.PUSTAKAWAN)
 def pustakawan_dashboard_view(request):
+    context = {
+        "dashboard_title": "Dashboard Pustakawan",
+        "dashboard_intro": (
+            "Pantau koleksi, sirkulasi, dan antrean kerja perpustakaan."
+        ),
+        "active_loans": 0,
+        "total_books": 0,
+        "total_copies": 0,
+        "copies_available": 0,
+        "total_ebooks": 0,
+        "active_ebooks": 0,
+        "copy_status_total": 0,
+        "copy_status_rows": [],
+        "trend_months": [],
+        "trend_max": 0,
+        "trend_loan_total": 0,
+        "trend_return_total": 0,
+    }
     try:
-        from apps.circulation.models import Loan
-        from apps.circulation.services import LOAN_ACTIVE
-
-        active_loans = Loan.objects.filter(status=LOAN_ACTIVE).count()
+        context.update(_librarian_dashboard_stats())
     except Exception:
-        active_loans = 0
-    return render(
-        request,
-        "accounts/dashboard.html",
-        {
-            "dashboard_title": "Dashboard Pustakawan",
-            "dashboard_intro": (
-                "Area administratif perpustakaan. "
-                "Pengelolaan lanjutan mengikuti requirement tiap modul."
-            ),
-            "active_loans": active_loans,
-        },
-    )
+        logger.exception("Dashboard pustakawan: gagal menghitung statistik.")
+    return render(request, "accounts/dashboard.html", context)
 
 
 @active_login_required
