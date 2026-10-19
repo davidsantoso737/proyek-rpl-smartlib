@@ -7,119 +7,179 @@
 {% url 'catalog:catalog' as back_url %}
 {% include "partials/_back_link.html" with href=back_url label="Kembali ke katalog" %}
 
-<div class="mb-6">
-    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-700 mb-3">Buku Fisik</span>
-    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-        {{ book.title }}
-    </h1>
-    <p class="text-slate-500 text-sm mt-1">
-        {% for author in authors %}{{ author.name }}{% if not forloop.last %}, {% endif %}{% empty %}Penulis tidak tercatat{% endfor %}
-        &middot; {{ book.category.name }}
-    </p>
-</div>
+<div class="mx-auto max-w-5xl">
+    <article class="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+        <div class="grid gap-6 p-5 sm:p-6 md:grid-cols-3 md:gap-6 lg:gap-8 lg:p-8">
 
-<div class="space-y-6">
-    <div class="grid gap-6 md:grid-cols-2">
-        <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
-            <h2 class="text-base font-semibold text-slate-900 mb-3">Informasi koleksi</h2>
-            <dl class="text-sm space-y-2">
-                <div class="flex justify-between gap-4">
-                    <dt class="text-slate-500">ISBN</dt>
-                    <dd class="font-medium text-right">{{ book.isbn }}</dd>
+            {# --- Kolom kiri: sampul sebagai jangkar visual --- #}
+            <div class="flex justify-center md:col-span-1 md:justify-start">
+                <div class="relative aspect-[3/4] w-full max-w-[200px] overflow-hidden rounded-xl border border-slate-200 sm:max-w-[240px] md:max-w-none"
+                     role="img" aria-label="{% if book.cover_url %}Sampul {{ book.title }}{% else %}Sampul belum tersedia{% endif %}">
+                    <div class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-blue-50/60 px-4 text-center" aria-hidden="true">
+                        <svg class="h-9 w-9 text-blue-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10.5 5 8.5 4.5 4 4.5v13c4.5 0 6.5.5 8 2 1.5-1.5 3.5-2 8-2v-13c-4.5 0-6.5.5-8 2Z"/><path d="M12 6.5v13"/></svg>
+                        <p class="text-xs font-medium text-slate-500">Sampul belum tersedia</p>
+                    </div>
+                    {% if book.cover_url %}
+                        <img src="{{ book.cover_url }}" alt="" loading="lazy"
+                             class="relative h-full w-full bg-slate-100 object-contain" onerror="this.remove()">
+                    {% endif %}
                 </div>
-                <div class="flex justify-between gap-4">
-                    <dt class="text-slate-500">Penerbit</dt>
-                    <dd class="font-medium text-right">{{ book.publisher|default:"-" }}</dd>
-                </div>
-                <div class="flex justify-between gap-4">
-                    <dt class="text-slate-500">Tahun terbit</dt>
-                    <dd class="font-medium text-right">{{ book.publication_year|default:"-" }}</dd>
-                </div>
-                <div class="flex justify-between gap-4">
-                    <dt class="text-slate-500">Edisi</dt>
-                    <dd class="font-medium text-right">{{ book.edition|default:"-" }}</dd>
-                </div>
-                <div class="flex justify-between gap-4">
-                    <dt class="text-slate-500">Kategori</dt>
-                    <dd class="font-medium text-right">{{ book.category.name }}</dd>
-                </div>
-            </dl>
+            </div>
 
-            {% if book.description %}
-                <h2 class="text-base font-semibold text-slate-900 mt-6 mb-2">Deskripsi</h2>
-                <p class="text-sm text-slate-600 leading-relaxed">{{ book.description }}</p>
-            {% endif %}
+            {# --- Kolom kanan: hierarki informasi buku --- #}
+            <div class="min-w-0 md:col-span-2">
+                <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">Buku Fisik</span>
+                <h1 class="mt-3 break-words text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">
+                    {{ book.title }}
+                </h1>
+                <p class="mt-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">{% for author in authors %}{{ author.name }}{% if not forloop.last %}, {% endif %}{% empty %}Penulis tidak tercatat{% endfor %}</span>
+                    <span class="mx-1.5 text-slate-300" aria-hidden="true">&middot;</span>
+                    <span>{{ book.category.name }}</span>
+                </p>
 
-            {% for author in authors %}
-                {% if author.bio %}
-                    <h2 class="text-base font-semibold text-slate-900 mt-6 mb-2">Tentang {{ author.name }}</h2>
-                    <p class="text-sm text-slate-600 leading-relaxed">{{ author.bio }}</p>
+                {% if book.description %}
+                    <div class="mt-5">
+                        <h2 class="text-sm font-semibold text-slate-900">Deskripsi</h2>
+                        <p class="mt-1.5 text-sm leading-relaxed text-slate-600">{{ book.description }}</p>
+                    </div>
                 {% endif %}
-            {% endfor %}
-        </div>
 
-        <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
-            <h2 class="text-base font-semibold text-slate-900 mb-3">Ketersediaan</h2>
-            {% if available > 0 %}
-                <p class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-xl text-sm mb-4">
-                    {{ available }} dari {{ total }} eksemplar tersedia untuk dipinjam.
-                </p>
-            {% else %}
-                <p class="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2.5 rounded-xl text-sm mb-4">
-                    Seluruh {{ total }} eksemplar sedang tidak tersedia.
-                </p>
-            {% endif %}
-
-            {% if copies %}
-                <div class="rounded-xl border border-slate-200 overflow-x-auto overflow-hidden" tabindex="0" role="region" aria-label="Tabel eksemplar tersedia, dapat digeser horizontal">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="bg-slate-50 text-left text-slate-500">
-                                <th scope="col" class="px-4 py-2.5 font-medium">Kode</th>
-                                <th scope="col" class="px-4 py-2.5 font-medium">Status</th>
-                                <th scope="col" class="px-4 py-2.5 font-medium">Lokasi</th>
-                                <th scope="col" class="px-4 py-2.5 font-medium text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            {% for copy in copies %}
-                                <tr>
-                                    <td class="px-4 py-2.5 font-medium">{{ copy.copy_code }}</td>
-                                    <td class="px-4 py-2.5">
-                                        {% if copy.status == "TERSEDIA" %}
-                                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-100 text-emerald-700">{{ copy.status }}</span>
-                                        {% else %}
-                                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-700">{{ copy.status }}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="px-4 py-2.5 text-slate-600">{{ copy.location }}</td>
-                                    <td class="px-4 py-2.5 text-right">
-                                        {% if copy.status == "TERSEDIA" and user.role != "PUSTAKAWAN" %}
-                                            <form method="post" action="{% url 'circulation:cart_add' copy.pk %}" class="inline">
-                                                {% csrf_token %}
-                                                <button type="submit"
-                                                        class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition">
-                                                    + Keranjang
-                                                </button>
-                                            </form>
-                                        {% endif %}
-                                        {% if user.role == "PUSTAKAWAN" %}
-                                            <a href="{% url 'circulation:copy_label' copy.pk %}" target="_blank" rel="noopener"
-                                               class="inline-block px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium transition">
-                                                QR
-                                            </a>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="mt-5">
+                    <h2 class="text-sm font-semibold text-slate-900">Detail koleksi</h2>
+                    <dl class="mt-2 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+                        <div>
+                            <dt class="text-xs text-slate-500">ISBN</dt>
+                            <dd class="mt-0.5 break-words text-sm font-medium text-slate-800">{{ book.isbn }}</dd>
+                        </div>
+                        {% if book.publisher %}
+                            <div>
+                                <dt class="text-xs text-slate-500">Penerbit</dt>
+                                <dd class="mt-0.5 break-words text-sm font-medium text-slate-800">{{ book.publisher }}</dd>
+                            </div>
+                        {% endif %}
+                        {% if book.publication_year %}
+                            <div>
+                                <dt class="text-xs text-slate-500">Tahun terbit</dt>
+                                <dd class="mt-0.5 text-sm font-medium text-slate-800">{{ book.publication_year }}</dd>
+                            </div>
+                        {% endif %}
+                        {% if book.edition %}
+                            <div>
+                                <dt class="text-xs text-slate-500">Edisi</dt>
+                                <dd class="mt-0.5 break-words text-sm font-medium text-slate-800">{{ book.edition }}</dd>
+                            </div>
+                        {% endif %}
+                    </dl>
                 </div>
+
+                {% for author in authors %}
+                    {% if author.bio %}
+                        <div class="mt-5">
+                            <h2 class="text-sm font-semibold text-slate-900">Tentang {{ author.name }}</h2>
+                            <p class="mt-1.5 text-sm leading-relaxed text-slate-600">{{ author.bio }}</p>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+
+                {% if total %}
+                    <div class="mt-6 border-t border-slate-100 pt-5">
+                        {% if available > 0 %}
+                            <p class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-800">
+                                {{ available }} dari {{ total }} eksemplar tersedia untuk dipinjam.
+                            </p>
+                        {% else %}
+                            <p class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800">
+                                Seluruh {{ total }} eksemplar sedang tidak tersedia.
+                            </p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {# --- Eksemplar: lanjutan dari informasi buku --- #}
+        <div class="border-t border-slate-100 p-5 sm:p-6 lg:p-8">
+            <h2 class="text-base font-semibold text-slate-900">Eksemplar</h2>
+
+            {% if page_obj.object_list %}
+                <ul class="mt-2 divide-y divide-slate-100">
+                    {% for copy in page_obj.object_list %}
+                        <li class="flex flex-col gap-2 py-2.5 sm:flex-row sm:items-center sm:gap-4">
+                            <div class="min-w-0 sm:flex-1">
+                                <p class="truncate text-sm font-medium text-slate-900">{{ copy.copy_code }}</p>
+                                <p class="truncate text-xs text-slate-500">{{ copy.location }}</p>
+                            </div>
+                            <div class="flex shrink-0 items-center justify-between gap-3 sm:justify-end sm:gap-4">
+                                {% if copy.status == "TERSEDIA" %}
+                                    <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">{{ copy.status }}</span>
+                                {% else %}
+                                    <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">{{ copy.status }}</span>
+                                {% endif %}
+                                {% if copy.status == "TERSEDIA" and user.role != "PUSTAKAWAN" %}
+                                    <form method="post" action="{% url 'circulation:cart_add' copy.pk %}" class="inline">
+                                        {% csrf_token %}
+                                        <button type="submit" aria-label="Tambah eksemplar {{ copy.copy_code }} ke keranjang"
+                                                class="inline-flex items-center gap-1.5 min-h-[44px] rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+                                            <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"/></svg>
+                                            Tambah
+                                        </button>
+                                    </form>
+                                {% elif user.role == "PUSTAKAWAN" %}
+                                    <a href="{% url 'circulation:copy_label' copy.pk %}" target="_blank" rel="noopener"
+                                       class="inline-flex items-center min-h-[44px] rounded-xl bg-slate-100 px-3.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400">
+                                        QR
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+
+                {% if page_obj.has_other_pages %}
+                    <nav aria-label="Navigasi halaman eksemplar" class="mt-4 flex flex-col items-center gap-2">
+                        <div class="flex flex-wrap items-center justify-center gap-1.5">
+                            {% if page_obj.has_previous %}
+                                <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.previous_page_number }}" rel="prev" aria-label="Halaman sebelumnya"
+                                   class="inline-flex h-10 min-w-[40px] items-center justify-center rounded-xl border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+                                </a>
+                            {% else %}
+                                <span aria-disabled="true" aria-label="Halaman sebelumnya (tidak tersedia)"
+                                      class="inline-flex h-10 min-w-[40px] items-center justify-center rounded-xl border border-slate-200 bg-white px-2 text-slate-300">
+                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+                                </span>
+                            {% endif %}
+
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if num == page_obj.number %}
+                                    <span aria-current="page" class="inline-flex h-10 min-w-[40px] items-center justify-center rounded-xl bg-blue-600 px-2 text-sm font-semibold text-white">{{ num }}</span>
+                                {% else %}
+                                    <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ num }}" aria-label="Halaman {{ num }}"
+                                       class="inline-flex h-10 min-w-[40px] items-center justify-center rounded-xl border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">{{ num }}</a>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if page_obj.has_next %}
+                                <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.next_page_number }}" rel="next" aria-label="Halaman berikutnya"
+                                   class="inline-flex h-10 min-w-[40px] items-center justify-center rounded-xl border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+                                </a>
+                            {% else %}
+                                <span aria-disabled="true" aria-label="Halaman berikutnya (tidak tersedia)"
+                                      class="inline-flex h-10 min-w-[40px] items-center justify-center rounded-xl border border-slate-200 bg-white px-2 text-slate-300">
+                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+                                </span>
+                            {% endif %}
+                        </div>
+                        <p class="text-xs text-slate-500">Halaman {{ page_obj.number }} dari {{ page_obj.paginator.num_pages }}</p>
+                    </nav>
+                {% endif %}
             {% else %}
-                <p class="text-sm text-slate-500">Belum ada eksemplar tercatat untuk judul ini.</p>
+                <p class="mt-2 text-sm text-slate-500">Belum ada eksemplar tercatat untuk judul ini.</p>
             {% endif %}
         </div>
-    </div>
+    </article>
 </div>
 
 {% endblock %}

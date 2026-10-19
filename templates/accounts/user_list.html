@@ -4,124 +4,137 @@
 
 {% block content %}
 
-<div class="mb-6 flex flex-wrap items-start justify-between gap-3">
+<div class="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+    <div class="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 pt-4 sm:pt-5">
         <div>
-            <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-                Kelola Pengguna
-            </h1>
+            <h1 class="text-xl font-semibold text-slate-900">Kelola Pengguna</h1>
             <p class="text-slate-500 text-sm mt-1">
                 Tambah, ubah, serta aktif/nonaktifkan akun Siswa dan Guru.
             </p>
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap items-center gap-2">
             <a href="{% url 'accounts:user_create' role='SISWA' %}"
-               class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
-                + Tambah Siswa
+               class="inline-flex items-center gap-1.5 min-h-[44px] rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 transition shadow-sm">
+                <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                Tambah Siswa
             </a>
             <a href="{% url 'accounts:user_create' role='GURU' %}"
-               class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
-                + Tambah Guru
+               class="inline-flex items-center gap-1.5 min-h-[44px] rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 transition shadow-sm">
+                <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                Tambah Guru
             </a>
             <a href="{% url 'accounts:import_upload' kind='SISWA' %}"
-               class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+               class="inline-flex items-center min-h-[44px] rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium px-4 py-2 transition">
                 Import Siswa
             </a>
             <a href="{% url 'accounts:import_upload' kind='GURU' %}"
-               class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition">
+               class="inline-flex items-center min-h-[44px] rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium px-4 py-2 transition">
                 Import Guru
             </a>
         </div>
     </div>
 
-  <div class="space-y-6">
-    <div class="rounded-xl border border-slate-200 bg-white px-4 sm:px-6 py-4">
-        <form method="get" action="{% url 'accounts:user_list' %}" class="flex flex-col md:flex-row gap-3">
-            <input type="text" name="q" value="{{ q }}" placeholder="Cari username atau nama..."
+    <div class="px-4 sm:px-5 mt-4">
+        <form method="get" action="{% url 'accounts:user_list' %}" role="search" aria-label="Cari pengguna" class="flex flex-col sm:flex-row gap-2">
+            <label class="sr-only" for="user-q">Cari username atau nama</label>
+            <input id="user-q" type="text" name="q" value="{{ q }}" placeholder="Cari username atau nama..."
                    class="flex-1 min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-            <select name="role"
-                    class="w-full md:w-auto min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <label class="sr-only" for="user-role">Filter role</label>
+            <select id="user-role" name="role"
+                    class="w-full sm:w-auto min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 <option value="" {% if role_filter == "" %}selected{% endif %}>Semua role</option>
                 <option value="SISWA" {% if role_filter == "SISWA" %}selected{% endif %}>Siswa</option>
                 <option value="GURU" {% if role_filter == "GURU" %}selected{% endif %}>Guru</option>
             </select>
             <button type="submit"
-                    class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
+                    class="inline-flex items-center justify-center gap-1.5 min-h-[44px] rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium px-4 py-2 transition">
+                <svg class="h-[18px] w-[18px] shrink-0 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
                 Cari
             </button>
         </form>
     </div>
 
-    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
-        <p class="text-sm text-slate-500 mb-4">
+    <div class="px-4 sm:px-5 py-4">
+        <p class="text-[13px] text-slate-500">
             Ditemukan <span class="font-semibold text-slate-900">{{ result_count }}</span> akun.
         </p>
 
         {% if page_obj.object_list %}
-            <div class="rounded-xl border border-slate-200 overflow-x-auto" tabindex="0" role="region" aria-label="Tabel daftar pengguna, dapat digeser horizontal">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="bg-slate-50 text-left text-slate-500">
-                            <th scope="col" class="px-4 py-2.5 font-medium">Username</th>
-                            <th scope="col" class="px-4 py-2.5 font-medium">Nama</th>
-                            <th scope="col" class="px-4 py-2.5 font-medium">Role</th>
-                            <th scope="col" class="px-4 py-2.5 font-medium">Identitas</th>
-                            <th scope="col" class="px-4 py-2.5 font-medium">Status</th>
-                            <th scope="col" class="px-4 py-2.5 font-medium text-right">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        {% for account in page_obj.object_list %}
-                            <tr class="hover:bg-slate-50/60">
-                                <td class="px-4 py-2.5 font-medium">{{ account.username }}</td>
-                                <td class="px-4 py-2.5">{{ account.full_name }}</td>
-                                <td class="px-4 py-2.5">
-                                    {% if account.role == "GURU" %}
-                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-700">Guru</span>
-                                    {% else %}
-                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-700">Siswa</span>
-                                    {% endif %}
-                                </td>
-                                <td class="px-4 py-2.5 text-slate-600 text-xs">
-                                    {% if account.role == "GURU" %}NIP: {{ account.nip|default:"-" }}{% else %}NIS: {{ account.nis|default:"-" }}{% endif %}
-                                </td>
-                                <td class="px-4 py-2.5">
-                                    {% if account.is_active %}
-                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-100 text-emerald-700">Aktif</span>
-                                    {% else %}
-                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-red-100 text-red-700">Nonaktif</span>
-                                    {% endif %}
-                                </td>
-                                <td class="px-4 py-2.5">
-                                    <div class="flex justify-end gap-2">
-                                        <a href="{% url 'accounts:user_update' account.pk %}"
-                                           class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium transition">Ubah</a>
-                                        <form method="post" action="{% url 'accounts:user_reset_password' account.pk %}" class="inline">
-                                            {% csrf_token %}
-                                            <button type="submit" onclick="return confirm('Reset password akun ini ke NIS/NIP awal? Pengguna wajib mengganti password saat login berikutnya.')"
-                                                    class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium transition">
-                                                Reset
-                                            </button>
-                                        </form>
-                                        <form method="post" action="{% url 'accounts:user_toggle_active' account.pk %}" class="inline">
-                                            {% csrf_token %}
-                                            <button type="submit" onclick="return confirm('Ubah status aktif akun ini?')"
-                                                    class="px-3 py-1.5 rounded-xl text-xs font-medium transition {% if account.is_active %}bg-red-600 hover:bg-red-700 text-white{% else %}bg-slate-100 hover:bg-slate-200 text-slate-800{% endif %}">
-                                                {% if account.is_active %}Nonaktifkan{% else %}Aktifkan{% endif %}
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
+            <div class="mt-3 border-t border-slate-200/80">
+                <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Tabel daftar pengguna, dapat digeser horizontal">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-200/80 text-left">
+                                <th scope="col" class="px-4 py-3 text-xs font-semibold text-slate-500 whitespace-nowrap">Username</th>
+                                <th scope="col" class="px-4 py-3 text-xs font-semibold text-slate-500">Nama</th>
+                                <th scope="col" class="px-4 py-3 text-xs font-semibold text-slate-500">Role</th>
+                                <th scope="col" class="px-4 py-3 text-xs font-semibold text-slate-500 whitespace-nowrap">Identitas</th>
+                                <th scope="col" class="px-4 py-3 text-xs font-semibold text-slate-500">Status</th>
+                                <th scope="col" class="px-4 py-3 text-xs font-semibold text-slate-500 text-right">Aksi</th>
                             </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for account in page_obj.object_list %}
+                                <tr class="hover:bg-slate-50/60">
+                                    <td class="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">{{ account.username }}</td>
+                                    <td class="px-4 py-3 text-slate-800">{{ account.full_name }}</td>
+                                    <td class="px-4 py-3">
+                                        {% if account.role == "GURU" %}
+                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-700">Guru</span>
+                                        {% else %}
+                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-700">Siswa</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-4 py-3 text-slate-600 text-xs whitespace-nowrap">
+                                        {% if account.role == "GURU" %}NIP: {{ account.nip|default:"-" }}{% else %}NIS: {{ account.nis|default:"-" }}{% endif %}
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        {% if account.is_active %}
+                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700">Aktif</span>
+                                        {% else %}
+                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700">Nonaktif</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <div class="flex justify-end items-center gap-1.5 flex-wrap">
+                                            <a href="{% url 'accounts:user_update' account.pk %}"
+                                               class="inline-flex items-center min-h-[40px] rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium px-3 transition">Ubah</a>
+                                            <form method="post" action="{% url 'accounts:user_reset_password' account.pk %}" class="inline">
+                                                {% csrf_token %}
+                                                <button type="submit" onclick="return confirm('Reset password akun ini ke NIS/NIP awal? Pengguna wajib mengganti password saat login berikutnya.')"
+                                                        class="inline-flex items-center min-h-[40px] rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium px-3 transition">
+                                                    Reset
+                                                </button>
+                                            </form>
+                                            <form method="post" action="{% url 'accounts:user_toggle_active' account.pk %}" class="inline">
+                                                {% csrf_token %}
+                                                {% if account.is_active %}
+                                                <button type="submit" onclick="return confirm('Ubah status aktif akun ini?')"
+                                                        class="inline-flex items-center min-h-[40px] rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-xs font-medium px-3 transition">
+                                                    Nonaktifkan
+                                                </button>
+                                                {% else %}
+                                                <button type="submit" onclick="return confirm('Ubah status aktif akun ini?')"
+                                                        class="inline-flex items-center min-h-[40px] rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium px-3 transition">
+                                                    Aktifkan
+                                                </button>
+                                                {% endif %}
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {% include "partials/_pagination.html" %}
         {% else %}
-            <div class="text-center py-12">
-                <p class="text-slate-900 font-semibold mb-1">Belum ada akun yang cocok.</p>
-                <p class="text-slate-500 text-sm">Ubah kata kunci atau tambahkan akun Siswa/Guru baru.</p>
+            <div class="py-10 px-4 text-center">
+                <svg class="mx-auto h-8 w-8 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <p class="mt-2 text-sm font-semibold text-slate-900">Belum ada akun yang cocok.</p>
+                <p class="mt-0.5 text-[13px] text-slate-500">Ubah kata kunci atau tambahkan akun Siswa/Guru baru.</p>
             </div>
         {% endif %}
     </div>

@@ -1,0 +1,132 @@
+{# Reader sidebar for the Siswa/Guru home (BookBase-style rail). #}
+{# Same language as _librarian_sidebar.html (R-31): shared brand mark, #}
+{# one 18px/1.8 inline-SVG set, active row = blue-50 surface + blue-700 #}
+{# semibold text + aria-current. Only routes the role may actually open; #}
+{# Materi Saya renders for Guru only. Contains no id attributes so #}
+{# base.html can include it twice (desktop rail + mobile drawer). #}
+{% with current_url=request.resolver_match.url_name|default:"" current_ns=request.resolver_match.namespace|default:"" %}
+{% url 'accounts:dashboard' as brand_href %}
+<div class="px-3 pb-1 pt-3">
+{% include "partials/_brand.html" with href=brand_href title_class="font-semibold text-[15px] text-slate-900" %}
+</div>
+<div class="mx-3 mb-1 mt-3 border-t border-slate-200/80" aria-hidden="true"></div>
+<nav aria-label="Navigasi perpustakaan" class="py-2">
+    <p class="px-3 pt-3 text-xs font-semibold text-slate-500">Jelajah</p>
+    <ul class="mt-1 space-y-0.5">
+        <li>
+            <a href="{% url 'accounts:dashboard' %}"
+               class="flex items-center gap-2.5 min-h-[44px] rounded-lg px-3 py-2 text-sm {% if 'dashboard' in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}font-medium text-slate-700 hover:bg-slate-100{% endif %}"
+               {% if "dashboard" in current_url %}aria-current="page"{% endif %}>
+                <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+                Beranda
+            </a>
+        </li>
+        <li>
+            <a href="{% url 'catalog:catalog' %}"
+               class="flex items-center gap-2.5 min-h-[44px] rounded-lg px-3 py-2 text-sm {% if current_ns == 'catalog' %}bg-blue-50 text-blue-700 font-semibold{% else %}font-medium text-slate-700 hover:bg-slate-100{% endif %}"
+               {% if current_ns == "catalog" %}aria-current="page"{% endif %}>
+                <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5C10.5 5 8.5 4.5 4 4.5v13c4.5 0 6.5.5 8 2 1.5-1.5 3.5-2 8-2v-13c-4.5 0-6.5.5-8 2Z"/><path d="M12 6.5v13"/></svg>
+                Katalog
+            </a>
+        </li>
+        <li>
+            <a href="{% url 'ai:recommendations' %}"
+               class="flex items-center gap-2.5 min-h-[44px] rounded-lg px-3 py-2 text-sm {% if current_ns == 'ai' and current_url == 'recommendations' %}bg-blue-50 text-blue-700 font-semibold{% else %}font-medium text-slate-700 hover:bg-slate-100{% endif %}"
+               {% if current_ns == "ai" and current_url == "recommendations" %}aria-current="page"{% endif %}>
+                <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3Z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15Z"/></svg>
+                Rekomendasi
+            </a>
+        </li>
+    </ul>
+
+    <p class="px-3 pt-5 text-xs font-semibold text-slate-500">Koleksi saya</p>
+    <ul class="mt-1 space-y-0.5">
+        <li>
+            <a href="{% url 'circulation:cart' %}"
+               class="flex items-center justify-between gap-2 min-h-[44px] rounded-lg px-3 py-2 text-sm {% if 'cart' in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}font-medium text-slate-700 hover:bg-slate-100{% endif %}"
+               {% if "cart" in current_url %}aria-current="page"{% endif %}>
+                <span class="flex items-center gap-2.5">
+                    <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/><path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20.5 8H6"/></svg>
+                    Keranjang
+                </span>
+                {% if cart_item_count %}<span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ cart_item_count }}</span>{% endif %}
+            </a>
+        </li>
+        <li>
+            <a href="{% url 'circulation:loan_list' %}"
+               class="flex items-center gap-2.5 min-h-[44px] rounded-lg px-3 py-2 text-sm {% if 'loan' in current_url or current_url == 'return_history' %}bg-blue-50 text-blue-700 font-semibold{% else %}font-medium text-slate-700 hover:bg-slate-100{% endif %}"
+               {% if "loan" in current_url or current_url == "return_history" %}aria-current="page"{% endif %}>
+                <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+                Riwayat
+            </a>
+        </li>
+        <li>
+            <a href="{% url 'circulation:my_ebooks' %}"
+               class="flex items-center gap-2.5 min-h-[44px] rounded-lg px-3 py-2 text-sm {% if current_url == 'my_ebooks' or current_url == 'ebook_reader' %}bg-blue-50 text-blue-700 font-semibold{% else %}font-medium text-slate-700 hover:bg-slate-100{% endif %}"
+               {% if current_url == "my_ebooks" or current_url == "ebook_reader" %}aria-current="page"{% endif %}>
+                <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M10 18.5h4"/></svg>
+                E-Book Saya
+            </a>
+        </li>
+        <li>
+            <a href="{% url 'materials:list' %}"
+               class="flex items-center gap-2.5 min-h-[44px] rounded-lg px-3 py-2 text-sm {% if current_ns == 'materials' and current_url == 'list' %}bg-blue-50 text-blue-700 font-semibold{% else %}font-medium text-slate-700 hover:bg-slate-100{% endif %}"
+               {% if current_ns == "materials" and current_url == "list" %}aria-current="page"{% endif %}>
+                <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>
+                Bahan Ajar
+            </a>
+        </li>
+        {% if user.role == "GURU" %}
+        <li>
+            <a href="{% url 'materials:my' %}"
+               class="flex items-center gap-2.5 min-h-[44px] rounded-lg px-3 py-2 text-sm {% if current_ns == 'materials' and current_url == 'my' %}bg-blue-50 text-blue-700 font-semibold{% else %}font-medium text-slate-700 hover:bg-slate-100{% endif %}"
+               {% if current_ns == "materials" and current_url == "my" %}aria-current="page"{% endif %}>
+                <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z"/></svg>
+                Materi Saya
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+
+    <p class="px-3 pt-5 text-xs font-semibold text-slate-500">Akun</p>
+    <ul class="mt-1 space-y-0.5">
+        <li>
+            <a href="{% url 'accounts:profile' %}"
+               class="flex items-center gap-2.5 min-h-[44px] rounded-lg px-3 py-2 text-sm {% if 'profile' in current_url or 'password' in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}font-medium text-slate-700 hover:bg-slate-100{% endif %}"
+               {% if "profile" in current_url or "password" in current_url %}aria-current="page"{% endif %}>
+                <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3.5"/><path d="M5.5 20a7.5 7.5 0 0 1 13 0"/></svg>
+                Profil
+            </a>
+        </li>
+        <li>
+            <a href="{% url 'notifications:list' %}"
+               class="flex items-center justify-between gap-2 min-h-[44px] rounded-lg px-3 py-2 text-sm {% if current_ns == 'notifications' %}bg-blue-50 text-blue-700 font-semibold{% else %}font-medium text-slate-700 hover:bg-slate-100{% endif %}"
+               {% if current_ns == "notifications" %}aria-current="page"{% endif %}>
+                <span class="flex items-center gap-2.5">
+                    <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+                    Notifikasi
+                </span>
+                {% if unread_notifications %}<span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ unread_notifications }}</span>{% endif %}
+            </a>
+        </li>
+    </ul>
+
+    <div class="mt-5 border-t border-slate-200 px-3 pt-4 pb-1">
+        <div class="flex items-center gap-2.5 rounded-lg bg-slate-50 px-3 py-2.5">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white" aria-hidden="true">{{ user.full_name|default:user.username|slice:":1"|upper }}</span>
+            <span class="min-w-0 leading-tight">
+                <span class="block truncate text-sm font-medium text-slate-900">{{ user.full_name }}</span>
+                <span class="block text-xs text-slate-500">{% if user.role == "GURU" %}Guru{% else %}Siswa{% endif %}</span>
+            </span>
+        </div>
+        <form method="post" action="{% url 'accounts:logout' %}" class="mt-2">
+            {% csrf_token %}
+            <button type="submit"
+                    class="flex w-full items-center gap-2.5 min-h-[44px] rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
+                <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+                Keluar
+            </button>
+        </form>
+    </div>
+</nav>
+{% endwith %}

@@ -7,67 +7,93 @@
 {% url 'catalog:catalog' as back_url %}
 {% include "partials/_back_link.html" with href=back_url label="Lanjut cari koleksi" %}
 
-<div class="mb-6">
-    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-        Keranjang Peminjaman
-    </h1>
-    <p class="text-slate-500 text-sm mt-1">
-        Periksa kembali eksemplar pilihan sebelum diajukan. Pengajuan bukan peminjaman aktif sampai buku diserahkan.
-    </p>
-</div>
-
-<div class="space-y-6">
-    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
+<div class="mx-auto max-w-5xl">
+    <header class="mb-5">
+        <h1 class="text-2xl font-bold text-slate-900 sm:text-3xl">
+            Keranjang Peminjaman
+        </h1>
+        <p class="mt-1 text-sm text-slate-500">
+            Periksa kembali eksemplar pilihan sebelum diajukan. Pengajuan bukan peminjaman aktif sampai buku diserahkan.
+        </p>
         {% if copies %}
-            <div class="rounded-xl border border-slate-200 overflow-x-auto overflow-hidden mb-6" tabindex="0" role="region" aria-label="Tabel keranjang peminjaman, dapat digeser horizontal">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="bg-slate-50 text-left text-slate-500">
-                            <th scope="col" class="px-4 py-2.5 font-medium">Kode</th>
-                            <th scope="col" class="px-4 py-2.5 font-medium">Judul</th>
-                            <th scope="col" class="px-4 py-2.5 font-medium">Lokasi</th>
-                            <th scope="col" class="px-4 py-2.5 font-medium text-right">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        {% for copy in copies %}
-                            <tr class="hover:bg-slate-50/60">
-                                <td class="px-4 py-2.5 font-medium">{{ copy.copy_code }}</td>
-                                <td class="px-4 py-2.5">{{ copy.book.title }}</td>
-                                <td class="px-4 py-2.5 text-slate-600">{{ copy.location }}</td>
-                                <td class="px-4 py-2.5 text-right">
-                                    <form method="post" action="{% url 'circulation:cart_remove' copy.pk %}" class="inline">
-                                        {% csrf_token %}
-                                        <button type="submit"
-                                                class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium transition">
-                                            Hapus
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-            <form method="post" action="{% url 'circulation:loan_create' %}">
-                {% csrf_token %}
-                <button type="submit"
-                        class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
-                    Ajukan Peminjaman ({{ copies|length }} eksemplar)
-                </button>
-            </form>
-        {% else %}
-            <div class="text-center py-12">
-                <p class="text-slate-900 font-semibold mb-1">Keranjang masih kosong.</p>
-                <p class="text-slate-500 text-sm mb-5">Pilih eksemplar yang tersedia dari halaman detail koleksi.</p>
-                <a href="{% url 'catalog:catalog' %}"
-                   class="inline-block px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
-                    Buka katalog
-                </a>
-            </div>
+            <p class="mt-2 text-sm text-slate-500">
+                <span class="font-semibold text-slate-700">{{ copies|length }} eksemplar</span> dipilih untuk diajukan.
+            </p>
         {% endif %}
-    </div>
+    </header>
+
+    {% if copies %}
+        <div class="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+            <ul class="divide-y divide-slate-100">
+                {% for copy in copies %}
+                    <li class="flex items-start gap-3 p-4 sm:items-center sm:gap-4 sm:p-5">
+                        <div class="w-16 shrink-0 overflow-hidden rounded-lg border border-slate-200 sm:w-20">
+                            {% include "partials/_book_cover.html" with cover_url=copy.book.cover_url title=copy.book.title %}
+                        </div>
+
+                        <div class="min-w-0 flex-1">
+                            <h2 class="text-sm font-semibold leading-snug text-slate-900 break-words sm:text-[15px]">
+                                {% if copy.book.is_active %}
+                                    <a href="{% url 'catalog:book_detail' copy.book.pk %}"
+                                       class="rounded transition hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+                                        {{ copy.book.title }}
+                                    </a>
+                                {% else %}
+                                    {{ copy.book.title }}
+                                {% endif %}
+                            </h2>
+                            <p class="mt-0.5 truncate text-xs text-slate-500">
+                                {% for rel in copy.book.bookauthor_set.all %}{{ rel.author.name }}{% if not forloop.last %}, {% endif %}{% empty %}Penulis tidak tercatat{% endfor %}
+                            </p>
+                            <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                                <span class="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-medium text-slate-700">{{ copy.copy_code }}</span>
+                                <span class="inline-flex items-center gap-1">
+                                    <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
+                                    {{ copy.location }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <form method="post" action="{% url 'circulation:cart_remove' copy.pk %}" class="shrink-0 self-start sm:self-center">
+                            {% csrf_token %}
+                            <button type="submit" aria-label="Hapus eksemplar {{ copy.copy_code }} dari keranjang"
+                                    class="inline-flex items-center gap-1.5 min-h-[44px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500">
+                                <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>
+                                Hapus
+                            </button>
+                        </form>
+                    </li>
+                {% endfor %}
+            </ul>
+
+            <div class="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/60 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+                <p class="text-sm text-slate-600">
+                    <span class="font-semibold text-slate-900">{{ copies|length }} eksemplar</span> siap diajukan untuk disetujui pustakawan.
+                </p>
+                <form method="post" action="{% url 'circulation:loan_create' %}" class="w-full sm:w-auto">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="inline-flex w-full items-center justify-center min-h-[44px] rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 sm:w-auto">
+                        Ajukan Peminjaman ({{ copies|length }} eksemplar)
+                    </button>
+                </form>
+            </div>
+        </div>
+    {% else %}
+        <div class="rounded-xl border border-slate-200/80 bg-white px-6 py-10 text-center shadow-sm">
+            <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600" aria-hidden="true">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/><path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20.5 8H6"/></svg>
+            </span>
+            <h2 class="mt-4 text-base font-semibold text-slate-900">Keranjang peminjaman masih kosong</h2>
+            <p class="mx-auto mt-1.5 max-w-md text-sm text-slate-500">
+                Pilih eksemplar yang tersedia dari halaman detail buku, lalu tambahkan ke keranjang sebelum diajukan.
+            </p>
+            <a href="{% url 'catalog:catalog' %}"
+               class="mt-5 inline-flex items-center gap-1.5 min-h-[44px] rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+                Jelajahi katalog
+            </a>
+        </div>
+    {% endif %}
 </div>
 
 {% endblock %}

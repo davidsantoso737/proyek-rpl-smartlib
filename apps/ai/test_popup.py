@@ -62,6 +62,40 @@ class PopupTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="chat-form"')
 
+    def test_pustakawan_tanpa_akses_ai(self):
+        pus = self._make_user(
+            username="pus1", role=User.Role.PUSTAKAWAN, nis=None
+        )
+        self.client.force_login(pus)
+        dashboard = self.client.get(
+            reverse("accounts:dashboard"), follow=True
+        )
+        self.assertNotContains(dashboard, 'id="ai-fab"')
+        self.assertNotContains(dashboard, 'id="ai-popup-panel"')
+        self.assertEqual(
+            self.client.get(reverse("ai:assistant")).status_code, 403
+        )
+        self.assertEqual(
+            self.client.post(
+                reverse("ai:assistant_ask"), {"question": "Halo"}
+            ).status_code,
+            403,
+        )
+        self.assertEqual(
+            self.client.get(reverse("ai:recommendations")).status_code, 403
+        )
+
+    def test_guru_mendapat_popup(self):
+        guru = self._make_user(
+            username="guru1", role=User.Role.GURU, nis=None, nip="20001"
+        )
+        self.client.force_login(guru)
+        response = self.client.get(
+            reverse("accounts:dashboard"), follow=True
+        )
+        self.assertContains(response, 'id="ai-fab"')
+        self.assertContains(response, 'id="ai-popup-panel"')
+
     def test_css_terkompilasi_memuat_class_popup(self):
         """Regresi: ikon tak terlihat bila utilitas positioning belum dibuild."""
         from pathlib import Path

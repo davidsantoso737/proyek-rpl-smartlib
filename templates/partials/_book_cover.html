@@ -1,0 +1,16 @@
+{# Reusable portrait cover with an honest placeholder fallback (R-38). #}
+{# Params: cover_url (may be empty/None), title (book title for alt/short #}
+{# label). Never requests an empty URL; an empty cover renders a soft #}
+{# blue-neutral panel with a book glyph, never a fake cover image. #}
+{# Portrait ratio keeps cards aligned with or without a real cover. #}
+<div class="relative aspect-[3/4] w-full overflow-hidden bg-blue-50/60">
+    {% if cover_url %}
+        <img src="{{ cover_url }}" alt="Sampul {{ title }}" loading="lazy"
+             class="absolute inset-0 h-full w-full object-cover" onerror="this.remove()">
+    {% else %}
+        <div class="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-2.5 text-center" aria-hidden="true">
+            <svg class="h-6 w-6 text-blue-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10.5 5 8.5 4.5 4 4.5v13c4.5 0 6.5.5 8 2 1.5-1.5 3.5-2 8-2v-13c-4.5 0-6.5.5-8 2Z"/><path d="M12 6.5v13"/></svg>
+            <p class="line-clamp-2 text-[11px] font-medium leading-snug text-slate-500">{{ title|truncatechars:50 }}</p>
+        </div>
+    {% endif %}
+</div>

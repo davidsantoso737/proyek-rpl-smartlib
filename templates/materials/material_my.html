@@ -1,68 +1,75 @@
 {% extends "base.html" %}
 
-{% block title %}Bahan Ajar Saya - Digital Library{% endblock %}
+{% block title %}Materi Saya - Digital Library{% endblock %}
 
 {% block content %}
 
+<div class="mx-auto max-w-5xl">
+
 <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-            <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-                Bahan Ajar Saya
+            <h1 class="text-2xl font-bold text-slate-900 sm:text-3xl">
+                Materi Saya
             </h1>
             <p class="text-slate-500 text-sm mt-1">
                 Status verifikasi setiap materi yang Anda unggah.
             </p>
         </div>
         <a href="{% url 'materials:upload' %}"
-           class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
-            + Unggah materi
+           class="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:w-auto">
+            <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            Unggah materi
         </a>
 </div>
 
-<div class="space-y-6">
-    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
-        {% if materials %}
-            <div class="space-y-3">
-                {% for material in materials %}
-                    <div class="rounded-xl border border-slate-200 bg-white p-4">
-                        <div class="flex flex-wrap items-center justify-between gap-2">
-                            <p class="font-semibold text-slate-900">{{ material.title }}</p>
-                            {% if material.status == "TERSEDIA" %}
-                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-100 text-emerald-700">Tersedia</span>
-                            {% elif material.status == "MENUNGGU" %}
-                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-700">Menunggu verifikasi</span>
-                            {% elif material.status == "DITOLAK" %}
-                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-red-100 text-red-700">Ditolak</span>
-                            {% elif material.status == "MENUNGGU_PENGHAPUSAN" %}
-                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-700">Menunggu penghapusan</span>
-                            {% else %}
-                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-700">{{ material.status }}</span>
-                            {% endif %}
-                        </div>
-                        {% if material.status == "DITOLAK" and material.rejection_reason %}
-                            <p class="text-xs text-red-700 mt-2">Alasan: {{ material.rejection_reason }}</p>
-                        {% endif %}
-                        {% if material.status == "TERSEDIA" %}
-                            <form method="post" action="{% url 'materials:deletion_request' material.pk %}" class="flex flex-col sm:flex-row gap-2 mt-3">
-                                {% csrf_token %}
-                                <input type="text" name="reason" placeholder="Alasan penghapusan..."
-                                       class="flex-1 min-w-0 border border-slate-300 rounded-xl px-3.5 py-2 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                <button type="submit"
-                                        class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition">
-                                    Minta hapus
-                                </button>
-                            </form>
-                        {% endif %}
-                    </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="text-center py-12">
-                <p class="text-slate-900 font-semibold mb-1">Belum ada materi.</p>
-                <p class="text-slate-500 text-sm">Unggah bahan ajar pertama Anda untuk diverifikasi pustakawan.</p>
-            </div>
-        {% endif %}
+{% if materials %}
+    <ul class="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+        {% for material in materials %}
+            <li class="px-4 py-4 sm:px-5">
+                <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                    <h2 class="min-w-0 font-semibold text-slate-900 break-words">{{ material.title }}</h2>
+                    {% include "partials/_material_status_badge.html" with status=material.status %}
+                </div>
+                <p class="mt-0.5 text-xs text-slate-500 break-words">
+                    {{ material.file_type|upper }}
+                    <span class="text-slate-300">&middot;</span>
+                    {{ material.file_name }}
+                    <span class="text-slate-300">&middot;</span>
+                    Diunggah {{ material.created_at|date:"d M Y H:i" }}
+                </p>
+                {% if material.description %}
+                    <p class="mt-2 max-w-2xl text-[13px] text-slate-500 line-clamp-2">{{ material.description }}</p>
+                {% endif %}
+                {% if material.status == "DITOLAK" and material.rejection_reason %}
+                    <p class="mt-2 rounded-lg bg-red-50 px-3 py-2 text-[13px] text-red-700">Alasan: {{ material.rejection_reason }}</p>
+                {% endif %}
+                {% if material.status == "TERSEDIA" %}
+                    <form method="post" action="{% url 'materials:deletion_request' material.pk %}" class="mt-3 flex flex-col gap-2 sm:flex-row">
+                        {% csrf_token %}
+                        <label class="sr-only" for="reason-{{ material.pk }}">Alasan penghapusan</label>
+                        <input id="reason-{{ material.pk }}" type="text" name="reason" placeholder="Alasan penghapusan..."
+                               class="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button type="submit"
+                                class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-red-200 bg-white px-4 text-sm font-medium text-red-700 transition hover:bg-red-50">
+                            Minta hapus
+                        </button>
+                    </form>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <div class="flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:gap-4 sm:p-6">
+        <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>
+        </span>
+        <div class="min-w-0">
+            <p class="text-sm font-semibold text-slate-900">Belum ada materi</p>
+            <p class="text-[13px] text-slate-500">Unggah bahan ajar pertama Anda untuk diverifikasi pustakawan.</p>
+        </div>
     </div>
+{% endif %}
+
 </div>
 
 {% endblock %}

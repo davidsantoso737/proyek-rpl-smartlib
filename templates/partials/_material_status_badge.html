@@ -1,0 +1,14 @@
+{# Presentation-only teaching-material status badge (never changes backend values). #}
+{# Params: status (raw TeachingMaterial.status value). Labels and colors match #}
+{# the labels already used by the materials pages; unknown values fall back to raw. #}
+{% if status == "TERSEDIA" %}
+    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">Tersedia</span>
+{% elif status == "MENUNGGU" %}
+    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">Menunggu verifikasi</span>
+{% elif status == "DITOLAK" %}
+    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">Ditolak</span>
+{% elif status == "MENUNGGU_PENGHAPUSAN" %}
+    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">Menunggu penghapusan</span>
+{% else %}
+    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{{ status }}</span>
+{% endif %}

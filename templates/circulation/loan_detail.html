@@ -7,109 +7,118 @@
 {% url 'circulation:loan_list' as back_url %}
 {% include "partials/_back_link.html" with href=back_url label="Kembali ke riwayat" %}
 
-<div class="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-            <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+<div class="mx-auto max-w-5xl">
+    <header class="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0">
+            <h1 class="text-2xl font-bold text-slate-900 sm:text-3xl">
                 Pengajuan #{{ loan.pk }}
             </h1>
-            <p class="text-slate-500 text-sm mt-1">
+            <p class="mt-1 text-sm text-slate-500">
                 Diajukan {{ loan.requested_at|date:"d M Y H:i" }}
             </p>
         </div>
-        {% if loan.status == "PENDING_APPROVAL" %}
-            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-700">Menunggu persetujuan</span>
-        {% elif loan.status == "APPROVED" %}
-            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-100 text-emerald-700">Disetujui</span>
-        {% elif loan.status == "REJECTED" %}
-            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-red-100 text-red-700">Ditolak</span>
-        {% elif loan.status == "ACTIVE" %}
-            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-sky-100 text-sky-700">Dipinjam aktif</span>
-        {% else %}
-            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-700">{{ loan.status }}</span>
-        {% endif %}
-    </div>
+        <div class="shrink-0">
+            {% include "partials/_loan_status_badge.html" with status=loan.status %}
+        </div>
+    </header>
 
     <div class="space-y-6">
-    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
         {% if loan.status == "PENDING_APPROVAL" %}
-            <p class="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2.5 rounded-xl text-sm mb-5">
-                Pengajuan ini belum menjadi peminjaman aktif. Status berubah setelah pustakawan menyetujui dan buku diserahkan.
-            </p>
+            <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <p class="text-sm text-amber-800">
+                    Pengajuan ini belum menjadi peminjaman aktif. Status berubah setelah pustakawan menyetujui dan buku diserahkan.
+                </p>
+            </div>
         {% elif loan.status == "APPROVED" %}
-            <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-5 mb-5 flex flex-col sm:flex-row gap-5 items-center">
-                <img src="{% url 'circulation:pickup_qr' loan.pk %}" alt="QR Pickup pengajuan {{ loan.pk }}"
-                     class="w-40 h-40 bg-white p-2 rounded-xl border border-emerald-200">
-                <div class="text-sm">
-                    <p class="font-semibold text-emerald-900 mb-1">QR Pickup pengambilan buku</p>
-                    <p class="text-emerald-800">
-                        Tunjukkan QR ini kepada pustakawan saat mengambil buku di perpustakaan.
-                    </p>
-                    <p class="text-emerald-800 mt-1">
-                        Berlaku sampai {{ loan.pickup_exp_at|date:"d M Y H:i" }} dan hanya untuk sekali pengambilan.
-                    </p>
-                    <div class="mt-3">
-                        <p class="text-emerald-800 text-xs mb-1">
-                            Jika kamera pustakawan bermasalah, bacakan/salin kode token ini:
+            <section class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 sm:p-5" aria-labelledby="pickup-heading">
+                <div class="grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start">
+                    <div class="justify-self-center sm:justify-self-start">
+                        <img src="{% url 'circulation:pickup_qr' loan.pk %}" alt="QR Pickup pengajuan {{ loan.pk }}"
+                             class="h-40 w-40 rounded-xl border border-emerald-200 bg-white p-2">
+                    </div>
+                    <div class="text-sm">
+                        <h2 id="pickup-heading" class="font-semibold text-emerald-900">QR Pickup pengambilan buku</h2>
+                        <p class="mt-1 text-emerald-800">
+                            Tunjukkan QR ini kepada pustakawan saat mengambil buku di perpustakaan.
                         </p>
-                        <div class="flex items-center gap-2">
-                            <code id="pickup-token" class="flex-1 break-all bg-white border border-emerald-200 rounded-xl px-3 py-2 text-xs text-slate-800">{{ loan.pickup_token }}</code>
-                            <button type="button" id="copy-token" aria-label="Salin kode token"
-                                    class="shrink-0 px-3 py-2 min-h-[44px] rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium transition">
-                                Salin
-                            </button>
+                        <p class="mt-1 text-emerald-800">
+                            Berlaku sampai <span class="font-semibold">{{ loan.pickup_exp_at|date:"d M Y H:i" }}</span> dan hanya untuk sekali pengambilan.
+                        </p>
+                        <div class="mt-3">
+                            <p class="text-xs text-emerald-800">
+                                Jika kamera pustakawan bermasalah, bacakan/salin kode token ini:
+                            </p>
+                            <div class="mt-1 flex items-center gap-2">
+                                <code id="pickup-token" class="min-w-0 flex-1 break-all rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs text-slate-800">{{ loan.pickup_token }}</code>
+                                <button type="button" id="copy-token" aria-label="Salin kode token"
+                                        class="inline-flex shrink-0 items-center min-h-[44px] rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 transition hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">
+                                    Salin
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
         {% elif loan.status == "REJECTED" %}
-            <p class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm mb-5">
-                Pengajuan ditolak{% if loan.rejection_reason %}: {{ loan.rejection_reason }}{% endif %}
-            </p>
+            <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                <p class="text-sm text-red-800">
+                    Pengajuan ditolak{% if loan.rejection_reason %}: {{ loan.rejection_reason }}{% endif %}
+                </p>
+            </div>
         {% elif loan.status == "ACTIVE" %}
-            <div class="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm mb-5 flex flex-wrap gap-x-6 gap-y-1 text-blue-900">
-                <span>Diserahkan <span class="font-semibold">{{ loan.borrowed_at|date:"d M Y H:i" }}</span></span>
-                <span>Jatuh tempo <span class="font-semibold">{{ loan.due_at|date:"d M Y H:i" }}</span></span>
+            <div class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                <div class="flex flex-wrap gap-x-6 gap-y-1">
+                    <span>Diserahkan <span class="font-semibold">{{ loan.borrowed_at|date:"d M Y H:i" }}</span></span>
+                    <span>Jatuh tempo <span class="font-semibold">{{ loan.due_at|date:"d M Y H:i" }}</span></span>
+                </div>
             </div>
         {% endif %}
 
-        <h2 class="text-base font-semibold text-slate-900 mb-3">Eksemplar diajukan ({{ loan.items.count }})</h2>
-        <div class="rounded-xl border border-slate-200 overflow-x-auto" tabindex="0" role="region" aria-label="Tabel eksemplar diajukan, dapat digeser horizontal">
-            <table class="w-full text-sm">
-                <thead>
-                        <tr class="bg-slate-50 text-left text-slate-500">
-                            <th scope="col" class="px-4 py-2.5 font-medium">Kode</th>
-                            <th scope="col" class="px-4 py-2.5 font-medium">Judul</th>
-                            <th scope="col" class="px-4 py-2.5 font-medium">Lokasi</th>
-                            <th scope="col" class="px-4 py-2.5 font-medium">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        {% for item in loan.items.all %}
-                            <tr>
-                                <td class="px-4 py-2.5 font-medium">{{ item.book_copy.copy_code }}</td>
-                                <td class="px-4 py-2.5">{{ item.book_copy.book.title }}</td>
-                                <td class="px-4 py-2.5 text-slate-600">{{ item.book_copy.location }}</td>
-                                <td class="px-4 py-2.5 text-xs">
-                                    {% if item.returned_at %}
-                                        {% if item.return_status == "HILANG" %}
-                                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-red-100 text-red-700">Hilang</span>
-                                        {% else %}
-                                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-100 text-emerald-700">Kembali {{ item.returned_at|date:"d M Y" }}</span>
-                                        {% endif %}
-                                        {% if item.fine_amount %}
-                                            <span class="block mt-1 text-amber-700 font-medium">Denda Rp{{ item.fine_amount }} ({{ item.fine_status }})</span>
-                                        {% endif %}
-                                    {% elif item.borrowed_at %}
-                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-sky-100 text-sky-700">Dipinjam</span>
+        <section class="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+            <div class="border-b border-slate-100 px-4 py-3 sm:px-5">
+                <h2 class="text-sm font-semibold text-slate-900">Eksemplar diajukan ({{ loan.items.count }})</h2>
+            </div>
+            <ul class="divide-y divide-slate-100">
+                {% for item in loan.items.all %}
+                    <li class="px-4 py-3 sm:px-5">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-semibold leading-snug break-words text-slate-900">
+                                    {{ item.book_copy.book.title }}
+                                </p>
+                                <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                                    <span class="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-medium text-slate-700">{{ item.book_copy.copy_code }}</span>
+                                    <span class="inline-flex items-center gap-1">
+                                        <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
+                                        {{ item.book_copy.location }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="shrink-0 text-right">
+                                {% if item.returned_at %}
+                                    {% if item.return_status == "HILANG" %}
+                                        <span class="inline-flex items-center whitespace-nowrap rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">Hilang</span>
                                     {% else %}
-                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-700">Diajukan</span>
+                                        <span class="inline-flex items-center whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">Kembali {{ item.returned_at|date:"d M Y" }}</span>
                                     {% endif %}
-                                </td>
-                            </tr>
-                        {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                                {% elif item.borrowed_at %}
+                                    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-700">Dipinjam</span>
+                                {% else %}
+                                    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">Diajukan</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if item.fine_amount %}
+                            <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                <span class="font-semibold">Denda Rp{{ item.fine_amount }}</span>
+                                <span class="mx-1" aria-hidden="true">&middot;</span>
+                                {% if item.fine_status == "BELUM_BAYAR" %}Belum dibayar{% elif item.fine_status == "LUNAS" %}Lunas{% else %}{{ item.fine_status }}{% endif %}
+                            </div>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
     </div>
 </div>
 

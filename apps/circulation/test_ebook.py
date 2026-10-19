@@ -4,6 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from django.contrib.auth import get_user_model
+from django.contrib.staticfiles import finders
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -125,7 +126,27 @@ class EbookTests(TestCase):
         )
         self.assertEqual(reader.status_code, 200)
         self.assertContains(reader, "Ebook Satu")
-        self.assertContains(reader, "<embed")
+        self.assertContains(reader, 'id="ebook-reader"')
+        self.assertContains(reader, "js/ebook-reader.js")
+        self.assertContains(reader, "vendor/pdfjs/pdf.min.mjs")
+        # Halaman hasil pindai (JBIG2/CCITT/JPX) hanya tergambar bila PDF.js
+        # diberi wasmUrl dan iccUrl, jadi keduanya harus ada di templat dan
+        # berkasnya benar-benar tersedia.
+        self.assertContains(reader, "vendor/pdfjs/wasm/")
+        self.assertContains(reader, "vendor/pdfjs/iccs/")
+        for asset in (
+            "vendor/pdfjs/wasm/jbig2.wasm",
+            "vendor/pdfjs/wasm/openjpeg.wasm",
+            "vendor/pdfjs/wasm/qcms_bg.wasm",
+            "vendor/pdfjs/iccs/CGATS001Compat-v2-micro.icc",
+        ):
+            self.assertIsNotNone(finders.find(asset), asset)
+        self.assertContains(
+            reader, reverse("circulation:ebook_file", args=[loan.pk])
+        )
+        # Reader tidak menawarkan kontrol unduh/cetak apa pun.
+        self.assertNotContains(reader, "Unduh e-book")
+        self.assertNotContains(reader, "<embed")
         content = self.client.get(
             reverse("circulation:ebook_file", args=[loan.pk])
         )
@@ -133,9 +154,10 @@ class EbookTests(TestCase):
         self.assertEqual(content["Content-Type"], "application/pdf")
         self.assertEqual(content["X-Frame-Options"], "SAMEORIGIN")
         self.assertNotIn("attachment", content.get("Content-Disposition", ""))
+        self.assertIn("no-store", content["Cache-Control"])
         self.assertTrue(b"".join(content.streaming_content).startswith(b"%PDF"))
 
-    def test_non_pdf_tanpa_embed_tapi_unduh(self):
+    def test_non_pdf_tanpa_pratinjau_dan_tanpa_unduh(self):
         (TMP_ROOT / "tiga.epub").write_bytes(b"epub-dummy")
         category = Category.objects.first()
         author = Author.objects.first()
@@ -156,16 +178,16 @@ class EbookTests(TestCase):
             reverse("circulation:ebook_reader", args=[loan.pk])
         )
         self.assertEqual(reader.status_code, 200)
+        # Tidak ada viewer, tidak ada tautan unduh, hanya pemberitahuan.
         self.assertNotContains(reader, "<embed")
-        self.assertContains(reader, "Unduh e-book")
+        self.assertNotContains(reader, 'id="ebook-reader"')
+        self.assertNotContains(reader, "Unduh e-book")
+        self.assertContains(reader, "belum bisa dibaca")
+        # Format yang tidak dapat dipratinjau tidak disajikan sebagai berkas.
         content = self.client.get(
             reverse("circulation:ebook_file", args=[loan.pk])
         )
-        self.assertEqual(content.status_code, 200)
-        self.assertEqual(
-            content["Content-Type"], "application/epub+zip"
-        )
-        self.assertIn("attachment", content["Content-Disposition"])
+        self.assertEqual(content.status_code, 404)
 
     def test_expired_access_ditolak_dan_bisa_pinjam_lagi(self):
         loan = self._approve(request_ebook_loan(self.siswa, self.ebook1.pk))

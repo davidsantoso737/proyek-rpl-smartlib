@@ -8,6 +8,7 @@
     "build": "npx @tailwindcss/cli -i ./static/src/input.css -o ./static/css/tailwind.css --minify"
   },
   "dependencies": {
-    "html5-qrcode": "^2.3.8"
+    "html5-qrcode": "^2.3.8",
+    "pdfjs-dist": "^6.4.299"
   }
 }

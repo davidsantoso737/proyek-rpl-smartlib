@@ -101,9 +101,13 @@ class AssistantTests(TestCase):
             self.client.post(ASK_URL, {"question": "Ada buku apa?"}).status_code,
             302,
         )
+        # Pustakawan tidak memiliki akses AI Assistant.
         self.client.force_login(self.pus)
         self.assertEqual(
-            self.client.post(ASK_URL, {"question": "Halo"}).status_code, 200
+            self.client.post(ASK_URL, {"question": "Halo"}).status_code, 403
+        )
+        self.assertEqual(
+            self.client.get(reverse("ai:assistant")).status_code, 403
         )
 
     def test_provider_success(self):

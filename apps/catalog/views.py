@@ -25,6 +25,7 @@ from .models import Author, Book, BookAuthor, BookCopy, Category, Ebook, EbookAu
 User = get_user_model()
 
 PAGE_SIZE = 12
+COPY_PAGE_SIZE = 4
 
 
 def _book_queryset():
@@ -163,16 +164,21 @@ def catalog_list_view(request):
 def book_detail_view(request, pk):
     """Detail koleksi fisik + ketersediaan aktual eksemplar (FR-10, FR-11)."""
     book = get_object_or_404(_book_queryset(), pk=pk)
-    copies = book.copies.order_by("copy_code")
+    page_obj = Paginator(book.copies.order_by("copy_code"), COPY_PAGE_SIZE).get_page(
+        request.GET.get("page")
+    )
+    params = request.GET.copy()
+    params.pop("page", None)
     return render(
         request,
         "catalog/book_detail.html",
         {
             "book": book,
             "authors": [rel.author for rel in book.bookauthor_set.all()],
-            "copies": copies,
+            "page_obj": page_obj,
             "available": count_available_copies(book),
             "total": book.total_copies,
+            "querystring": params.urlencode(),
         },
     )
 

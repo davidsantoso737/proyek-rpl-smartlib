@@ -413,6 +413,11 @@ EBOOK_CONTENT_TYPES = {
     "epub": "application/epub+zip",
 }
 
+# Format yang benar-benar dapat ditampilkan reader daring. Hanya tipe ini
+# yang dilayani oleh ebook_file_view; format lain tidak punya jalur pratinjau
+# di aplikasi sehingga tidak disediakan sebagai berkas yang dapat diunduh.
+PREVIEWABLE_EBOOK_TYPES = frozenset({"pdf"})
+
 
 @role_required(*REQUESTER_ROLES)
 @require_POST
@@ -495,24 +500,33 @@ def ebook_file_view(request, pk):
     """Stream file dari storage privat setelah otorisasi penuh (NFR-26).
 
     Tidak ada URL publik untuk file ini: hanya rute ini yang
-    menyentuh storage, selalu sesudah pemeriksaan di atas.
+    menyentuh storage, selalu sesudah pemeriksaan di atas. Hanya format
+    yang dapat dipratinjau reader (PDF) yang dilayani, dan selalu sebagai
+    respons sebaris tanpa header lampiran, sehingga rute ini tidak menjadi
+    jalur unduh/penyebaran berkas.
     """
     loan = _usable_ebook_loan_or_403(request, pk)
+    file_type = (loan.ebook.file_type or "").lower()
+    if file_type not in PREVIEWABLE_EBOOK_TYPES:
+        raise Http404(
+            "Format e-book ini tidak dapat dipratinjau di aplikasi."
+        )
+    content_type = EBOOK_CONTENT_TYPES.get(
+        file_type, "application/octet-stream"
+    )
     try:
         path = resolve_ebook_file(loan.ebook)
     except EbookLoanError as exc:
         raise Http404(str(exc))
-    content_type = EBOOK_CONTENT_TYPES.get(
-        (loan.ebook.file_type or "").lower(), "application/octet-stream"
-    )
-    # PDF ditampilkan sebaris; format lain diunduh agar tidak melewati
-    # jalur pratinjau browser yang tidak mendukungnya.
-    return FileResponse(
+    response = FileResponse(
         open(path, "rb"),
         content_type=content_type,
         filename=loan.ebook.file_name,
-        as_attachment=(loan.ebook.file_type or "").lower() != "pdf",
+        as_attachment=False,
     )
+    # Dokumen privat: cegah cache browser/proxy menyimpan salinan berkas.
+    response["Cache-Control"] = "private, no-store"
+    return response
 
 
 @role_required(User.Role.PUSTAKAWAN)

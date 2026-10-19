@@ -1,0 +1,29 @@
+{# One discovery card for the reader home (R-31: same cover/title/meta #}
+{# language as the catalog; portrait cover keeps the grid aligned). #}
+{# Params: item dict with kind/id/title/authors/category/cover_url and #}
+{# optional reason. Only the title links to the real detail page, so no #}
+{# nested-interactive conflict; hover lifts the border only. #}
+<article class="group flex min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white transition duration-150 motion-safe:hover:-translate-y-0.5 motion-reduce:transform-none hover:border-blue-200 hover:shadow">
+    {% if item.kind == "book" %}
+        {% url 'catalog:book_detail' item.id as detail_url %}
+    {% else %}
+        {% url 'catalog:ebook_detail' item.id as detail_url %}
+    {% endif %}
+    {% include "partials/_book_cover.html" with cover_url=item.cover_url title=item.title %}
+    <div class="flex flex-1 flex-col p-2">
+        <p class="mb-1">
+            <span class="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                {% if item.kind == "book" %}Buku Fisik{% else %}E-Book{% endif %}
+            </span>
+        </p>
+        <h3 class="line-clamp-2 text-[13px] font-semibold leading-snug text-slate-900">
+            <a href="{{ detail_url }}" class="transition group-hover:text-blue-700">{{ item.title }}</a>
+        </h3>
+        <p class="mt-0.5 truncate text-xs text-slate-500">{{ item.authors|join:", "|default:"Penulis tidak tercatat" }}</p>
+        {% if item.reason %}
+            <p class="mt-0.5 line-clamp-2 text-[11px] leading-snug text-slate-500">{{ item.reason }}</p>
+        {% else %}
+            <p class="mt-0.5 truncate text-[11px] text-slate-500">{{ item.category }}</p>
+        {% endif %}
+    </div>
+</article>

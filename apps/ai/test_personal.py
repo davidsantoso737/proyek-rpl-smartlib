@@ -266,6 +266,32 @@ class PersonalContextTests(TestCase):
         self.assertIn("Siswa", result["answer"])
         self.assertIn("NIS 10001", result["answer"])
 
+    def test_siapa_saya_variasi(self):
+        for question in (
+            "siapa saya?",
+            "Siapa saya?",
+            "aku siapa?",
+            "siapakah saya?",
+            "identitas saya?",
+            "data diri saya?",
+            "profilku?",
+            "nama aku siapa?",
+        ):
+            with self.subTest(question=question):
+                result = ask(self.siswa_a, question)
+                self.assertIn("siswaA Full", result["answer"])
+                self.assertIn("Siswa", result["answer"])
+
+    def test_ai_tetap_kecil_untuk_dirinya(self):
+        # "kamu siapa?" menanyakan identitas AI, bukan pengguna.
+        result = ask(self.siswa_a, "kamu siapa?")
+        self.assertEqual(result["source"], "smalltalk")
+        self.assertIn("AI Assistant", result["answer"])
+
+    def test_siapa_penulis_bukan_profil(self):
+        result = ask(self.siswa_a, "siapa penulis favorit saya?")
+        self.assertNotIn("Data akun Anda", result["answer"])
+
     def test_tidak_mengubah_data(self):
         before = (
             Loan.objects.count(),

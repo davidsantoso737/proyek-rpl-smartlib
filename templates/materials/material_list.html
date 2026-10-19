@@ -4,9 +4,11 @@
 
 {% block content %}
 
+<div class="mx-auto max-w-5xl">
+
 <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-            <h1 class="text-xl font-semibold text-slate-900">
+            <h1 class="text-2xl font-bold text-slate-900 sm:text-3xl">
                 Bahan Ajar
             </h1>
             <p class="text-slate-500 text-sm mt-1">
@@ -15,39 +17,53 @@
         </div>
         {% if user.role == "GURU" %}
             <a href="{% url 'materials:upload' %}"
-               class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
-                + Unggah materi
+               class="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:w-auto">
+                <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                Unggah materi
             </a>
         {% endif %}
 </div>
 
-<div class="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
-    {% if materials %}
-        <ul class="divide-y divide-slate-100">
-            {% for material in materials %}
-                <li class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 sm:px-5 py-3.5 transition hover:bg-slate-50/60">
-                    <div class="min-w-0">
-                        <p class="font-medium text-slate-900">{{ material.title }}</p>
-                        <p class="text-xs text-slate-500 mt-0.5">
-                            {{ material.uploaded_by.full_name }} &middot;
-                            {{ material.file_type|upper }} &middot;
-                            {{ material.file_name }}
-                        </p>
-                    </div>
-                    <a href="{% url 'materials:download' material.pk %}"
-                       class="inline-flex items-center min-h-[44px] rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium px-4 transition">
-                        Unduh
-                    </a>
-                </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <div class="py-10 px-4 text-center">
-            <svg class="mx-auto h-9 w-9 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>
-            <p class="mt-2 text-sm font-semibold text-slate-900">Belum ada bahan ajar terverifikasi.</p>
-            <p class="mt-0.5 text-[13px] text-slate-500">Materi yang disetujui pustakawan akan tampil di sini.</p>
+{% if materials %}
+    <ul class="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+        {% for material in materials %}
+            <li class="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-4 sm:px-5">
+                <div class="min-w-0">
+                    <p class="font-semibold text-slate-900 break-words">{{ material.title }}</p>
+                    <p class="text-xs text-slate-500 mt-0.5 break-words">
+                        {{ material.uploaded_by.full_name }}
+                        <span class="text-slate-300">&middot;</span>
+                        {{ material.file_type|upper }}
+                        <span class="text-slate-300">&middot;</span>
+                        {{ material.file_name }}
+                    </p>
+                </div>
+                <a href="{% url 'materials:download' material.pk %}"
+                   class="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
+                    <svg class="h-[18px] w-[18px] shrink-0 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+                    Unduh
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <div class="flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:gap-4 sm:p-6">
+        <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>
+        </span>
+        <div class="min-w-0">
+            <p class="text-sm font-semibold text-slate-900">Belum ada bahan ajar</p>
+            <p class="text-[13px] text-slate-500">
+                {% if user.role == "GURU" %}
+                    Unggah materi pertama Anda; materi yang disetujui pustakawan akan tampil di sini.
+                {% else %}
+                    Materi yang disetujui pustakawan akan tampil di sini.
+                {% endif %}
+            </p>
         </div>
-    {% endif %}
+    </div>
+{% endif %}
+
 </div>
 
 {% endblock %}

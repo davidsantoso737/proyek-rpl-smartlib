@@ -16,26 +16,34 @@
 <body class="min-h-screen flex flex-col bg-slate-100 text-slate-900 antialiased">
 
     {% with current_url=request.resolver_match.url_name|default:"" current_ns=request.resolver_match.namespace|default:"" %}
-    {% if user.is_authenticated and user.role == "PUSTAKAWAN" %}
-    <div class="w-full px-4 sm:px-6 lg:px-0">
+    {% if user.is_authenticated %}
+    <div class="w-full">
         <div class="items-start lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
-            <aside class="sticky top-0 hidden max-h-[100dvh] overflow-y-auto rounded-br-xl border border-t-0 border-slate-200/80 bg-white px-3 py-2 shadow-sm lg:block" aria-label="Panel navigasi pustakawan">
-                {% include "partials/_librarian_sidebar.html" %}
+            <aside class="sticky top-0 hidden max-h-[100dvh] overflow-y-auto border-r border-slate-200/80 bg-white px-3 py-2 lg:block" aria-label="Panel navigasi">
+                {% include "partials/_app_sidebar.html" %}
             </aside>
             <div class="min-w-0">
     {% endif %}
-    <header id="site-header" class="print:hidden sticky top-0 z-30 {% if user.is_authenticated and user.role == 'PUSTAKAWAN' %}bg-white/95 backdrop-blur border border-t-0 border-slate-200/80 shadow-sm rounded-b-xl lg:border-l-0 lg:rounded-none{% else %}bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm{% endif %}">
-        {% if user.is_authenticated and user.role == "PUSTAKAWAN" %}
-        <div class="flex min-h-[68px] items-center justify-between gap-3 py-2 lg:px-8">
-            <div class="flex items-center">
-                <button id="nav-toggle" type="button"
-                        class="lg:hidden inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-700 hover:bg-slate-100"
-                        aria-expanded="false" aria-controls="mobile-nav" aria-label="Buka menu navigasi">
-                    <svg id="nav-icon-open" class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16"/></svg>
-                    <svg id="nav-icon-close" class="hidden h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
-                </button>
-            </div>
-            <div class="flex items-center gap-1.5">
+    <header id="site-header" class="print:hidden sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
+        {% if user.is_authenticated %}
+        <div class="mx-auto flex min-h-[68px] w-full max-w-[1200px] items-center gap-1.5 px-4 py-2 sm:gap-2 sm:px-6">
+            <button id="nav-toggle" type="button"
+                    class="lg:hidden inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-700 hover:bg-slate-100"
+                    aria-expanded="false" aria-controls="mobile-nav" aria-label="Buka menu navigasi">
+                <svg id="nav-icon-open" class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16"/></svg>
+                <svg id="nav-icon-close" class="hidden h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+            {% if current_ns != 'catalog' %}
+            <form method="get" action="{% url 'catalog:catalog' %}" role="search" aria-label="Pencarian buku" class="relative min-w-0 flex-[7]">
+                <svg class="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+                <label class="sr-only" for="home-search">Cari buku di katalog</label>
+                <input id="home-search" type="search" name="q" value="" placeholder="Cari judul, penulis, ISBN..."
+                       class="w-full min-w-0 rounded-xl border border-slate-300 bg-slate-50 py-2.5 pl-9 pr-3.5 text-sm placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-1">
+            </form>
+            {% else %}
+            <div class="flex-[7]" aria-hidden="true"></div>
+            {% endif %}
+            <div class="flex flex-[3] items-center justify-end gap-1.5 shrink-0 sm:gap-2">
                 <a href="{% url 'notifications:list' %}"
                    class="relative inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-700 hover:bg-slate-100"
                    aria-label="Notifikasi{% if unread_notifications %}, {{ unread_notifications }} belum dibaca{% endif %}">
@@ -43,329 +51,31 @@
                     {% if unread_notifications %}<span class="absolute right-1 top-1 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ unread_notifications }}</span>{% endif %}
                 </a>
                 <a href="{% url 'accounts:profile' %}"
-                   class="flex items-center gap-2.5 min-h-[44px] rounded-xl py-1.5 pl-1.5 pr-1.5 sm:pr-3 hover:bg-slate-100">
+                   class="flex min-h-[44px] items-center gap-2.5 rounded-xl py-1.5 pl-1.5 pr-1.5 hover:bg-slate-100 sm:pr-3"
+                   aria-label="Profil {{ user.full_name }}">
                     <span class="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white" aria-hidden="true">{{ user.full_name|default:user.username|slice:":1"|upper }}</span>
-                    <span class="hidden sm:block leading-tight text-left">
-                        <span class="block text-sm font-medium text-slate-900">{{ user.full_name }}</span>
-                        <span class="block text-xs text-slate-500">Pustakawan</span>
-                    </span>
+                    <span class="hidden max-w-40 truncate text-sm font-medium text-slate-900 md:block">{{ user.full_name }}</span>
                 </a>
             </div>
         </div>
-        <div id="mobile-nav" class="hidden lg:hidden border-t border-slate-200">
-            <nav aria-label="Navigasi seluler" class="py-3 max-h-[calc(100dvh-6rem)] overflow-y-auto">
-                {% include "partials/_librarian_sidebar.html" %}
+        <div id="mobile-nav" class="hidden border-t border-slate-200 bg-white lg:hidden">
+            <nav aria-label="Navigasi seluler" class="max-h-[calc(100dvh-5rem)] overflow-y-auto px-3 py-2">
+                {% include "partials/_app_sidebar.html" %}
             </nav>
         </div>
         {% else %}
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-2 flex items-center justify-between gap-3">
-            {% if user.is_authenticated %}{% url 'accounts:dashboard' as brand_href %}{% else %}{% url 'accounts:login' as brand_href %}{% endif %}
+            {% url 'accounts:login' as brand_href %}
             {% include "partials/_brand.html" with href=brand_href %}
-
-            {% if user.is_authenticated %}
-            <nav aria-label="Navigasi utama" class="hidden xl:flex items-center gap-1 text-sm">
-                <span class="hidden min-[1400px]:inline-flex items-center gap-2 mr-1 px-3 py-1.5 rounded-full bg-slate-100 text-slate-700">
-                    <span class="font-medium">{{ user.full_name }}</span>
-                    {% if user.role == "PUSTAKAWAN" %}
-                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">Pustakawan</span>
-                    {% elif user.role == "GURU" %}
-                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">Guru</span>
-                    {% else %}
-                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">Siswa</span>
-                    {% endif %}
-                </span>
-                <a href="{% url 'accounts:dashboard' %}"
-                   class="whitespace-nowrap inline-flex items-center min-h-[44px] rounded-xl px-2.5 py-2 font-medium {% if "dashboard" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                   {% if "dashboard" in current_url %}aria-current="page"{% endif %}>
-                    Dashboard
-                </a>
-                <a href="{% url 'catalog:catalog' %}"
-                   class="whitespace-nowrap inline-flex items-center min-h-[44px] rounded-xl px-2.5 py-2 font-medium {% if current_ns == "catalog" and "manage" not in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                   {% if current_ns == "catalog" and "manage" not in current_url %}aria-current="page"{% endif %}>
-                    Katalog
-                </a>
-                <a href="{% url 'materials:list' %}"
-                   class="whitespace-nowrap inline-flex items-center min-h-[44px] rounded-xl px-2.5 py-2 font-medium {% if current_ns == "materials" and current_url == "list" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                   {% if current_ns == "materials" and current_url == "list" %}aria-current="page"{% endif %}>
-                    Bahan Ajar
-                </a>
-                {% if user.role == "PUSTAKAWAN" %}
-                <div class="relative" data-nav-dropdown>
-                    <button type="button" data-nav-dropdown-toggle aria-expanded="false" aria-controls="nav-drop-sirkulasi" aria-haspopup="true"
-                            class="whitespace-nowrap inline-flex items-center gap-1 min-h-[44px] rounded-xl px-2.5 py-2 font-medium {% if "approval" in current_url or "handover" in current_url or current_url == "return" or current_url == "return_confirm" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}">
-                        Sirkulasi
-                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
-                    </button>
-                    <div id="nav-drop-sirkulasi" data-nav-dropdown-menu class="hidden absolute left-0 top-full z-30 mt-1 w-64 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
-                        <a href="{% url 'circulation:approval_list' %}"
-                           class="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 min-h-[44px] text-sm font-medium {% if "approval" in current_url and "ebook" not in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "approval" in current_url and "ebook" not in current_url %}aria-current="page"{% endif %}>
-                            Persetujuan{% if pending_loans %}<span class="ml-1.5 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ pending_loans }}</span>{% endif %}
-                        </a>
-                        <a href="{% url 'circulation:ebook_approval_list' %}"
-                           class="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 min-h-[44px] text-sm font-medium {% if "ebook_approval" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "ebook_approval" in current_url %}aria-current="page"{% endif %}>
-                            E-Approval{% if pending_ebooks %}<span class="ml-1.5 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ pending_ebooks }}</span>{% endif %}
-                        </a>
-                        <a href="{% url 'circulation:handover' %}"
-                           class="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 min-h-[44px] text-sm font-medium {% if "handover" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "handover" in current_url %}aria-current="page"{% endif %}>
-                            Penyerahan
-                        </a>
-                        <a href="{% url 'circulation:return' %}"
-                           class="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 min-h-[44px] text-sm font-medium {% if current_url == "return" or current_url == "return_confirm" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if current_url == "return" or current_url == "return_confirm" %}aria-current="page"{% endif %}>
-                            Pengembalian
-                        </a>
-                    </div>
-                </div>
-                <div class="relative" data-nav-dropdown>
-                    <button type="button" data-nav-dropdown-toggle aria-expanded="false" aria-controls="nav-drop-kelola" aria-haspopup="true"
-                            class="whitespace-nowrap inline-flex items-center gap-1 min-h-[44px] rounded-xl px-2.5 py-2 font-medium {% if "manage" in current_url or "user_" in current_url or "opname" in current_url or "review" in current_url or "verif" in current_url or "deletion" in current_url or current_ns == "reports" or current_ns == "core" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}">
-                        Kelola
-                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
-                    </button>
-                    <div id="nav-drop-kelola" data-nav-dropdown-menu class="hidden absolute left-0 top-full z-30 mt-1 w-64 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
-                        <a href="{% url 'catalog:manage_books' %}"
-                           class="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 min-h-[44px] text-sm font-medium {% if "manage" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "manage" in current_url %}aria-current="page"{% endif %}>
-                            Kelola Koleksi
-                        </a>
-                        <a href="{% url 'accounts:user_list' %}"
-                           class="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 min-h-[44px] text-sm font-medium {% if "user_" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "user_" in current_url %}aria-current="page"{% endif %}>
-                            Pengguna
-                        </a>
-                        <a href="{% url 'inventory:opname_list' %}"
-                           class="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 min-h-[44px] text-sm font-medium {% if "opname" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "opname" in current_url %}aria-current="page"{% endif %}>
-                            Stok Opname
-                        </a>
-                        <a href="{% url 'materials:review_list' %}"
-                           class="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 min-h-[44px] text-sm font-medium {% if "review" in current_url or "verif" in current_url or "deletion" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "review" in current_url or "verif" in current_url or "deletion" in current_url %}aria-current="page"{% endif %}>
-                            Verifikasi{% if pending_materials or pending_deletions %}<span class="ml-1.5 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ pending_materials|add:pending_deletions }}</span>{% endif %}
-                        </a>
-                        <a href="{% url 'reports:report' %}"
-                           class="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 min-h-[44px] text-sm font-medium {% if current_ns == "reports" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if current_ns == "reports" %}aria-current="page"{% endif %}>
-                            Laporan
-                        </a>
-                        <a href="{% url 'core:policy' %}"
-                           class="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 min-h-[44px] text-sm font-medium {% if current_ns == "core" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if current_ns == "core" %}aria-current="page"{% endif %}>
-                            Konfigurasi
-                        </a>
-                    </div>
-                </div>
-                {% else %}
-                <a href="{% url 'circulation:cart' %}"
-                   class="whitespace-nowrap inline-flex items-center min-h-[44px] rounded-xl px-2.5 py-2 font-medium {% if "cart" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                   {% if "cart" in current_url %}aria-current="page"{% endif %}>
-                    Keranjang{% if cart_item_count %}<span class="ml-1.5 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ cart_item_count }}</span>{% endif %}
-                </a>
-                <a href="{% url 'circulation:loan_list' %}"
-                   class="whitespace-nowrap inline-flex items-center min-h-[44px] rounded-xl px-2.5 py-2 font-medium {% if "loan" in current_url or current_url == "return_history" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                   {% if "loan" in current_url or current_url == "return_history" %}aria-current="page"{% endif %}>
-                    Riwayat
-                </a>
-                <a href="{% url 'circulation:my_ebooks' %}"
-                   class="whitespace-nowrap inline-flex items-center min-h-[44px] rounded-xl px-2.5 py-2 font-medium {% if current_url == "my_ebooks" or current_url == "ebook_reader" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                   {% if current_url == "my_ebooks" or current_url == "ebook_reader" %}aria-current="page"{% endif %}>
-                    E-Book Saya
-                </a>
-                {% if user.role == "GURU" %}
-                <a href="{% url 'materials:my' %}"
-                   class="whitespace-nowrap inline-flex items-center min-h-[44px] rounded-xl px-2.5 py-2 font-medium {% if current_ns == "materials" and current_url == "my" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                   {% if current_ns == "materials" and current_url == "my" %}aria-current="page"{% endif %}>
-                    Materi Saya
-                </a>
-                {% endif %}
-                {% endif %}
-                <a href="{% url 'accounts:profile' %}"
-                   class="whitespace-nowrap inline-flex items-center min-h-[44px] rounded-xl px-2.5 py-2 font-medium {% if "profile" in current_url or "password" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                   {% if "profile" in current_url or "password" in current_url %}aria-current="page"{% endif %}>
-                    Profil
-                </a>
-                <a href="{% url 'notifications:list' %}"
-                   class="whitespace-nowrap inline-flex items-center min-h-[44px] rounded-xl px-2.5 py-2 font-medium {% if current_ns == "notifications" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                   {% if current_ns == "notifications" %}aria-current="page"{% endif %}>
-                    Notifikasi{% if unread_notifications %}<span class="ml-1.5 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ unread_notifications }}</span>{% endif %}
-                </a>
-                <form method="post" action="{% url 'accounts:logout' %}" class="inline">
-                    {% csrf_token %}
-                    <button type="submit"
-                            class="whitespace-nowrap inline-flex items-center min-h-[44px] rounded-xl bg-slate-200 hover:bg-slate-300 px-4 py-2 font-medium transition">
-                        Keluar
-                    </button>
-                </form>
-            </nav>
-            <button id="nav-toggle" type="button"
-                    class="xl:hidden inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-700 hover:bg-slate-100"
-                    aria-expanded="false" aria-controls="mobile-nav" aria-label="Buka menu navigasi">
-                <svg id="nav-icon-open" class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16"/></svg>
-                <svg id="nav-icon-close" class="hidden h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
-            </button>
-            {% else %}
             <a href="{% url 'accounts:login' %}"
                class="inline-flex items-center min-h-[44px] px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition">
                 Masuk
             </a>
-            {% endif %}
         </div>
         {% endif %}
-        {% if user.is_authenticated and user.role != "PUSTAKAWAN" %}
-        <div id="mobile-nav" class="hidden xl:hidden border-t border-slate-200 bg-white">
-            <nav aria-label="Navigasi seluler" class="max-w-6xl mx-auto px-4 sm:px-6 py-3 space-y-5 max-h-[calc(100dvh-4rem)] overflow-y-auto">
-                <div class="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-700 w-fit">
-                    <span class="font-medium">{{ user.full_name }}</span>
-                    {% if user.role == "PUSTAKAWAN" %}
-                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">Pustakawan</span>
-                    {% elif user.role == "GURU" %}
-                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">Guru</span>
-                    {% else %}
-                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">Siswa</span>
-                    {% endif %}
-                </div>
-                <div>
-                    <p class="text-xs font-semibold text-slate-500 mb-1 px-3">Utama</p>
-                    <div class="space-y-1">
-                        <a href="{% url 'accounts:dashboard' %}"
-                           class="flex items-center min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if "dashboard" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "dashboard" in current_url %}aria-current="page"{% endif %}>
-                            Dashboard
-                        </a>
-                        <a href="{% url 'catalog:catalog' %}"
-                           class="flex items-center min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if current_ns == "catalog" and "manage" not in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if current_ns == "catalog" and "manage" not in current_url %}aria-current="page"{% endif %}>
-                            Katalog
-                        </a>
-                        <a href="{% url 'materials:list' %}"
-                           class="flex items-center min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if current_ns == "materials" and current_url == "list" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if current_ns == "materials" and current_url == "list" %}aria-current="page"{% endif %}>
-                            Bahan Ajar
-                        </a>
-                    </div>
-                </div>
-                {% if user.role == "PUSTAKAWAN" %}
-                <div>
-                    <p class="text-xs font-semibold text-slate-500 mb-1 px-3">Sirkulasi</p>
-                    <div class="space-y-1">
-                        <a href="{% url 'circulation:approval_list' %}"
-                           class="flex items-center justify-between gap-2 min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if "approval" in current_url and "ebook" not in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "approval" in current_url and "ebook" not in current_url %}aria-current="page"{% endif %}>
-                            Persetujuan{% if pending_loans %}<span class="ml-1.5 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ pending_loans }}</span>{% endif %}
-                        </a>
-                        <a href="{% url 'circulation:ebook_approval_list' %}"
-                           class="flex items-center justify-between gap-2 min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if "ebook_approval" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "ebook_approval" in current_url %}aria-current="page"{% endif %}>
-                            E-Approval{% if pending_ebooks %}<span class="ml-1.5 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ pending_ebooks }}</span>{% endif %}
-                        </a>
-                        <a href="{% url 'circulation:handover' %}"
-                           class="flex items-center min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if "handover" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "handover" in current_url %}aria-current="page"{% endif %}>
-                            Penyerahan
-                        </a>
-                        <a href="{% url 'circulation:return' %}"
-                           class="flex items-center min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if current_url == "return" or current_url == "return_confirm" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if current_url == "return" or current_url == "return_confirm" %}aria-current="page"{% endif %}>
-                            Pengembalian
-                        </a>
-                    </div>
-                </div>
-                <div>
-                    <p class="text-xs font-semibold text-slate-500 mb-1 px-3">Kelola</p>
-                    <div class="space-y-1">
-                        <a href="{% url 'catalog:manage_books' %}"
-                           class="flex items-center min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if "manage" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "manage" in current_url %}aria-current="page"{% endif %}>
-                            Kelola Koleksi
-                        </a>
-                        <a href="{% url 'accounts:user_list' %}"
-                           class="flex items-center min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if "user_" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "user_" in current_url %}aria-current="page"{% endif %}>
-                            Pengguna
-                        </a>
-                        <a href="{% url 'inventory:opname_list' %}"
-                           class="flex items-center min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if "opname" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "opname" in current_url %}aria-current="page"{% endif %}>
-                            Stok Opname
-                        </a>
-                        <a href="{% url 'materials:review_list' %}"
-                           class="flex items-center justify-between gap-2 min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if "review" in current_url or "verif" in current_url or "deletion" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "review" in current_url or "verif" in current_url or "deletion" in current_url %}aria-current="page"{% endif %}>
-                            Verifikasi{% if pending_materials or pending_deletions %}<span class="ml-1.5 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ pending_materials|add:pending_deletions }}</span>{% endif %}
-                        </a>
-                        <a href="{% url 'reports:report' %}"
-                           class="flex items-center min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if current_ns == "reports" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if current_ns == "reports" %}aria-current="page"{% endif %}>
-                            Laporan
-                        </a>
-                        <a href="{% url 'core:policy' %}"
-                           class="flex items-center min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if current_ns == "core" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if current_ns == "core" %}aria-current="page"{% endif %}>
-                            Konfigurasi
-                        </a>
-                    </div>
-                </div>
-                {% else %}
-                <div>
-                    <p class="text-xs font-semibold text-slate-500 mb-1 px-3">Peminjaman</p>
-                    <div class="space-y-1">
-                        <a href="{% url 'circulation:cart' %}"
-                           class="flex items-center justify-between gap-2 min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if "cart" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "cart" in current_url %}aria-current="page"{% endif %}>
-                            Keranjang{% if cart_item_count %}<span class="ml-1.5 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ cart_item_count }}</span>{% endif %}
-                        </a>
-                        <a href="{% url 'circulation:loan_list' %}"
-                           class="flex items-center min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if "loan" in current_url or current_url == "return_history" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "loan" in current_url or current_url == "return_history" %}aria-current="page"{% endif %}>
-                            Riwayat
-                        </a>
-                        <a href="{% url 'circulation:my_ebooks' %}"
-                           class="flex items-center min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if current_url == "my_ebooks" or current_url == "ebook_reader" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if current_url == "my_ebooks" or current_url == "ebook_reader" %}aria-current="page"{% endif %}>
-                            E-Book Saya
-                        </a>
-                        {% if user.role == "GURU" %}
-                        <a href="{% url 'materials:my' %}"
-                           class="flex items-center min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if current_ns == "materials" and current_url == "my" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if current_ns == "materials" and current_url == "my" %}aria-current="page"{% endif %}>
-                            Materi Saya
-                        </a>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endif %}
-                <div>
-                    <p class="text-xs font-semibold text-slate-500 mb-1 px-3">Akun</p>
-                    <div class="space-y-1">
-                        <a href="{% url 'accounts:profile' %}"
-                           class="flex items-center min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if "profile" in current_url or "password" in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if "profile" in current_url or "password" in current_url %}aria-current="page"{% endif %}>
-                            Profil
-                        </a>
-                        <a href="{% url 'notifications:list' %}"
-                           class="flex items-center justify-between gap-2 min-h-[44px] rounded-xl px-3 py-3 text-sm font-medium {% if current_ns == "notifications" %}bg-blue-50 text-blue-700 font-semibold{% else %}text-slate-700 hover:bg-slate-100{% endif %}"
-                           {% if current_ns == "notifications" %}aria-current="page"{% endif %}>
-                            Notifikasi{% if unread_notifications %}<span class="ml-1.5 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ unread_notifications }}</span>{% endif %}
-                        </a>
-                        <form method="post" action="{% url 'accounts:logout' %}">
-                            {% csrf_token %}
-                            <button type="submit"
-                                    class="flex w-full items-center justify-center min-h-[44px] rounded-xl bg-slate-200 hover:bg-slate-300 px-4 py-3 text-sm font-medium transition">
-                                Keluar
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </nav>
-        </div>
-        {% endif %}
-        {% endwith %}
     </header>
 
-    <main class="{% if user.is_authenticated and user.role == 'PUSTAKAWAN' %}w-full flex-1 py-6 sm:py-8 lg:px-8{% else %}flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8{% endif %}">
+    <main class="w-full flex-1 px-4 sm:px-6 lg:px-8 py-6">
         {% if messages %}
             <div class="mb-6 space-y-2">
                 {% for message in messages %}
@@ -379,7 +89,7 @@
         {% block content %}
         {% endblock %}
     </main>
-    {% if user.is_authenticated and user.role == "PUSTAKAWAN" %}
+    {% if user.is_authenticated %}
             </div>
         </div>
     </div>
@@ -400,30 +110,6 @@
     if (!header) {
         return;
     }
-    function closeDropdowns(except) {
-        header.querySelectorAll("[data-nav-dropdown-menu]").forEach(function (menu) {
-            if (menu !== except && !menu.classList.contains("hidden")) {
-                menu.classList.add("hidden");
-                var btn = menu.parentElement.querySelector("[data-nav-dropdown-toggle]");
-                if (btn) {
-                    btn.setAttribute("aria-expanded", "false");
-                }
-            }
-        });
-    }
-    header.querySelectorAll("[data-nav-dropdown-toggle]").forEach(function (btn) {
-        btn.addEventListener("click", function (event) {
-            event.stopPropagation();
-            var menu = btn.parentElement.querySelector("[data-nav-dropdown-menu]");
-            if (!menu) {
-                return;
-            }
-            var willOpen = menu.classList.contains("hidden");
-            closeDropdowns(menu);
-            menu.classList.toggle("hidden", !willOpen);
-            btn.setAttribute("aria-expanded", willOpen ? "true" : "false");
-        });
-    });
     var toggle = document.getElementById("nav-toggle");
     var panel = document.getElementById("mobile-nav");
     function setPanel(open) {
@@ -441,9 +127,6 @@
         if (iconClose) {
             iconClose.classList.toggle("hidden", !open);
         }
-        if (!open) {
-            closeDropdowns(null);
-        }
     }
     if (toggle && panel) {
         toggle.addEventListener("click", function (event) {
@@ -457,25 +140,22 @@
         });
     }
     document.addEventListener("click", function (event) {
-        if (!header.contains(event.target)) {
-            closeDropdowns(null);
+        if (!header.contains(event.target) && panel && !panel.classList.contains("hidden")) {
+            setPanel(false);
         }
     });
     document.addEventListener("keydown", function (event) {
-        if (event.key === "Escape") {
-            closeDropdowns(null);
-            if (panel && !panel.classList.contains("hidden")) {
-                setPanel(false);
-                if (toggle) {
-                    toggle.focus();
-                }
+        if (event.key === "Escape" && panel && !panel.classList.contains("hidden")) {
+            setPanel(false);
+            if (toggle) {
+                toggle.focus();
             }
         }
     });
 })();
 </script>
 
-{% if user.is_authenticated %}
+{% if user.role == "SISWA" or user.role == "GURU" %}
 <div id="ai-popup-root">
     <button id="ai-fab" type="button"
             aria-label="Buka AI Assistant" aria-expanded="false" aria-controls="ai-popup-panel"
@@ -621,5 +301,6 @@
 </script>
 {% endif %}
 
+{% endwith %}
 </body>
 </html>

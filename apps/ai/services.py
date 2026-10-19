@@ -134,8 +134,9 @@ SYSTEM_PROMPT = (
     "ada pengambilan langsung tanpa persetujuan dan QR. "
     "b) E-book: detail e-book -> tombol Minta (satu pending & satu akses "
     "aktif per pengguna per e-book) -> pustakawan menyetujui di E-Approval "
-    "-> baca di E-Book Saya -> Reader (PDF inline, non-PDF diunduh); masa "
-    "akses N hari; kedaluwarsa berarti ajukan ulang. E-book TIDAK memakai QR. "
+    "-> baca di E-Book Saya -> Reader (PDF tampil di dalam aplikasi, tanpa "
+    "unduh); masa akses N hari; kedaluwarsa berarti ajukan ulang. "
+    "E-book TIDAK memakai QR. "
     "c) Pengembalian: peminjam membawa fisik ke perpustakaan; HANYA "
     "pustakawan yang mencatat di menu Pengembalian via QR Identitas "
     "eksemplar (kode eksemplar, BERBEDA dari QR Pickup) atau ketik kode; "
@@ -606,8 +607,8 @@ def _guide_pinjam_ebook(policy):
         "3. Tunggu persetujuan pustakawan (menu E-Approval khusus "
         "pustakawan); pantau di menu E-Book Saya dan Notifikasi.\n"
         "4. Jika disetujui, buka menu E-Book Saya lalu klik Baca untuk "
-        "membuka Reader. PDF tampil langsung di halaman; format selain "
-        "PDF akan diunduh. E-book tidak memakai QR.\n"
+        "membuka Reader. PDF tampil langsung di halaman dan tidak "
+        "disediakan tombol unduh. E-book tidak memakai QR.\n"
         "5. Jika masa akses berakhir atau pengajuan ditolak, ajukan "
         "ulang dari detail e-book."
     )
@@ -1115,6 +1116,7 @@ def _my_profile_row(user):
         "role": user.get_role_display(),
         "identitas": identifier,
         "kelas": user.student_class or "-",
+        "jurusan": user.department or "-",
     }
 
 
@@ -1176,7 +1178,11 @@ _PERSONAL_INTENTS = (
     )),
     ("profil", re.compile(
         r"(profil.*(saya|aku|ku)|data.*(saya|aku|diri)|akun.*(saya|aku)|"
-        r"nama.*saya|\bsaya\b.*\b(kelas|jurusan|nis|nip)\b)"
+        r"nama.*(saya|aku|ku)|identitas.*(saya|aku)|"
+        r"siapa(ka?h)?\s+(saya|aku)\s*\??$|"
+        r"(saya|aku)\s+siapa\s*\??$|"
+        r"\b(profilku|akunku|dataku|identitasku|namaku)\b|"
+        r"\bsaya\b.*\b(kelas|jurusan|nis|nip)\b)"
     )),
 )
 
@@ -1382,6 +1388,8 @@ def _render_profil(personal):
         parts += f", {profile['identitas']}"
     if profile["kelas"] != "-":
         parts += f", kelas: {profile['kelas']}"
+    if profile["jurusan"] != "-":
+        parts += f", jurusan: {profile['jurusan']}"
     return (
         f"Data akun Anda: {parts}. "
         "Ubah data via menu Profil; username, peran, dan NIS/NIP tidak "

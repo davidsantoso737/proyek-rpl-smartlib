@@ -1,0 +1,16 @@
+{# Presentation-only loan status badge (never changes backend values). #}
+{# Params: status (raw Loan.status value). Maps to consistent Indonesian #}
+{# labels already used by the project; unknown values fall back to raw. #}
+{% if status == "PENDING_APPROVAL" %}
+    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">Menunggu persetujuan</span>
+{% elif status == "APPROVED" %}
+    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">Disetujui</span>
+{% elif status == "ACTIVE" %}
+    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-700">Dipinjam aktif</span>
+{% elif status == "COMPLETED" %}
+    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">Selesai</span>
+{% elif status == "REJECTED" %}
+    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">Ditolak</span>
+{% else %}
+    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{{ status }}</span>
+{% endif %}

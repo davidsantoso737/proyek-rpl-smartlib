@@ -130,34 +130,154 @@ def dashboard_view(request):
     raise PermissionDenied("Role akun Anda tidak dikenal.")
 
 
+def _reader_home_context(request):
+    """Presentation-only context for the Siswa/Guru library home.
+
+    Read-only assembly from existing sources: the AI recommendation
+    service, Category, and the active Book/Ebook rows with fields the
+    catalog already selects. No model, URL, permission, or business
+    logic change; a failure here degrades to empty sections.
+    """
+    context = {
+        "reader_home": True,
+        "home_recommendation": {"items": [], "basis": "general"},
+        "home_categories": [],
+        "active_category_id": "",
+        "category_books": [],
+        "category_has_more": False,
+    }
+    try:
+        from apps.ai.recommendations import recommend_for_user
+        from apps.catalog.models import Book, Category, Ebook
+
+        recommendation = recommend_for_user(request.user, limit=4)
+        book_ids = [
+            item["id"] for item in recommendation["items"]
+            if item["kind"] == "book"
+        ]
+        ebook_ids = [
+            item["id"] for item in recommendation["items"]
+            if item["kind"] == "ebook"
+        ]
+        covers = {}
+        if book_ids:
+            covers.update(
+                (row["id"], row["cover_url"])
+                for row in Book.objects.filter(pk__in=book_ids).values(
+                    "id", "cover_url"
+                )
+            )
+        if ebook_ids:
+            covers.update(
+                (row["id"], row["cover_url"])
+                for row in Ebook.objects.filter(pk__in=ebook_ids).values(
+                    "id", "cover_url"
+                )
+            )
+        for item in recommendation["items"]:
+            item["cover_url"] = covers.get(item["id"])
+        context["home_recommendation"] = recommendation
+
+        categories = list(Category.objects.order_by("name"))
+        context["home_categories"] = categories
+
+        category_param = (request.GET.get("kategori") or "").strip()
+        active_id = (
+            int(category_param) if category_param.isdigit() else None
+        )
+        if active_id is not None and not any(
+            cat.pk == active_id for cat in categories
+        ):
+            active_id = None
+        context["active_category_id"] = (
+            str(active_id) if active_id is not None else ""
+        )
+
+        held = {
+            (item["kind"], item["id"])
+            for item in recommendation["items"]
+        }
+        books_qs = (
+            Book.objects.filter(is_active=True)
+            .select_related("category")
+            .prefetch_related("bookauthor_set__author")
+            .order_by("title")
+        )
+        ebooks_qs = (
+            Ebook.objects.filter(is_active=True)
+            .select_related("category")
+            .prefetch_related("ebookauthor_set__author")
+            .order_by("title")
+        )
+        if active_id is not None:
+            books_qs = books_qs.filter(category_id=active_id)
+            ebooks_qs = ebooks_qs.filter(category_id=active_id)
+        preview = []
+        for book in books_qs[:8]:
+            if ("book", book.pk) in held:
+                continue
+            preview.append(
+                {
+                    "kind": "book",
+                    "id": book.pk,
+                    "title": book.title,
+                    "authors": [
+                        rel.author.name
+                        for rel in book.bookauthor_set.all()
+                    ],
+                    "category": book.category.name,
+                    "cover_url": book.cover_url,
+                }
+            )
+        for ebook in ebooks_qs[:8]:
+            if ("ebook", ebook.pk) in held:
+                continue
+            preview.append(
+                {
+                    "kind": "ebook",
+                    "id": ebook.pk,
+                    "title": ebook.title,
+                    "authors": [
+                        rel.author.name
+                        for rel in ebook.ebookauthor_set.all()
+                    ],
+                    "category": ebook.category.name,
+                    "cover_url": ebook.cover_url,
+                }
+            )
+        preview.sort(key=lambda row: row["title"].lower())
+        context["category_books"] = preview[:8]
+        context["category_has_more"] = (
+            not context["category_books"]
+            and (books_qs.exists() or ebooks_qs.exists())
+        )
+    except Exception:
+        logger.exception("Beranda reader: gagal menyusun konteks.")
+    return context
+
+
 @role_required(User.Role.SISWA)
 def siswa_dashboard_view(request):
-    return render(
-        request,
-        "accounts/dashboard.html",
-        {
-            "dashboard_title": "Dashboard Siswa",
-            "dashboard_intro": (
-                "Selamat datang di Digital Library. "
-                "Kelola profil dan keamanan akun Anda dari sini."
-            ),
-        },
-    )
+    context = {
+        "dashboard_title": "Beranda",
+        "dashboard_intro": (
+            "Temukan bacaan berikutnya dari koleksi perpustakaan."
+        ),
+    }
+    context.update(_reader_home_context(request))
+    return render(request, "accounts/dashboard.html", context)
 
 
 @role_required(User.Role.GURU)
 def guru_dashboard_view(request):
-    return render(
-        request,
-        "accounts/dashboard.html",
-        {
-            "dashboard_title": "Dashboard Guru",
-            "dashboard_intro": (
-                "Selamat datang di Digital Library. "
-                "Kelola profil dan keamanan akun Anda dari sini."
-            ),
-        },
-    )
+    context = {
+        "dashboard_title": "Beranda",
+        "dashboard_intro": (
+            "Temukan bacaan berikutnya dari koleksi perpustakaan."
+        ),
+    }
+    context.update(_reader_home_context(request))
+    return render(request, "accounts/dashboard.html", context)
 
 
 @role_required(User.Role.PUSTAKAWAN)

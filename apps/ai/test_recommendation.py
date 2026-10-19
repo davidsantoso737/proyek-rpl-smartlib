@@ -88,9 +88,12 @@ class RecommendationTests(TestCase):
 
     def test_authenticated_user(self):
         self.assertEqual(self.client.get(REC_URL).status_code, 302)
-        for user in (self.siswa, self.guru, self.pus):
+        for user in (self.siswa, self.guru):
             self.client.force_login(user)
             self.assertEqual(self.client.get(REC_URL).status_code, 200)
+        # Pustakawan tidak memiliki akses AI.
+        self.client.force_login(self.pus)
+        self.assertEqual(self.client.get(REC_URL).status_code, 403)
 
     def test_recommendation_generated_personal(self):
         self._borrow(self.siswa, "RA-1")

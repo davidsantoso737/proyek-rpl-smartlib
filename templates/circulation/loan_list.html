@@ -4,51 +4,59 @@
 
 {% block content %}
 
-<div class="mb-6">
-    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-        Riwayat Peminjaman
-    </h1>
-    <p class="text-slate-500 text-sm mt-1">
-        Status dan riwayat pengajuan peminjaman Anda.
-    </p>
-</div>
+<div class="mx-auto max-w-5xl">
+    <header class="mb-5">
+        <h1 class="text-2xl font-bold text-slate-900 sm:text-3xl">
+            Riwayat Peminjaman
+        </h1>
+        <p class="mt-1 text-sm text-slate-500">
+            Status dan riwayat pengajuan peminjaman Anda.
+        </p>
+    </header>
 
-<div class="space-y-6">
-    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
-        {% if loans %}
-            <div class="space-y-3">
-                {% for loan in loans %}
+    {% if loans %}
+        <ul class="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+            {% for loan in loans %}
+                <li>
                     <a href="{% url 'circulation:loan_detail' loan.pk %}"
-                       class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
-                        <div>
-                            <p class="font-semibold text-slate-900">
-                                Pengajuan #{{ loan.pk }} &middot; {{ loan.items.count }} eksemplar
+                       class="group flex items-center justify-between gap-3 px-4 py-4 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-blue-600 sm:px-5">
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-semibold text-slate-900 transition group-hover:text-blue-700">
+                                Pengajuan #{{ loan.pk }}
                             </p>
-                            <p class="text-xs text-slate-500 mt-0.5">
+                            <p class="mt-0.5 text-xs text-slate-500">
+                                {{ loan.items.count }} eksemplar
+                                <span class="mx-1 text-slate-300" aria-hidden="true">&middot;</span>
                                 Diajukan {{ loan.requested_at|date:"d M Y H:i" }}
+                                {% if loan.status == "ACTIVE" and loan.due_at %}
+                                    <span class="mx-1 text-slate-300" aria-hidden="true">&middot;</span>
+                                    Jatuh tempo {{ loan.due_at|date:"d M Y" }}
+                                {% endif %}
                             </p>
                         </div>
-                        {% if loan.status == "PENDING_APPROVAL" %}
-                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-700">Menunggu persetujuan</span>
-                        {% elif loan.status == "ACTIVE" %}
-                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-sky-100 text-sky-700">Dipinjam aktif{% if loan.due_at %} &middot; kembali {{ loan.due_at|date:"d M Y" }}{% endif %}</span>
-                        {% else %}
-                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-700">{{ loan.status }}</span>
-                        {% endif %}
+                        <div class="flex shrink-0 items-center gap-2">
+                            {% include "partials/_loan_status_badge.html" with status=loan.status %}
+                            <svg class="hidden h-4 w-4 text-slate-400 sm:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+                        </div>
                     </a>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="text-center py-12">
-                <p class="text-slate-900 font-semibold mb-1">Belum ada pengajuan.</p>
-                <p class="text-slate-500 text-sm mb-5">Ajukan peminjaman pertama Anda melalui katalog.</p>
-                <a href="{% url 'catalog:catalog' %}"
-                   class="inline-block px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
-                    Buka katalog
-                </a>
-            </div>
-        {% endif %}
-    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <div class="rounded-xl border border-slate-200/80 bg-white px-6 py-10 text-center shadow-sm">
+            <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600" aria-hidden="true">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+            </span>
+            <h2 class="mt-4 text-base font-semibold text-slate-900">Belum ada pengajuan</h2>
+            <p class="mx-auto mt-1.5 max-w-md text-sm text-slate-500">
+                Ajukan peminjaman pertama Anda melalui katalog.
+            </p>
+            <a href="{% url 'catalog:catalog' %}"
+               class="mt-5 inline-flex items-center min-h-[44px] rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+                Buka katalog
+            </a>
+        </div>
+    {% endif %}
 </div>
 
 {% endblock %}

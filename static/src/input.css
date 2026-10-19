@@ -93,3 +93,128 @@ body {
   border-radius: 0.25rem;
   accent-color: #2563eb;
 }
+
+/* E-book reader text layer (F-ebook): the selectable text layer drawn on
+   top of the PDF.js canvas. Copied from the vendored PDF.js build
+   (static/vendor/pdfjs) so selecting text and in-page browser search keep
+   working without pulling in PDF.js's own viewer stylesheet and toolbar.
+   --total-scale-factor is set by static/js/ebook-reader.js on the page
+   wrapper for each rendered page; the remaining custom properties are
+   supplied by the TextLayer class per text run. */
+/* Phase 6H: materials upload form. Scoped to .material-form (set on the
+   <form>) so the native file widget and textarea treatment never leak to
+   other FileFields in the project (e.g. the catalog e-book form). The
+   focus ring still comes from the shared utility; no extra outline is
+   added here. */
+.material-form textarea {
+  min-height: 7rem;
+}
+.material-form input[type="file"]::file-selector-button {
+  margin-right: 0.75rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--color-slate-300);
+  border-radius: 0.625rem;
+  background: var(--color-slate-100);
+  color: var(--color-slate-800);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.material-form input[type="file"]::file-selector-button:hover {
+  background: var(--color-slate-200);
+}
+
+.textLayer {
+  color-scheme: only light;
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  -webkit-text-size-adjust: none;
+  -moz-text-size-adjust: none;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 0;
+
+  &.highlighting {
+    touch-action: none;
+  }
+
+  :is(span, br) {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    user-select: text;
+  }
+
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+  /* Rounding granularity used by PDF.js's setLayerDimensions() when it
+     sizes this layer from --total-scale-factor. */
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+
+  > :not(.markedContent),
+  .markedContent span:not(.markedContent) {
+    z-index: 1;
+    --font-height: 0;
+    font-size: calc(var(--text-scale-factor) * var(--font-height));
+    --scale-x: 1;
+    --rotate: 0deg;
+    transform: rotate(var(--rotate)) scaleX(var(--scale-x))
+      scale(var(--min-font-size-inv));
+  }
+
+  .markedContent {
+    display: contents;
+  }
+
+  span[role="img"] {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+    cursor: default;
+  }
+
+  ::-moz-selection {
+    background: rgba(0 0 255 / 0.25);
+    background: color-mix(in srgb, AccentColor, transparent 50%);
+    color: transparent;
+  }
+
+  ::selection {
+    background: rgba(0 0 255 / 0.25);
+    background: color-mix(in srgb, AccentColor, transparent 50%);
+    color: transparent;
+  }
+
+  br::selection {
+    background: transparent;
+  }
+
+  .endOfContent {
+    display: block;
+    position: absolute;
+    inset: 100% 0 0;
+    z-index: 0;
+    cursor: default;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+  }
+
+  &.selecting .endOfContent {
+    top: 0;
+  }
+}
