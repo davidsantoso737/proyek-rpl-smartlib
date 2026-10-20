@@ -61,8 +61,8 @@
         </div>
     </section>
 
-    <div class="grid items-start gap-4 xl:grid-cols-3">
-        <section class="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm xl:col-span-2" aria-labelledby="lib-trend-title">
+    <div class="grid items-start gap-4 lg:grid-cols-3">
+        <section class="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm lg:col-span-2" aria-labelledby="lib-trend-title">
             <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 border-b border-slate-200/80 px-4 py-4 sm:px-5">
                 <div class="min-w-0">
                     <h2 id="lib-trend-title" class="text-base font-semibold text-slate-900">Tren peminjaman &amp; pengembalian</h2>
@@ -135,8 +135,8 @@
         </section>
     </div>
 
-    <div class="grid items-start gap-4 xl:grid-cols-3">
-        <section class="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm xl:col-span-2" aria-labelledby="lib-queue-title">
+    <div class="grid items-start gap-4 lg:grid-cols-3">
+        <section class="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm lg:col-span-2" aria-labelledby="lib-queue-title">
             <div class="border-b border-slate-200/80 px-4 py-4 sm:px-5">
                 <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
                     <div class="min-w-0">
@@ -144,9 +144,9 @@
                         <p class="mt-0.5 text-[13px] text-slate-500">Pengajuan dan permintaan yang menunggu tindakan Anda.</p>
                     </div>
                     {% if pending_total %}
-                        <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">{{ pending_total }} menunggu</span>
+                        <span class="inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">{{ pending_total }} menunggu</span>
                     {% else %}
-                        <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">Bersih</span>
+                        <span class="inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">Bersih</span>
                     {% endif %}
                 </div>
                 {% if pending_total %}

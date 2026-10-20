@@ -58,54 +58,43 @@
         </form>
     </div>
 
-    <div>
+    <div class="px-4 sm:px-6">
         <p class="text-[13px] text-slate-500">
             Ditemukan <span class="font-semibold text-slate-900">{{ result_count }}</span> koleksi.
         </p>
 
         {% if page_obj.object_list %}
-            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 max-w-[1200px] mt-3">
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-3.5 lg:grid-cols-4 mt-3">
                 {% for item in page_obj.object_list %}
-                    <article class="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden flex flex-col transition motion-safe:hover:-translate-y-0.5 hover:border-blue-200 hover:shadow">
-                        <div class="relative h-36 bg-slate-100 border-b border-slate-100">
-                            <div class="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-4 text-center" aria-hidden="true">
-                                <svg class="h-8 w-8 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10.5 5 8.5 4.5 4 4.5v13c4.5 0 6.5.5 8 2 1.5-1.5 3.5-2 8-2v-13c-4.5 0-6.5.5-8 2Z"/><path d="M12 6.5v13"/></svg>
-                                <p class="text-xs text-slate-500">Tanpa sampul</p>
-                            </div>
-                            {% if item.obj.cover_url %}
-                                <img src="{{ item.obj.cover_url }}" alt="Sampul {{ item.title }}" loading="lazy"
-                                     class="relative h-full w-full object-contain bg-slate-100" onerror="this.remove()">
-                            {% endif %}
-                            <span class="absolute left-3 top-3 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-white/95 text-slate-700 shadow-sm">
-                                {% if item.kind == "book" %}Buku Fisik{% else %}E-Book{% endif %}
-                            </span>
-                        </div>
-                        <div class="flex flex-1 flex-col p-4">
-                            <div class="flex-1">
-                                <h2 class="text-sm font-semibold text-slate-900 leading-snug line-clamp-2 break-words">
-                                    {{ item.title }}
-                                </h2>
-                                <p class="text-[13px] text-slate-500 mt-1 truncate">
-                                    {{ item.authors|join:", "|default:"Penulis tidak tercatat" }}
-                                </p>
-                                <p class="text-xs text-slate-500 mt-0.5 truncate">
-                                    {{ item.obj.category.name }}
-                                </p>
-                            </div>
-                            <div class="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <article class="group flex min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white transition duration-150 motion-safe:hover:-translate-y-0.5 motion-reduce:transform-none hover:border-blue-200 hover:shadow">
+                        {% if item.kind == "book" %}
+                            {% url 'catalog:book_detail' item.obj.pk as detail_url %}
+                        {% else %}
+                            {% url 'catalog:ebook_detail' item.obj.pk as detail_url %}
+                        {% endif %}
+                        {% include "partials/_book_cover.html" with cover_url=item.obj.cover_url title=item.title %}
+                        <div class="flex flex-1 flex-col p-2">
+                            <p class="mb-1">
+                                <span class="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                                    {% if item.kind == "book" %}Buku Fisik{% else %}E-Book{% endif %}
+                                </span>
+                            </p>
+                            <h2 class="line-clamp-2 text-[13px] font-semibold leading-snug text-slate-900">
+                                <a href="{{ detail_url }}" class="transition group-hover:text-blue-700">{{ item.title }}</a>
+                            </h2>
+                            <p class="mt-0.5 truncate text-xs text-slate-500">{{ item.authors|join:", "|default:"Penulis tidak tercatat" }}</p>
+                            <p class="mt-0.5 truncate text-[11px] text-slate-500">{{ item.obj.category.name }}</p>
+                            <div class="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-2">
                                 {% if item.kind == "book" %}
                                     {% if item.available > 0 %}
-                                        <span class="text-xs font-semibold text-emerald-700">{{ item.available }} dari {{ item.total }} tersedia</span>
+                                        <span class="text-[11px] font-semibold text-emerald-700">{{ item.available }} dari {{ item.total }} tersedia</span>
                                     {% else %}
-                                        <span class="text-xs font-semibold text-amber-700">Sedang tidak tersedia</span>
+                                        <span class="text-[11px] font-semibold text-amber-700">Sedang tidak tersedia</span>
                                     {% endif %}
-                                    <a href="{% url 'catalog:book_detail' item.obj.pk %}"
-                                       class="text-blue-600 hover:underline text-sm font-medium shrink-0">Detail</a>
                                 {% else %}
-                                    <span class="text-xs font-semibold text-emerald-700">Tersedia sebagai e-book</span>
-                                    <a href="{% url 'catalog:ebook_detail' item.obj.pk %}"
-                                       class="text-blue-600 hover:underline text-sm font-medium shrink-0">Detail</a>
+                                    <span class="text-[11px] font-semibold text-emerald-700">Tersedia sebagai e-book</span>
                                 {% endif %}
+                                <a href="{{ detail_url }}" class="shrink-0 text-xs font-medium text-blue-600 hover:underline">Detail</a>
                             </div>
                         </div>
                     </article>
