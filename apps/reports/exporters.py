@@ -1,7 +1,8 @@
 """Export PDF (reportlab) dan Excel (openpyxl) dari baris laporan."""
 
 import io
-from datetime import datetime
+
+from django.utils import timezone
 
 
 def build_pdf(title, columns, rows):
@@ -65,7 +66,7 @@ def build_xlsx(title, columns, rows):
 
 
 def export_filename(title, ext):
-    stamp = datetime.now().strftime("%Y%m%d-%H%M")
+    stamp = timezone.localtime().strftime("%Y%m%d-%H%M")
     safe = "".join(
         ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in title
     )[:40]

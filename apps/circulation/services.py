@@ -22,6 +22,7 @@ from django.utils import timezone
 from apps.catalog.availability import STATUS_TERSEDIA
 from apps.catalog.models import BookCopy, Ebook
 from apps.notifications.models import Notification
+from apps.telegram.dispatch import enqueue_telegram_notification
 
 from .models import EbookLoan, Loan, LoanItem
 
@@ -318,13 +319,20 @@ def approve_loan(loan_id, approver, substitutions=None):
                 "updated_at",
             ]
         )
-        _notify(
-            loan.user,
-            "LOAN_APPROVED",
-            "Pengajuan disetujui",
+        title = "Pengajuan disetujui"
+        message = (
             f"Pengajuan #{loan.pk} disetujui. Tunjukkan QR Pickup "
-            "saat mengambil buku di perpustakaan.",
-            loan,
+            "saat mengambil buku di perpustakaan."
+        )
+        _notify(loan.user, "LOAN_APPROVED", title, message, loan)
+        enqueue_telegram_notification(
+            user=loan.user,
+            notification_type="LOAN_APPROVED",
+            title=title,
+            message=message,
+            reference_type="loan",
+            reference_id=loan.pk,
+            event_key="approved",
         )
     return loan
 
@@ -354,12 +362,17 @@ def reject_loan(loan_id, approver, reason):
                 "updated_at",
             ]
         )
-        _notify(
-            loan.user,
-            "LOAN_REJECTED",
-            "Pengajuan ditolak",
-            f"Pengajuan #{loan.pk} ditolak: {reason}",
-            loan,
+        title = "Pengajuan ditolak"
+        message = f"Pengajuan #{loan.pk} ditolak: {reason}"
+        _notify(loan.user, "LOAN_REJECTED", title, message, loan)
+        enqueue_telegram_notification(
+            user=loan.user,
+            notification_type="LOAN_REJECTED",
+            title=title,
+            message=message,
+            reference_type="loan",
+            reference_id=loan.pk,
+            event_key="rejected",
         )
     return loan
 
@@ -459,13 +472,21 @@ def activate_handover(token, librarian):
         BookCopy.objects.filter(
             pk__in=[item.book_copy_id for item in items]
         ).update(status=STATUS_DIPINJAM)
-        _notify(
-            loan.user,
-            "LOAN_ACTIVE",
-            "Peminjaman aktif",
+        title = "Peminjaman aktif"
+        local_due_at = timezone.localtime(due_at)
+        message = (
             f"Pengajuan #{loan.pk} aktif. Jatuh tempo "
-            f"{due_at.strftime('%d %b %Y %H:%M')}.",
-            loan,
+            f"{local_due_at.strftime('%d %b %Y %H:%M')}."
+        )
+        _notify(loan.user, "LOAN_ACTIVE", title, message, loan)
+        enqueue_telegram_notification(
+            user=loan.user,
+            notification_type="LOAN_ACTIVE",
+            title=title,
+            message=message,
+            reference_type="loan",
+            reference_id=loan.pk,
+            event_key="active",
         )
     return loan
 
@@ -552,7 +573,13 @@ def calculate_fine(item, returned_at):
     due_at = item.due_at or item.loan.due_at
     if due_at is None:
         return 0, item.fine_rate_per_day * 0
-    late_day = max(0, (returned_at.date() - due_at.date()).days)
+    late_day = max(
+        0,
+        (
+            timezone.localdate(returned_at)
+            - timezone.localdate(due_at)
+        ).days,
+    )
     return late_day, item.fine_rate_per_day * late_day
 
 
@@ -630,15 +657,13 @@ def process_return(code, librarian, condition="BAIK", lost=False):
             )
 
         if lost:
-            _notify(
-                loan.user,
-                "LOAN_RETURNED",
-                "Buku hilang tercatat",
+            title = "Buku hilang tercatat"
+            message = (
                 f"Eksemplar {copy.copy_code} ({copy.book.title}) "
-                f"tercatat hilang. Status penggantian: {REPLACEMENT_PENDING}.",
-                loan,
+                f"tercatat hilang. Status penggantian: {REPLACEMENT_PENDING}."
             )
         else:
+            title = "Buku dikembalikan"
             message = (
                 f"Eksemplar {copy.copy_code} ({copy.book.title}) "
                 "telah dikembalikan."
@@ -648,7 +673,16 @@ def process_return(code, librarian, condition="BAIK", lost=False):
                     f" Terlambat {late_day} hari, denda Rp{fine_amount} "
                     f"({FINE_UNPAID})."
                 )
-            _notify(loan.user, "LOAN_RETURNED", "Buku dikembalikan", message, loan)
+        _notify(loan.user, "LOAN_RETURNED", title, message, loan)
+        enqueue_telegram_notification(
+            user=loan.user,
+            notification_type="LOAN_RETURNED",
+            title=title,
+            message=message,
+            reference_type="loan_item",
+            reference_id=item.pk,
+            event_key="returned",
+        )
     item.copy_refreshed_status = copy.status
     return item
 
@@ -776,14 +810,28 @@ def approve_ebook_loan(loan_id, approver):
                 "updated_at",
             ]
         )
+        title = "Peminjaman e-book disetujui"
+        local_expires_at = timezone.localtime(loan.expires_at)
+        message = (
+            f"{loan.ebook.title} dapat dibaca sampai "
+            f"{local_expires_at.strftime('%d %b %Y %H:%M')}."
+        )
         _notify(
             loan.user,
             "EBOOK_APPROVED",
-            "Peminjaman e-book disetujui",
-            f"{loan.ebook.title} dapat dibaca sampai "
-            f"{loan.expires_at.strftime('%d %b %Y %H:%M')}.",
+            title,
+            message,
             loan,
             reference_type="ebook_loan",
+        )
+        enqueue_telegram_notification(
+            user=loan.user,
+            notification_type="EBOOK_APPROVED",
+            title=title,
+            message=message,
+            reference_type="ebook_loan",
+            reference_id=loan.pk,
+            event_key="approved",
         )
     return loan
 
@@ -804,13 +852,24 @@ def reject_ebook_loan(loan_id, approver, reason):
             )
         loan.status = EBOOK_REJECTED
         loan.save(update_fields=["status", "updated_at"])
+        title = "Peminjaman e-book ditolak"
+        message = f"{loan.ebook.title}: {reason}"
         _notify(
             loan.user,
             "EBOOK_REJECTED",
-            "Peminjaman e-book ditolak",
-            f"{loan.ebook.title}: {reason}",
+            title,
+            message,
             loan,
             reference_type="ebook_loan",
+        )
+        enqueue_telegram_notification(
+            user=loan.user,
+            notification_type="EBOOK_REJECTED",
+            title=title,
+            message=message,
+            reference_type="ebook_loan",
+            reference_id=loan.pk,
+            event_key="rejected",
         )
     return loan
 

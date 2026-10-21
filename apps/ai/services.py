@@ -441,9 +441,7 @@ def _my_loans_context(user):
         result.append(
             {
                 "status": loan.status,
-                "jatuh_tempo": loan.due_at.strftime("%d %b %Y")
-                if loan.due_at
-                else "-",
+                "jatuh_tempo": _fmt_date(loan.due_at),
                 "judul": sorted(
                     {
                         item.book_copy.book.title
@@ -965,9 +963,22 @@ def _fmt_date(value):
     if not value:
         return "-"
     try:
-        return value.strftime(PERSONAL_DATE_FMT)
+        local = (
+            timezone.localtime(value)
+            if timezone.is_aware(value)
+            else value
+        )
+        return local.strftime(PERSONAL_DATE_FMT)
     except (AttributeError, ValueError):
         return "-"
+
+
+def _local_date(value):
+    if value is None:
+        return None
+    if timezone.is_aware(value):
+        return timezone.localtime(value).date()
+    return value.date()
 
 
 def _my_active_loan_rows(user, today):
@@ -983,7 +994,11 @@ def _my_active_loan_rows(user, today):
             if item.returned_at is not None:
                 continue
             due = item.due_at or loan.due_at
-            late = max(0, (today - due.date()).days) if due else 0
+            late = (
+                max(0, (today - _local_date(due)).days)
+                if due
+                else 0
+            )
             rows.append(
                 {
                     "judul": item.book_copy.book.title,
@@ -1077,7 +1092,11 @@ def _my_ebook_summary(user, now):
                     "judul": loan.ebook.title,
                     "berlaku_sampai": _fmt_date(loan.expires_at),
                     "sisa_hari": max(
-                        0, (loan.expires_at.date() - now.date()).days
+                        0,
+                        (
+                            _local_date(loan.expires_at)
+                            - timezone.localdate(now)
+                        ).days,
                     ),
                 }
             )
@@ -1127,7 +1146,7 @@ def build_personal_context(user):
     menjawab graceful, bukan mengarang.
     """
     now = timezone.now()
-    today = now.date()
+    today = timezone.localdate(now)
     active_rows = _my_active_loan_rows(user, today)
     late_rows = [row for row in active_rows if row["terlambat_hari"] > 0]
     return {
