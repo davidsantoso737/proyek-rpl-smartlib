@@ -10,6 +10,7 @@ from django.utils import timezone
 from apps.circulation.models import Loan
 
 from .dispatch import enqueue_telegram_notification
+from .formatting import format_reminder
 
 LOAN_ACTIVE = "ACTIVE"
 
@@ -21,30 +22,16 @@ REMINDER_CONFIG = {
     REMINDER_H3: {
         "notification_type": "LOAN_DUE_SOON",
         "event_key": "due_3",
-        "title": "Pengingat jatuh tempo H-3",
-        "intro": "Buku berikut akan jatuh tempo dalam 3 hari:",
-        "footer": "Kembalikan tepat waktu untuk menghindari denda.",
     },
     REMINDER_H1: {
         "notification_type": "LOAN_DUE_SOON",
         "event_key": "due_1",
-        "title": "Pengingat jatuh tempo H-1",
-        "intro": "Buku berikut akan jatuh tempo besok:",
-        "footer": "Kembalikan tepat waktu untuk menghindari denda.",
     },
     REMINDER_OVERDUE: {
         "notification_type": "LOAN_OVERDUE",
         "event_key": "overdue",
-        "title": "Peminjaman terlambat",
-        "intro": "Buku berikut sudah melewati jatuh tempo:",
-        "footer": (
-            "Kembalikan segera. Denda mengikuti aturan perpustakaan."
-        ),
     },
 }
-
-MAX_MESSAGE_LINES = 10
-MAX_TITLE_LENGTH = 120
 
 
 def _local_date(value):
@@ -61,28 +48,6 @@ def _bucket_for(days_left):
     if days_left < 0:
         return REMINDER_OVERDUE
     return None
-
-
-def _format_message(bucket, entries):
-    config = REMINDER_CONFIG[bucket]
-    lines = [config["intro"]]
-    shown = entries[:MAX_MESSAGE_LINES]
-    for item, due_date, days_left in shown:
-        copy = item.book_copy
-        title = (copy.book.title or "").strip()
-        if len(title) > MAX_TITLE_LENGTH:
-            title = f"{title[:MAX_TITLE_LENGTH - 3]}..."
-        line = f"- {title} ({copy.copy_code})"
-        line += f", jatuh tempo {due_date.strftime('%d %b %Y')}"
-        if bucket == REMINDER_OVERDUE:
-            line += f", terlambat {abs(days_left)} hari"
-        lines.append(line)
-    remaining = len(entries) - len(shown)
-    if remaining > 0:
-        lines.append(f"- dan {remaining} buku lainnya.")
-    lines.append("")
-    lines.append(config["footer"])
-    return "\n".join(lines)
 
 
 def _event_key(bucket, entries):
@@ -153,11 +118,16 @@ def enqueue_due_reminders(now=None):
     for reminder in reminders:
         bucket = reminder["bucket"]
         config = REMINDER_CONFIG[bucket]
+        telegram_message = format_reminder(
+            bucket,
+            reminder["loan"].user,
+            reminder["entries"],
+        )
         outbox = enqueue_telegram_notification(
             user=reminder["loan"].user,
             notification_type=config["notification_type"],
-            title=config["title"],
-            message=_format_message(bucket, reminder["entries"]),
+            title=telegram_message.title,
+            message=telegram_message.message,
             reference_type="loan",
             reference_id=reminder["loan"].pk,
             event_key=reminder["event_key"],

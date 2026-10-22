@@ -18,6 +18,11 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.catalog.models import Author, Book, Category, Ebook
+from apps.catalog.statistics import (
+    COPY_STATUS_LABELS,
+    COPY_STATUS_ORDER,
+    collection_statistics,
+)
 from apps.circulation.models import EbookLoan, Loan, LoanItem
 from apps.notifications.models import Notification
 
@@ -112,6 +117,11 @@ NO_DATA_FALLBACK = (
     "Maaf, informasi tersebut belum tersedia dalam sistem perpustakaan."
 )
 
+STATISTICS_ERROR_FALLBACK = (
+    "Maaf, statistik koleksi belum dapat diperiksa saat ini. "
+    "Silakan coba lagi atau buka menu Katalog."
+)
+
 SYSTEM_PROMPT = (
     "Anda AI Assistant Digital Library sekolah. Bila ditanya siapa Anda, "
     "perkenalkan diri sebagai AI Assistant Digital Library yang membantu "
@@ -160,7 +170,13 @@ SYSTEM_PROMPT = (
     "mengarang. Jangan pernah menampilkan atau menanyakan data milik "
     "pengguna lain; tolak permintaan data orang lain. Angka "
     "belum_bayar_total adalah denda otoritatif; proyeksi hanya perkiraan "
-    "yang wajib dilabeli sebagai perkiraan."
+    "yang wajib dilabeli sebagai perkiraan. "
+    "i) Konteks statistik adalah angka otoritatif dari database. Sebut angka "
+    "apa adanya; jangan menjumlahkan judul, eksemplar fisik, dan e-book "
+    "menjadi satu total koleksi. Jangan menyatakan e-book tidak tersedia "
+    "bila statistik menyebut e-book aktif. Bedakan 'terdaftar di katalog' "
+    "dari 'tersedia untuk dipinjam', dan jangan mengungkap identitas "
+    "peminjam."
 )
 
 
@@ -257,6 +273,224 @@ def _is_listing_intent(normalized):
     if any(re.search(p, normalized) for p in _LISTING_PATTERNS):
         return True
     return not _content_tokens(normalized)
+
+
+# --- Statistik koleksi: pertanyaan angka/status, bukan pencarian judul ---
+#
+# Hanya pertanyaan yang tidak menyebut judul/penulis/kategori spesifik
+# yang masuk jalur statistik. Semua angka diambil dari
+# ``apps.catalog.statistics.collection_statistics`` (sumber yang sama
+# dengan dashboard pustakawan), bukan dihitung ulang di sini.
+
+_STATISTICS_TOKENS = frozenset(
+    {
+        "berapa", "berapakah", "jumlah", "banyak", "total", "keseluruhan",
+        "eksemplar", "copy", "kopi", "stok", "fisik", "katalog",
+        "perpustakaan", "terdaftar", "aktif", "dipinjam", "pinjam",
+        "meminjam", "peminjaman", "pinjaman", "rusak", "hilang", "kondisi",
+        "status", "distribusi", "kategori", "memiliki", "mempunyai",
+        "menyediakan", "tersedia", "tidak", "belum", "karena", "pengguna",
+        "lain", "diakses", "mengakses", "tercatat", "saat", "sekarang",
+        "siapa", "darimana", "mana", "berdasarkan", "menurut", "tiap",
+        "kalau", "kalo", "jika", "sebenarnya", "statistik", "ringkasan",
+        "gambaran", "ikhtisar", "overview", "jenis", "tipe", "macam",
+        "bentuk",
+    }
+)
+
+_COLLECTION_TOPIC = re.compile(
+    r"\b(buku|e\s*book|ebook|koleksi|judul|eksemplar|copy|kopi|stok|"
+    r"katalog|fisik|pinjaman|peminjaman|dipinjam|rusak|hilang)\b"
+)
+
+_COUNT_HINT = re.compile(r"\b(berapa|berapakah|jumlah|banyak|total)\b")
+_LISTING_HINT = re.compile(
+    r"\b(apa saja|apa aja|daftar|list|sebutkan|tampilkan|tunjukkan|"
+    r"semua|seluruh)\b"
+)
+_STATUS_WORD_PATTERNS = (
+    ("TERSEDIA", re.compile(r"\b(tersedia|ketersediaan)\b")),
+    (
+        "DIPINJAM",
+        re.compile(r"\b(dipinjam|meminjam|sedang pinjam|pinjaman)\b"),
+    ),
+    ("RUSAK", re.compile(r"\brusak\b")),
+    ("HILANG", re.compile(r"\bhilang\b")),
+)
+
+
+def _statistics_tokens(normalized):
+    return [
+        token
+        for token in _content_tokens(normalized)
+        if token not in _STATISTICS_TOKENS
+    ]
+
+
+def _collection_targets(normalized):
+    """(buku_fisik, e_book) yang relevan dengan pertanyaan."""
+    compact = normalized.replace(" ", "")
+    mentions_ebook = "ebook" in compact
+    mentions_physical = bool(
+        re.search(r"\b(buku|fisik|judul)\b", normalized)
+    )
+    if not mentions_ebook and not mentions_physical:
+        return True, True
+    return mentions_physical, mentions_ebook
+
+
+def _mentioned_statuses(normalized):
+    return [
+        code
+        for code, pattern in _STATUS_WORD_PATTERNS
+        if pattern.search(normalized)
+    ]
+
+
+def match_statistics_intents(normalized):
+    """Daftar maksud statistik/koleksi yang relevan, urut prioritas.
+
+    Hanya pertanyaan yang tidak menyebut judul/penulis/kategori spesifik
+    yang masuk jalur ini; pertanyaan mekanisme ("cara pinjam") tetap di
+    panduan alur. Beberapa maksud dapat muncul bersamaan.
+    """
+    if _MECHANISM_PATTERN.search(normalized):
+        return []
+    if _statistics_tokens(normalized):
+        return []
+    statuses = _mentioned_statuses(normalized)
+    category = bool(re.search(r"\bkategori\b", normalized))
+    overview_word = re.search(
+        r"\b(statistik|ringkasan|gambaran|ikhtisar|overview)\b", normalized
+    )
+    if (
+        not _COLLECTION_TOPIC.search(normalized)
+        and not statuses
+        and not category
+        and not overview_word
+    ):
+        return []
+
+    count = bool(_COUNT_HINT.search(normalized))
+    listing = bool(_LISTING_HINT.search(normalized))
+    mentions_ebook = "ebook" in normalized.replace(" ", "")
+    mentions_physical = bool(
+        re.search(r"\b(buku|fisik|judul)\b", normalized)
+    )
+    asks_types = bool(
+        re.search(
+            r"\b(jenis|tipe|macam|bentuk)\b.{0,25}\b"
+            r"(koleksi|buku|e\s*book|katalog)\b|"
+            r"\bkoleksi\b.{0,20}\b(jenis|tipe|macam)\b",
+            normalized,
+        )
+    )
+    asks_category_counts = category and (
+        count
+        or re.search(r"\b(sebaran|distribusi|per|tiap|setiap)\b", normalized)
+    )
+    asks_overview = bool(overview_word) or (
+        bool(re.search(r"\b(seluruh|keseluruhan)\b", normalized))
+        and bool(re.search(r"\b(perpustakaan|koleksi)\b", normalized))
+        and count
+    )
+    asks_unavailable = bool(
+        re.search(
+            r"\b(tidak|belum|tanpa)\b.{0,40}\b(tersedia|eksemplar)\b|"
+            r"tidak\s+memiliki\s+eksemplar",
+            normalized,
+        )
+    )
+    asks_condition = bool(re.search(r"\b(rusak|hilang|kondisi)\b", normalized))
+    asks_borrowed_list = (
+        bool(re.search(r"\b(dipinjam|meminjam|pinjam)\b", normalized))
+        and listing
+        and not count
+        and not asks_condition
+    )
+    asks_total_copies = bool(
+        re.search(
+            r"\b(total|jumlah)\b.{0,20}\b(eksemplar|copy|kopi|stok)\b|"
+            r"\b(eksemplar|copy|kopi|stok)\b.{0,20}\b(total|jumlah)\b",
+            normalized,
+        )
+    )
+    asks_availability = bool(
+        re.search(
+            r"\b(tersedia|ketersediaan|menyediakan|bisa dipinjam|"
+            r"dapat dipinjam)\b",
+            normalized,
+        )
+    )
+
+    if re.search(r"\bsiapa\b", normalized) and (
+        statuses or re.search(r"\b(dipinjam|meminjam)\b", normalized)
+    ):
+        return ["borrower_identity"]
+
+    if category:
+        return [
+            "catalog_by_category" if asks_category_counts else "category_list"
+        ]
+    if asks_types:
+        intents = ["collection_types"]
+        if count:
+            intents.append("catalog_counts")
+        return intents
+    if asks_overview:
+        return ["library_overview"]
+
+    intents = []
+    if asks_unavailable:
+        intents.append("unavailable_titles")
+    if asks_condition:
+        intents.append(
+            "inventory_condition"
+            if listing and not count
+            else "inventory_by_status"
+        )
+    elif asks_borrowed_list:
+        intents.append("borrowed_titles")
+    elif asks_total_copies:
+        intents.append("inventory_total")
+        if statuses:
+            intents.append("inventory_by_status")
+    elif (
+        statuses
+        and not asks_unavailable
+        and (not asks_availability or count)
+    ):
+        intents.append("inventory_by_status")
+    elif re.search(r"\b(status|distribusi)\b", normalized):
+        intents.append("inventory_by_status")
+
+    if asks_availability and not intents:
+        intents.append("catalog_availability")
+    elif listing and not intents:
+        intents.append("catalog_titles")
+
+    has_entity_count = any(
+        intent
+        in {
+            "inventory_total",
+            "inventory_by_status",
+            "inventory_condition",
+            "borrowed_titles",
+            "borrower_identity",
+        }
+        for intent in intents
+    )
+    if count and not has_entity_count:
+        counts_copies = bool(
+            re.search(r"\b(eksemplar|copy|kopi|stok)\b", normalized)
+        )
+        if (mentions_physical or mentions_ebook) and not counts_copies:
+            intents.append("catalog_counts")
+        elif re.search(r"\b(pinjaman|peminjaman)\b", normalized):
+            intents.append("active_loans")
+    if not intents and _COLLECTION_TOPIC.search(normalized):
+        intents.append("catalog_titles")
+    return list(dict.fromkeys(intents))
 
 
 def _book_payload(book):
@@ -479,32 +713,44 @@ SYSTEM_FEATURES = (
 
 
 def _system_facts():
-    """Agregat aman untuk semua role: hanya hitungan, tanpa data per pengguna."""
+    """Agregat aman untuk semua role: hanya hitungan, tanpa data per pengguna.
+
+    Metrik koleksi ditambahkan oleh ``retrieve_context`` dari
+    ``collection_statistics`` agar dashboard dan AI memakai definisi sama.
+    """
     from django.contrib.auth import get_user_model
 
-    from apps.catalog.models import BookCopy
     from apps.materials.models import TeachingMaterial
 
     User = get_user_model()
     roles = Counter(
         User.objects.values_list("role", flat=True)
     )
-    copies = BookCopy.objects.all()
     return {
         "pengguna_total": User.objects.count(),
         "siswa": roles.get("SISWA", 0),
         "guru": roles.get("GURU", 0),
         "pustakawan": roles.get("PUSTAKAWAN", 0),
-        "judul_fisik": Book.objects.filter(is_active=True).count(),
-        "eksemplar": copies.count(),
-        "eksemplar_tersedia": copies.filter(status="TERSEDIA").count(),
-        "ebook": Ebook.objects.filter(is_active=True).count(),
         "bahan_ajar": TeachingMaterial.objects.filter(
             status="TERSEDIA"
         ).count(),
-        "pinjaman_aktif": Loan.objects.filter(status="ACTIVE").count(),
         "fitur": list(SYSTEM_FEATURES),
     }
+
+
+def _with_collection_facts(facts, statistics):
+    if not statistics:
+        return facts
+    facts.update(
+        {
+            "judul_fisik": statistics["titles_active"],
+            "eksemplar": statistics["copies_total"],
+            "eksemplar_tersedia": statistics["copies_available"],
+            "ebook": statistics["ebooks_active"],
+            "pinjaman_aktif": statistics["active_loans"],
+        }
+    )
+    return facts
 
 
 def _facts_answer(normalized, facts):
@@ -530,24 +776,8 @@ def _facts_answer(normalized, facts):
             f"({facts['siswa']} siswa, {facts['guru']} guru, "
             f"{facts['pustakawan']} pustakawan)."
         )
-    if re.search(r"\b(eksemplar|copy|stok)\b", normalized):
-        return (
-            f"Terdapat {facts['eksemplar']} eksemplar, "
-            f"{facts['eksemplar_tersedia']} di antaranya tersedia."
-        )
-    if re.search(r"\be\s*book\b", normalized):
-        return f"Jumlah e-book aktif: {facts['ebook']}."
     if re.search(r"\b(bahan ajar|materi)\b", normalized):
         return f"Jumlah bahan ajar terverifikasi: {facts['bahan_ajar']}."
-    if re.search(r"\b(pinjam|dipinjam|aktif)\b", normalized):
-        return (
-            f"Peminjaman fisik aktif saat ini: {facts['pinjaman_aktif']}."
-        )
-    if re.search(r"\b(buku|koleksi|judul)\b", normalized):
-        return (
-            f"Jumlah judul buku fisik aktif: {facts['judul_fisik']} "
-            f"dengan {facts['eksemplar_tersedia']} eksemplar tersedia."
-        )
     if re.search(r"\b(denda)\b", normalized):
         policy = _policy_context()
         if policy:
@@ -1446,10 +1676,35 @@ def retrieve_context(user, question, limit=8):
 
     limit = min(limit, settings.AI_MAX_CONTEXT_ITEMS)
     normalized = normalize(question)
-    books, ebooks, from_listing = _search_collections(question, limit)
+    statistics_intents = match_statistics_intents(normalized)
+    if statistics_intents:
+        # Statistik dijawab dari snapshot agregat; pencarian judul per kata
+        # kunci tidak diperlukan.
+        books, ebooks, from_listing = [], [], False
+    else:
+        books, ebooks, from_listing = _search_collections(question, limit)
     policy = _policy_context()
     guide = workflow_answer(normalized, policy)
+    if statistics_intents:
+        # Pertanyaan statistik/koleksi umum bukan pertanyaan prosedur, jadi
+        # panduan alur yang terlalu luas (mis. pola "status"/"dipinjam")
+        # tidak boleh mengambil alih.
+        guide = None
+    statistics = None
+    if statistics_intents or from_listing:
+        try:
+            statistics = collection_statistics(detail_limit=5)
+        except Exception:
+            logger.exception("AI statistics gagal dibangun")
     personal_intent = match_personal(normalized)
+    if (
+        statistics_intents
+        and personal_intent is not None
+        and not _SELF_WORDS.search(normalized)
+    ):
+        # "Berapa buku yang sedang dipinjam?" adalah statistik perpustakaan,
+        # bukan pinjaman pribadi; rujukan diri ("... saya") tetap personal.
+        personal_intent = None
     data_saya = None
     if personal_intent is not None:
         if _mentions_other_person(normalized):
@@ -1467,11 +1722,13 @@ def retrieve_context(user, question, limit=8):
         "ebook": ebooks,
         "peminjaman_saya": _my_loans_context(user),
         "kebijakan": policy,
-        "fakta_sistem": _system_facts(),
+        "fakta_sistem": _with_collection_facts(_system_facts(), statistics),
         "panduan_alur": guide,
         "is_listing": from_listing or not _content_tokens(question),
         "personal_intent": personal_intent,
         "data_saya": data_saya,
+        "statistics_intents": statistics_intents,
+        "statistik": statistics,
     }
 
 
@@ -1513,13 +1770,393 @@ def _listing_answer(books, ebooks):
     return "\n".join(lines)
 
 
+def _status_distribution_lines(stats):
+    lines = []
+    known = {code for code, _ in COPY_STATUS_ORDER}
+    for code, label in COPY_STATUS_ORDER:
+        lines.append(
+            f"- {label}: {stats['copy_status_counts'].get(code, 0)}"
+        )
+    for code, total in sorted(stats["copy_status_counts"].items()):
+        if code not in known:
+            lines.append(f"- {COPY_STATUS_LABELS.get(code, code)}: {total}")
+    return lines
+
+
+_TITLE_COUNT_LABELS = {
+    "tersedia": "tersedia",
+    "dipinjam": "sedang dipinjam",
+    "rusak": "rusak",
+    "hilang": "hilang",
+}
+
+
+def _book_title_lines(rows, limit=None, key="tersedia"):
+    lines = []
+    for row in rows[:limit] if limit else rows:
+        suffix = ""
+        if key and key in row:
+            suffix = (
+                f" — {row[key]} eksemplar {_TITLE_COUNT_LABELS.get(key, key)}"
+            )
+        if row.get("alasan"):
+            suffix = f" — {row['alasan']}"
+        lines.append(f"- {row['judul']} ({row['kategori']}){suffix}")
+    return lines
+
+
+def _inventory_total_answer(stats, normalized):
+    total = stats["copies_total"]
+    if not total:
+        return "Belum ada eksemplar buku fisik yang tercatat di inventaris."
+    return (
+        f"Perpustakaan memiliki total {total} eksemplar buku fisik. "
+        f"Rinciannya: {stats['copies_available']} tersedia, "
+        f"{stats['copies_borrowed']} dipinjam, "
+        f"{stats['copies_damaged']} rusak, {stats['copies_lost']} hilang."
+    )
+
+
+def _inventory_status_answer(stats, normalized):
+    total = stats["copies_total"]
+    statuses = _mentioned_statuses(normalized)
+    distribution = bool(
+        re.search(r"\b(status|distribusi)\b", normalized)
+    ) or len(statuses) > 1
+    if distribution:
+        lines = [f"Rincian status {total} eksemplar fisik:"]
+        lines += _status_distribution_lines(stats)
+        if stats["titles_without_available"]:
+            lines.append(
+                f"{stats['titles_without_available']} judul sedang tidak "
+                "memiliki eksemplar tersedia."
+            )
+        return "\n".join(lines)
+    code = statuses[0] if statuses else "TERSEDIA"
+    value = stats["copy_status_counts"].get(code, 0)
+    if code == "DIPINJAM":
+        return (
+            f"Saat ini {value} eksemplar sedang dipinjam "
+            f"({stats['active_loans']} transaksi peminjaman fisik aktif) "
+            f"dari total {total} eksemplar."
+        )
+    if code == "TERSEDIA":
+        return (
+            f"Saat ini {value} eksemplar tersedia untuk dipinjam "
+            f"dari total {total} eksemplar fisik."
+        )
+    label = COPY_STATUS_LABELS.get(code, code)
+    return (
+        f"Ada {value} eksemplar berstatus {label} "
+        f"dari total {total} eksemplar fisik."
+    )
+
+
+def _inventory_condition_answer(stats, normalized):
+    total = stats["copies_total"]
+    if not stats["copies_damaged"] and not stats["copies_lost"]:
+        return (
+            f"Tidak ada eksemplar berstatus RUSAK maupun HILANG dari "
+            f"{total} eksemplar fisik yang tercatat."
+        )
+    lines = [
+        f"Kondisi inventaris fisik: {stats['copies_damaged']} eksemplar "
+        f"RUSAK dan {stats['copies_lost']} eksemplar HILANG dari "
+        f"{total} eksemplar."
+    ]
+    if stats["damaged_titles"]:
+        lines.append("Judul dengan eksemplar rusak:")
+        lines += _book_title_lines(stats["damaged_titles"], 5, key="rusak")
+    if stats["lost_titles"]:
+        lines.append("Judul dengan eksemplar hilang:")
+        lines += _book_title_lines(stats["lost_titles"], 5, key="hilang")
+    return "\n".join(lines)
+
+
+def _unavailable_titles_answer(stats, normalized):
+    if not stats["titles_without_available"]:
+        return (
+            f"Semua {stats['titles_active']} judul buku fisik aktif "
+            "memiliki minimal satu eksemplar tersedia."
+        )
+    lines = [
+        f"{stats['titles_without_available']} dari "
+        f"{stats['titles_active']} judul buku fisik aktif tidak memiliki "
+        "eksemplar TERSEDIA saat ini (sebagian):"
+    ]
+    lines += _book_title_lines(stats["unavailable_titles"], 5, key=None)
+    lines.append(
+        "Alasan di atas berasal dari status eksemplar fisik; e-book tidak "
+        "dihitung sebagai eksemplar."
+    )
+    return "\n".join(lines)
+
+
+def _borrowed_titles_answer(stats, normalized):
+    if not stats["copies_borrowed"]:
+        return (
+            "Tidak ada eksemplar yang sedang dipinjam saat ini "
+            f"({stats['active_loans']} transaksi peminjaman aktif)."
+        )
+    lines = [
+        f"Saat ini {stats['copies_borrowed']} eksemplar dari "
+        f"{stats['titles_borrowed']} judul sedang dipinjam "
+        f"({stats['active_loans']} transaksi peminjaman fisik aktif).",
+        "Judul yang sedang dipinjam (sebagian):",
+    ]
+    lines += _book_title_lines(stats["borrowed_titles"], 5, key="dipinjam")
+    if stats["overdue_items"]:
+        lines.append(
+            f"{stats['overdue_items']} eksemplar sudah melewati jatuh tempo."
+        )
+    lines.append("Identitas peminjam tidak ditampilkan oleh asisten.")
+    return "\n".join(lines)
+
+
+def _borrower_identity_answer(stats, normalized):
+    if not stats["copies_borrowed"]:
+        return (
+            "Tidak ada eksemplar yang sedang dipinjam saat ini. Identitas "
+            "peminjam juga tidak ditampilkan oleh asisten."
+        )
+    return (
+        "Saya tidak menampilkan identitas peminjam. Saat ini "
+        f"{stats['copies_borrowed']} eksemplar dari "
+        f"{stats['titles_borrowed']} judul sedang dipinjam "
+        f"({stats['active_loans']} transaksi peminjaman fisik aktif)."
+    )
+
+
+def _active_loans_answer(stats, normalized):
+    return (
+        f"Saat ini ada {stats['active_loans']} transaksi peminjaman fisik "
+        "aktif."
+    )
+
+
+def _catalog_availability_answer(stats, normalized):
+    physical, ebook = _collection_targets(normalized)
+    sections = []
+    if physical:
+        if not stats["copies_available"]:
+            sections.append(
+                "Saat ini tidak ada eksemplar buku fisik yang tersedia untuk "
+                "dipinjam."
+            )
+        else:
+            total_titles = stats["titles_with_available"]
+            lines = [f"Buku fisik yang tersedia ({total_titles} judul):"]
+            lines += _book_title_lines(
+                stats["available_titles"], LISTING_DISPLAY_MAX
+            )
+            if total_titles > len(stats["available_titles"]):
+                lines.append(
+                    f"Menampilkan {len(stats['available_titles'])} judul "
+                    "pertama; daftar lengkap ada di menu Katalog."
+                )
+            sections.append("\n".join(lines))
+    if ebook:
+        active = stats["ebooks_active"]
+        if not active:
+            sections.append("Katalog belum memiliki e-book aktif.")
+        elif "ebook" in normalized.replace(" ", "") and not physical:
+            lines = [f"Katalog memiliki {active} e-book aktif:"]
+            lines += [
+                f"- {row['judul']} ({row['kategori']}) [e-book]"
+                for row in stats["ebook_titles"][:LISTING_DISPLAY_MAX]
+            ]
+            if active > len(stats["ebook_titles"]):
+                lines.append(
+                    f"Menampilkan {len(stats['ebook_titles'])} e-book pertama; "
+                    "daftar lengkap ada di menu Katalog."
+                )
+            sections.append("\n".join(lines))
+        else:
+            lines = [f"E-book aktif ({active} judul):"]
+            lines += [
+                f"- {row['judul']} ({row['kategori']}) [e-book]"
+                for row in stats["ebook_titles"][:LISTING_DISPLAY_MAX]
+            ]
+            sections.append("\n".join(lines))
+    return "\n\n".join(sections)
+
+
+def _catalog_titles_answer(stats, normalized):
+    physical, ebook = _collection_targets(normalized)
+    sections = []
+    if physical:
+        if not stats["all_titles"]:
+            sections.append("Belum ada judul buku fisik aktif di katalog.")
+        else:
+            lines = [
+                f"Judul buku fisik aktif ({stats['titles_active']} judul):"
+            ]
+            lines += _book_title_lines(
+                stats["all_titles"], LISTING_DISPLAY_MAX
+            )
+            if stats["titles_active"] > len(stats["all_titles"]):
+                lines.append(
+                    f"Menampilkan {len(stats['all_titles'])} judul pertama; "
+                    "daftar lengkap ada di menu Katalog."
+                )
+            sections.append("\n".join(lines))
+    if ebook:
+        active = stats["ebooks_active"]
+        if not active:
+            sections.append("Katalog belum memiliki e-book aktif.")
+        else:
+            lines = [f"E-book aktif ({active} judul):"]
+            lines += [
+                f"- {row['judul']} ({row['kategori']}) [e-book]"
+                for row in stats["ebook_titles"][:LISTING_DISPLAY_MAX]
+            ]
+            sections.append("\n".join(lines))
+    return "\n\n".join(sections)
+
+
+def _collection_types_answer(stats, normalized):
+    lines = [
+        "Perpustakaan memiliki dua jenis koleksi:",
+        "- Buku fisik: dipinjam lewat Keranjang dan diambil dengan QR Pickup.",
+        "- E-book: diajukan di katalog lalu dibaca di menu E-Book Saya.",
+    ]
+    if _COUNT_HINT.search(normalized):
+        lines.append(
+            f"Saat ini ada {stats['titles_active']} judul buku fisik aktif "
+            f"dan {stats['ebooks_active']} e-book aktif."
+        )
+    return "\n".join(lines)
+
+
+def _category_list_answer(stats, normalized):
+    rows = stats["category_breakdown"]
+    if not rows:
+        return "Belum ada kategori dengan judul aktif di katalog saat ini."
+    lines = [f"Kategori dengan judul aktif ({len(rows)}):"]
+    lines += [f"- {row['kategori']}" for row in rows[:15]]
+    if len(rows) > 15:
+        lines.append("Sebagian kategori lain tidak ditampilkan.")
+    return "\n".join(lines)
+
+
+def _catalog_by_category_answer(stats, normalized):
+    rows = stats["category_breakdown"]
+    if not rows:
+        return "Belum ada kategori dengan judul aktif di katalog saat ini."
+    physical, ebook = _collection_targets(normalized)
+    if not physical and not ebook:
+        physical = ebook = True
+    lines = ["Jumlah judul aktif per kategori:"]
+    for row in rows[:10]:
+        parts = []
+        if physical:
+            parts.append(f"{row['buku']} judul buku fisik")
+        if ebook:
+            parts.append(f"{row['ebook']} e-book")
+        lines.append(f"- {row['kategori']}: " + ", ".join(parts))
+    if len(rows) > 10:
+        lines.append("Sebagian kategori lain tidak ditampilkan.")
+    lines.append(
+        "Angka ini menghitung judul, bukan jumlah eksemplar fisik."
+    )
+    return "\n".join(lines)
+
+
+def _catalog_counts_answer(stats, normalized):
+    physical, ebook = _collection_targets(normalized)
+    parts = []
+    if physical:
+        registered = (
+            f" dari {stats['titles_total']} judul terdaftar"
+            if stats["titles_total"] != stats["titles_active"]
+            else ""
+        )
+        parts.append(
+            f"Ada {stats['titles_active']} judul buku fisik aktif"
+            f"{registered}."
+        )
+    if ebook:
+        parts.append(
+            f"Katalog memiliki {stats['ebooks_active']} e-book aktif "
+            f"dari {stats['ebooks_total']} e-book terdaftar."
+        )
+    text = " ".join(parts)
+    if physical and not ebook:
+        text += (
+            f" Angka ini menghitung judul, bukan eksemplar; total eksemplar "
+            f"fisik ada {stats['copies_total']}."
+        )
+    elif physical and ebook:
+        text += (
+            " Judul buku fisik, e-book, dan eksemplar adalah metrik berbeda "
+            "dan tidak dijumlahkan menjadi satu total."
+        )
+    return text
+
+
+def _library_overview_answer(stats, normalized):
+    lines = [
+        "Ringkasan perpustakaan:",
+        f"- Judul buku fisik aktif: {stats['titles_active']} "
+        f"(dari {stats['titles_total']} terdaftar), "
+        f"{stats['titles_with_available']} memiliki eksemplar tersedia.",
+        f"- E-book aktif: {stats['ebooks_active']} "
+        f"(dari {stats['ebooks_total']} terdaftar).",
+        f"- Eksemplar fisik (seluruh inventaris): {stats['copies_total']} "
+        f"(tersedia {stats['copies_available']}, "
+        f"dipinjam {stats['copies_borrowed']}, "
+        f"rusak {stats['copies_damaged']}, "
+        f"hilang {stats['copies_lost']}).",
+        f"- Kategori: {stats['categories_total']}.",
+        f"- Peminjaman fisik aktif: {stats['active_loans']} transaksi.",
+        "Catatan: judul, eksemplar fisik, dan e-book adalah metrik berbeda "
+        "sehingga tidak dijumlahkan menjadi satu total koleksi.",
+    ]
+    return "\n".join(lines)
+
+
+_STATISTICS_RENDERERS = {
+    "library_overview": _library_overview_answer,
+    "collection_types": _collection_types_answer,
+    "category_list": _category_list_answer,
+    "catalog_by_category": _catalog_by_category_answer,
+    "inventory_total": _inventory_total_answer,
+    "inventory_by_status": _inventory_status_answer,
+    "inventory_condition": _inventory_condition_answer,
+    "borrowed_titles": _borrowed_titles_answer,
+    "borrower_identity": _borrower_identity_answer,
+    "active_loans": _active_loans_answer,
+    "unavailable_titles": _unavailable_titles_answer,
+    "catalog_availability": _catalog_availability_answer,
+    "catalog_titles": _catalog_titles_answer,
+    "catalog_counts": _catalog_counts_answer,
+}
+
+
+def _statistics_answer(intents, stats, normalized):
+    """Jawaban deterministik per maksud, tanpa ringkasan yang tidak diminta."""
+    sections = []
+    for intent in intents:
+        renderer = _STATISTICS_RENDERERS.get(intent)
+        if renderer is None:
+            continue
+        section = renderer(stats, normalized)
+        if section:
+            sections.append(section)
+    if not sections:
+        return STATISTICS_ERROR_FALLBACK
+    return "\n\n".join(sections)
+
+
 def build_local_answer(question, context):
     """Jawaban deterministik dari retrieval tanpa provider."""
     normalized = normalize(question)
     policy = context.get("kebijakan", {})
-    guide = context.get("panduan_alur") or workflow_answer(
-        normalized, policy
-    )
+    if "panduan_alur" in context:
+        # None berarti retrieval sengaja menonaktifkan panduan (statistik).
+        guide = context["panduan_alur"]
+    else:
+        guide = workflow_answer(normalized, policy)
     books = context.get("koleksi_fisik", [])
     ebooks = context.get("ebook", [])
     personal = context.get("data_saya")
@@ -1551,13 +2188,34 @@ def build_local_answer(question, context):
     if personal is not None and intent is not None:
         # Pertanyaan data milik sendiri: jawab dari query baru milik user.
         return render_personal_answer(intent, personal)
+    statistics_intents = context.get("statistics_intents")
+    if statistics_intents:
+        statistics = context.get("statistik")
+        if not statistics:
+            return STATISTICS_ERROR_FALLBACK
+        return _statistics_answer(
+            statistics_intents, statistics, normalized
+        )
     facts = context.get("fakta_sistem") or {}
     if facts:
         factual = _facts_answer(normalized, facts)
         if factual is not None:
             return factual
     if context.get("is_listing", _is_listing_intent(normalized)):
-        return _listing_answer(books, ebooks)
+        answer = _listing_answer(books, ebooks)
+        statistics = context.get("statistik")
+        if (
+            statistics
+            and not ebooks
+            and statistics["ebooks_active"]
+            and answer != NO_DATA_FALLBACK
+        ):
+            answer += (
+                f"\nSelain itu katalog memiliki "
+                f"{statistics['ebooks_active']} e-book aktif (bukan eksemplar "
+                "fisik)."
+            )
+        return answer
     if not books and not ebooks:
         return NO_DATA_FALLBACK
     lines = ["Berdasarkan katalog perpustakaan:"]
@@ -1605,6 +2263,14 @@ def ask(user, question):
             "provider_used": False,
         }
     context = retrieve_context(user, text)
+    if context.get("statistics_intents"):
+        # Statistik dijawab deterministik dari database: provider tidak boleh
+        # mengarang/menjumlahkan ulang angka koleksi.
+        return {
+            "answer": build_local_answer(text, context),
+            "source": "local",
+            "provider_used": False,
+        }
     provider = get_provider()
     if provider is None:
         return {

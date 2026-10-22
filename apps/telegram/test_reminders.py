@@ -23,8 +23,14 @@ class RecordingClient:
         self.errors = list(errors or [])
         self.sent = []
 
-    def send_message(self, chat_id, text):
-        self.sent.append({"chat_id": chat_id, "text": text})
+    def send_message(self, chat_id, text, *, parse_mode=None):
+        self.sent.append(
+            {
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": parse_mode,
+            }
+        )
         if self.errors:
             error = self.errors.pop(0)
             if error is not None:
@@ -131,7 +137,10 @@ class TelegramReminderTests(TestCase):
         self.assertEqual(stats["reminders"], 1)
         self.assertEqual(stats["books"], 1)
         self.assertEqual(outbox.notification_type, "LOAN_DUE_SOON")
-        self.assertEqual(outbox.title, "Pengingat jatuh tempo H-3")
+        self.assertEqual(
+            outbox.title,
+            "⏰ <b>SMARTLIB · Jatuh tempo H-3</b>",
+        )
         self.assertTrue(outbox.event_key.startswith("due_3:"))
         self.assertIn("3 hari", outbox.message)
 
@@ -141,7 +150,10 @@ class TelegramReminderTests(TestCase):
         enqueue_due_reminders(now=self.now)
 
         outbox = TelegramOutbox.objects.get()
-        self.assertEqual(outbox.title, "Pengingat jatuh tempo H-1")
+        self.assertEqual(
+            outbox.title,
+            "⏰ <b>SMARTLIB · Jatuh tempo besok</b>",
+        )
         self.assertTrue(outbox.event_key.startswith("due_1:"))
         self.assertIn("besok", outbox.message)
 
@@ -152,7 +164,10 @@ class TelegramReminderTests(TestCase):
 
         outbox = TelegramOutbox.objects.get()
         self.assertEqual(outbox.notification_type, "LOAN_OVERDUE")
-        self.assertEqual(outbox.title, "Peminjaman terlambat")
+        self.assertEqual(
+            outbox.title,
+            "⏰ <b>SMARTLIB · Peminjaman terlambat</b>",
+        )
         self.assertTrue(outbox.event_key.startswith("overdue:"))
         self.assertIn("terlambat 2 hari", outbox.message)
 
@@ -212,7 +227,8 @@ class TelegramReminderTests(TestCase):
         text = client.sent[0]["text"]
         self.assertIn("Pengingat A", text)
         self.assertIn("Pengingat B", text)
-        self.assertEqual(text.count("- Pengingat"), 2)
+        self.assertEqual(text.count("• <b>Pengingat"), 2)
+        self.assertEqual(client.sent[0]["parse_mode"], "HTML")
 
     def test_command_berulang_tidak_mengirim_ulang(self):
         self._make_loan(days=3)
@@ -271,7 +287,7 @@ class TelegramReminderTests(TestCase):
         outbox = TelegramOutbox.objects.get()
         self.assertEqual(stats["reminders"], 1)
         self.assertTrue(outbox.event_key.startswith("due_3:"))
-        self.assertIn("24 Oct 2026", outbox.message)
+        self.assertIn("24 Oktober 2026", outbox.message)
 
     def test_pengiriman_ulang_setelah_gangguan_sementara(self):
         self._make_loan(days=3)

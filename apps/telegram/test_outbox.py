@@ -42,8 +42,14 @@ class RecordingClient:
         self.message_id = message_id
         self.sent = []
 
-    def send_message(self, chat_id, text):
-        self.sent.append({"chat_id": chat_id, "text": text})
+    def send_message(self, chat_id, text, *, parse_mode=None):
+        self.sent.append(
+            {
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": parse_mode,
+            }
+        )
         if self.errors:
             error = self.errors.pop(0)
             if error is not None:
@@ -206,10 +212,31 @@ class TelegramOutboxTests(TestCase):
         self.assertEqual(len(client.sent), 1)
         self.assertEqual(client.sent[0]["chat_id"], self.account.chat_id)
         self.assertIn("Pengajuan disetujui", client.sent[0]["text"])
+        self.assertEqual(client.sent[0]["parse_mode"], "HTML")
 
         replay = process_due(client=client)
         self.assertEqual(replay["claimed"], 0)
         self.assertEqual(len(client.sent), 1)
+
+    def test_outbox_lama_tetap_dikirim_sebagai_teks_biasa(self):
+        TelegramOutbox.objects.create(
+            user=self.siswa,
+            notification_type="LOAN_APPROVED",
+            title="Judul lama",
+            message="Pesan lama",
+            event_key="legacy",
+            dedup_key="legacy-outbox-key",
+            next_attempt_at=timezone.now(),
+        )
+        client = RecordingClient()
+
+        stats = process_due(client=client)
+
+        self.assertEqual(stats["sent"], 1)
+        self.assertEqual(len(client.sent), 1)
+        self.assertIsNone(client.sent[0]["parse_mode"])
+        self.assertIn("Judul lama", client.sent[0]["text"])
+        self.assertIn("Pesan lama", client.sent[0]["text"])
 
     def test_gagal_permanen_tidak_mengulang_dan_transaksi_tetap_utuh(self):
         loan = self._approved_loan()
@@ -344,7 +371,7 @@ class TelegramOutboxTests(TestCase):
         returned = TelegramOutbox.objects.get(
             notification_type="LOAN_RETURNED"
         )
-        self.assertIn("denda", returned.message)
+        self.assertIn("denda", returned.message.casefold())
         self.assertEqual(returned.reference_type, "loan_item")
 
     def test_ebook_disetujui_membuat_outbox(self):

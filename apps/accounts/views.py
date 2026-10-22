@@ -7,7 +7,7 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
+from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -309,14 +309,18 @@ def _librarian_dashboard_stats():
 
     Definisi mengikuti tabel yang sudah ada: judul buku = baris Book,
     eksemplar = baris BookCopy per status, e-book = baris Ebook,
-    peminjaman aktif = Loan berstatus ACTIVE. Tren memakai tanggal
-    pengajuan (Loan.requested_at) dan pengembalian (LoanItem.returned_at)
-    agar konsisten dengan Laporan Peminjaman/Pengembalian.
+    peminjaman aktif = Loan berstatus ACTIVE. Metrik koleksi diambil dari
+    ``apps.catalog.statistics`` agar AI Assistant memakai angka yang sama.
+    Tren memakai tanggal pengajuan (Loan.requested_at) dan pengembalian
+    (LoanItem.returned_at) agar konsisten dengan Laporan
+    Peminjaman/Pengembalian.
     """
-    from apps.catalog.availability import STATUS_TERSEDIA
-    from apps.catalog.models import Book, BookCopy, Ebook
+    from apps.catalog.statistics import (
+        COPY_STATUS_ORDER,
+        collection_statistics,
+    )
     from apps.circulation.models import EbookLoan, Loan, LoanItem
-    from apps.circulation.services import EBOOK_APPROVED, LOAN_ACTIVE
+    from apps.circulation.services import EBOOK_APPROVED
 
     now = timezone.now()
     stats = {
@@ -334,29 +338,23 @@ def _librarian_dashboard_stats():
         "trend_return_total": 0,
     }
 
-    stats["total_books"] = Book.objects.count()
-    stats["total_ebooks"] = Ebook.objects.count()
-    stats["active_loans"] = Loan.objects.filter(status=LOAN_ACTIVE).count()
+    collection = collection_statistics(detail_limit=1)
+    stats["total_books"] = collection["titles_total"]
+    stats["total_ebooks"] = collection["ebooks_total"]
+    stats["active_loans"] = collection["active_loans"]
     stats["active_ebooks"] = EbookLoan.objects.filter(
         status=EBOOK_APPROVED,
         started_at__lte=now,
         expires_at__gt=now,
     ).count()
 
-    copy_rows = list(
-        BookCopy.objects.values("status").annotate(total=Count("pk"))
-    )
-    copy_counts = {row["status"]: row["total"] for row in copy_rows}
-    total_copies = sum(copy_counts.values())
+    copy_counts = collection["copy_status_counts"]
+    total_copies = collection["copies_total"]
     stats["total_copies"] = total_copies
-    stats["copies_available"] = copy_counts.get(STATUS_TERSEDIA, 0)
+    stats["copies_available"] = collection["copies_available"]
     stats["copy_status_total"] = total_copies
-    for code, label, tone in (
-        (STATUS_TERSEDIA, "Tersedia", "emerald"),
-        ("DIPINJAM", "Dipinjam", "blue"),
-        ("RUSAK", "Rusak", "amber"),
-        ("HILANG", "Hilang", "rose"),
-    ):
+    tones = ("emerald", "blue", "amber", "rose")
+    for (code, label), tone in zip(COPY_STATUS_ORDER, tones):
         value = copy_counts.get(code, 0)
         pct = round(value * 100 / total_copies) if total_copies else 0
         if value and not pct:

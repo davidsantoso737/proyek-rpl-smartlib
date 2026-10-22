@@ -8,6 +8,7 @@ from django.core.management.base import CommandError
 from django.test import SimpleTestCase, override_settings
 
 from apps.telegram.services import (
+    PARSE_MODE_HTML,
     BotInfo,
     SentMessage,
     TelegramAPIError,
@@ -196,7 +197,36 @@ class TelegramClientTests(SimpleTestCase):
         self.assertEqual(payload["chat_id"], 12345)
         self.assertEqual(payload["text"], "Halo SmartLib")
         self.assertTrue(payload["disable_web_page_preview"])
+        self.assertNotIn("parse_mode", payload)
         self.assertNotIn(TEST_TOKEN, request.data.decode("utf-8"))
+
+    def test_kirim_pesan_html(self):
+        opener = Mock(
+            return_value=FakeResponse(
+                {
+                    "ok": True,
+                    "result": {
+                        "message_id": 43,
+                        "chat": {"id": 12345},
+                        "date": 1710000000,
+                    },
+                }
+            )
+        )
+        TelegramClient(TEST_TOKEN, opener=opener).send_message(
+            12345,
+            "<b>Halo</b>",
+            parse_mode=PARSE_MODE_HTML,
+        )
+        request = opener.call_args.args[0]
+        payload = json.loads(request.data.decode("utf-8"))
+        self.assertEqual(payload["parse_mode"], "HTML")
+        self.assertEqual(payload["text"], "<b>Halo</b>")
+
+    def test_parse_mode_tidak_didukung(self):
+        client = TelegramClient(TEST_TOKEN, opener=Mock())
+        with self.assertRaises(TelegramValidationError):
+            client.send_message(12345, "Halo", parse_mode="MarkdownV2")
 
     def test_chat_id_dan_pesan_tidak_valid(self):
         client = TelegramClient(TEST_TOKEN, opener=Mock())

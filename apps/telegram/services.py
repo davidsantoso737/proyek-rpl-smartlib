@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_API_BASE_URL = "https://api.telegram.org"
 MAX_MESSAGE_LENGTH = 4096
+PARSE_MODE_HTML = "HTML"
 
 
 class TelegramError(Exception):
@@ -349,6 +350,7 @@ class TelegramClient:
         text: str,
         *,
         disable_web_page_preview: bool = True,
+        parse_mode: str | None = None,
     ) -> SentMessage:
         if (
             not isinstance(chat_id, int)
@@ -367,14 +369,18 @@ class TelegramClient:
             raise TelegramValidationError(
                 f"Pesan Telegram maksimal {MAX_MESSAGE_LENGTH} karakter."
             )
-        result = self._request(
-            "sendMessage",
-            {
-                "chat_id": chat_id,
-                "text": message,
-                "disable_web_page_preview": bool(disable_web_page_preview),
-            },
-        )
+        payload = {
+            "chat_id": chat_id,
+            "text": message,
+            "disable_web_page_preview": bool(disable_web_page_preview),
+        }
+        if parse_mode is not None:
+            if parse_mode != PARSE_MODE_HTML:
+                raise TelegramValidationError(
+                    "parse_mode Telegram hanya mendukung HTML."
+                )
+            payload["parse_mode"] = parse_mode
+        result = self._request("sendMessage", payload)
         if not isinstance(result, dict):
             raise TelegramResponseError("Respons sendMessage tidak valid.")
         try:

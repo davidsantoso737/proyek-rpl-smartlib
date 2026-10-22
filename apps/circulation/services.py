@@ -22,6 +22,7 @@ from django.utils import timezone
 from apps.catalog.availability import STATUS_TERSEDIA
 from apps.catalog.models import BookCopy, Ebook
 from apps.notifications.models import Notification
+from apps.telegram import formatting
 from apps.telegram.dispatch import enqueue_telegram_notification
 
 from .models import EbookLoan, Loan, LoanItem
@@ -325,11 +326,12 @@ def approve_loan(loan_id, approver, substitutions=None):
             "saat mengambil buku di perpustakaan."
         )
         _notify(loan.user, "LOAN_APPROVED", title, message, loan)
+        telegram_message = formatting.format_loan_approved(loan, items)
         enqueue_telegram_notification(
             user=loan.user,
             notification_type="LOAN_APPROVED",
-            title=title,
-            message=message,
+            title=telegram_message.title,
+            message=telegram_message.message,
             reference_type="loan",
             reference_id=loan.pk,
             event_key="approved",
@@ -365,11 +367,12 @@ def reject_loan(loan_id, approver, reason):
         title = "Pengajuan ditolak"
         message = f"Pengajuan #{loan.pk} ditolak: {reason}"
         _notify(loan.user, "LOAN_REJECTED", title, message, loan)
+        telegram_message = formatting.format_loan_rejected(loan, reason)
         enqueue_telegram_notification(
             user=loan.user,
             notification_type="LOAN_REJECTED",
-            title=title,
-            message=message,
+            title=telegram_message.title,
+            message=telegram_message.message,
             reference_type="loan",
             reference_id=loan.pk,
             event_key="rejected",
@@ -479,11 +482,12 @@ def activate_handover(token, librarian):
             f"{local_due_at.strftime('%d %b %Y %H:%M')}."
         )
         _notify(loan.user, "LOAN_ACTIVE", title, message, loan)
+        telegram_message = formatting.format_loan_active(loan, items)
         enqueue_telegram_notification(
             user=loan.user,
             notification_type="LOAN_ACTIVE",
-            title=title,
-            message=message,
+            title=telegram_message.title,
+            message=telegram_message.message,
             reference_type="loan",
             reference_id=loan.pk,
             event_key="active",
@@ -674,11 +678,14 @@ def process_return(code, librarian, condition="BAIK", lost=False):
                     f"({FINE_UNPAID})."
                 )
         _notify(loan.user, "LOAN_RETURNED", title, message, loan)
+        telegram_message = formatting.format_loan_returned(
+            loan, item, lost=lost
+        )
         enqueue_telegram_notification(
             user=loan.user,
             notification_type="LOAN_RETURNED",
-            title=title,
-            message=message,
+            title=telegram_message.title,
+            message=telegram_message.message,
             reference_type="loan_item",
             reference_id=item.pk,
             event_key="returned",
@@ -824,11 +831,12 @@ def approve_ebook_loan(loan_id, approver):
             loan,
             reference_type="ebook_loan",
         )
+        telegram_message = formatting.format_ebook_approved(loan)
         enqueue_telegram_notification(
             user=loan.user,
             notification_type="EBOOK_APPROVED",
-            title=title,
-            message=message,
+            title=telegram_message.title,
+            message=telegram_message.message,
             reference_type="ebook_loan",
             reference_id=loan.pk,
             event_key="approved",
@@ -862,11 +870,12 @@ def reject_ebook_loan(loan_id, approver, reason):
             loan,
             reference_type="ebook_loan",
         )
+        telegram_message = formatting.format_ebook_rejected(loan, reason)
         enqueue_telegram_notification(
             user=loan.user,
             notification_type="EBOOK_REJECTED",
-            title=title,
-            message=message,
+            title=telegram_message.title,
+            message=telegram_message.message,
             reference_type="ebook_loan",
             reference_id=loan.pk,
             event_key="rejected",

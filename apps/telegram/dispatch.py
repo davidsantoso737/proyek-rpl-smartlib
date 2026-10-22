@@ -13,9 +13,11 @@ from django.db import DatabaseError, transaction
 from django.db.models import Count
 from django.utils import timezone
 
+from .formatting import is_formatted_title
 from .models import TelegramAccount, TelegramOutbox
 from .preferences import should_send_telegram
 from .services import (
+    PARSE_MODE_HTML,
     TelegramAPIError,
     TelegramConfigError,
     TelegramNetworkError,
@@ -192,8 +194,13 @@ def _deliver(outbox, client):
         return TelegramOutbox.Status.SKIPPED
 
     text = f"{outbox.title}\n\n{outbox.message}".strip()
+    parse_mode = PARSE_MODE_HTML if is_formatted_title(outbox.title) else None
     try:
-        sent = client.send_message(account.chat_id, text)
+        sent = client.send_message(
+            account.chat_id,
+            text,
+            parse_mode=parse_mode,
+        )
     except TelegramTimeoutError:
         _finish(
             outbox,
