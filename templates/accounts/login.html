@@ -4,34 +4,34 @@
 
 {% block content %}
 
-<div class="flex items-center justify-center py-10">
-    <div class="w-full max-w-md">
-        <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <div class="bg-blue-600 px-8 py-6">
-                <h1 class="text-2xl font-bold text-white">
-                    Selamat datang
+<div class="flex min-h-[calc(100dvh-10.125rem)] items-center justify-center py-8 sm:py-10">
+    <div class="w-full max-w-[27rem]">
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="bg-blue-600 px-6 py-6 sm:px-8 sm:py-7">
+                <h1 id="login-heading" class="text-xl font-bold tracking-tight text-white sm:text-2xl">
+                    Selamat datang di SmartLib
                 </h1>
-                <p class="text-blue-100 text-sm mt-1">
-                    Masuk menggunakan akun perpustakaan Anda.
+                <p class="mt-2 text-sm leading-6 text-blue-50">
+                    Masuk menggunakan akun perpustakaan Anda untuk melanjutkan.
                 </p>
             </div>
 
-            <div class="p-8">
+            <div class="p-6 sm:p-8">
                 {% if request.GET.logged_out %}
-                    <p class="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-2.5 rounded-xl text-sm mb-4">
+                    <p role="status" class="bg-emerald-50 border border-emerald-200 text-emerald-900 px-4 py-2.5 rounded-xl text-sm mb-5">
                         Anda telah berhasil keluar.
                     </p>
                 {% endif %}
 
                 {% if form.non_field_errors %}
-                    <div role="alert" class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm mb-4">
+                    <div role="alert" class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm mb-5">
                         {% for error in form.non_field_errors %}
                             <p>{{ error }}</p>
                         {% endfor %}
                     </div>
                 {% endif %}
 
-                <form method="post" action="{% url 'accounts:login' %}" class="space-y-4">
+                <form method="post" action="{% url 'accounts:login' %}" class="space-y-5 [&_input]:min-h-11" aria-labelledby="login-heading">
                     {% csrf_token %}
                     {% if next %}
                         <input type="hidden" name="next" value="{{ next }}">
@@ -43,7 +43,7 @@
                         </label>
                         {{ form.username }}
                         {% for error in form.username.errors %}
-                            <p class="text-red-700 text-sm mt-1">{{ error }}</p>
+                            <p class="text-red-700 text-sm mt-1.5">{{ error }}</p>
                         {% endfor %}
                     </div>
 
@@ -53,19 +53,19 @@
                         </label>
                         {{ form.password }}
                         {% for error in form.password.errors %}
-                            <p class="text-red-700 text-sm mt-1">{{ error }}</p>
+                            <p class="text-red-700 text-sm mt-1.5">{{ error }}</p>
                         {% endfor %}
                     </div>
 
                     <button type="submit"
-                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm">
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-3 rounded-xl transition-colors">
                         Masuk
                     </button>
                 </form>
             </div>
         </div>
 
-        <p class="text-center text-xs text-slate-500 mt-4">
+        <p class="text-center text-xs text-slate-600 mt-5">
             Lupa password atau akun nonaktif? Hubungi pustakawan.
         </p>
     </div>

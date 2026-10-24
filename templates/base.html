@@ -64,13 +64,11 @@
             </nav>
         </div>
         {% else %}
-        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-2 flex items-center justify-between gap-3">
-            {% url 'accounts:login' as brand_href %}
-            {% include "partials/_brand.html" with href=brand_href %}
-            <a href="{% url 'accounts:login' %}"
-               class="inline-flex items-center min-h-[44px] px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition">
-                Masuk
-            </a>
+        <div class="px-4 sm:px-6 lg:px-8">
+            <div class="mx-auto flex min-h-16 w-full max-w-[27rem] items-center py-2">
+                {% url 'accounts:login' as brand_href %}
+                {% include "partials/_brand.html" with href=brand_href %}
+            </div>
         </div>
         {% endif %}
     </header>
@@ -79,7 +77,7 @@
         {% if messages %}
             <div class="mb-6 space-y-2">
                 {% for message in messages %}
-                    <p class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-xl text-sm">
+                    <p class="px-4 py-2.5 rounded-xl text-sm border {% if message.tags == 'error' %}bg-red-50 border-red-200 text-red-800{% elif message.tags == 'warning' %}bg-amber-50 border-amber-200 text-amber-900{% elif message.tags == 'info' %}bg-slate-50 border-slate-200 text-slate-800{% else %}bg-emerald-50 border-emerald-200 text-emerald-800{% endif %}">
                         {{ message }}
                     </p>
                 {% endfor %}

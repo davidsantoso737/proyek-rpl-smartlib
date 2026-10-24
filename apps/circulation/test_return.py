@@ -13,6 +13,7 @@ from apps.circulation.services import (
     ReturnError,
     activate_handover,
     approve_loan,
+    calculate_fine,
     confirm_fine_payment,
     lookup_return,
     process_return,
@@ -113,6 +114,21 @@ class ReturnTests(TestCase):
         self.assertEqual(item.late_day, 3)
         self.assertEqual(item.fine_amount, Decimal("3000"))
         self.assertEqual(item.fine_status, "BELUM_BAYAR")
+
+    def test_denda_memakai_batas_hari_wib(self):
+        loan = self._active_loan()
+        due_at = datetime.datetime(
+            2026, 10, 20, 16, 0, tzinfo=datetime.timezone.utc
+        )
+        returned_at = datetime.datetime(
+            2026, 10, 20, 18, 0, tzinfo=datetime.timezone.utc
+        )
+        LoanItem.objects.filter(loan=loan).update(due_at=due_at)
+        Loan.objects.filter(pk=loan.pk).update(due_at=due_at)
+        item = LoanItem.objects.get(loan=loan)
+        late_day, fine = calculate_fine(item, returned_at)
+        self.assertEqual(late_day, 1)
+        self.assertEqual(fine, Decimal("1000"))
 
     def test_fine_memakai_snapshot_bukan_tarif_baru(self):
         loan = self._active_loan()

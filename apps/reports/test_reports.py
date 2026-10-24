@@ -111,6 +111,37 @@ class ReportTests(TestCase):
         )
         self.assertContains(response, "Tidak ada data")
 
+    def test_filter_tanggal_pengembalian_memakai_wib(self):
+        from apps.circulation.models import LoanItem
+
+        item = LoanItem.objects.get(loan__pk=self.active_pk)
+        item.returned_at = datetime.datetime(
+            2026, 10, 20, 18, 0, tzinfo=datetime.timezone.utc
+        )
+        item.return_status = "KEMBALI"
+        item.save(update_fields=["returned_at", "return_status"])
+        self.client.force_login(self.pus)
+
+        response = self.client.get(
+            REPORT_URL,
+            {
+                "report_type": "pengembalian",
+                "date_from": "2026-10-21",
+                "date_to": "2026-10-21",
+            },
+        )
+        self.assertContains(response, "RP-002")
+
+        response = self.client.get(
+            REPORT_URL,
+            {
+                "report_type": "pengembalian",
+                "date_from": "2026-10-20",
+                "date_to": "2026-10-20",
+            },
+        )
+        self.assertContains(response, "Tidak ada data")
+
     def test_empty_report(self):
         self.client.force_login(self.pus)
         response = self.client.get(

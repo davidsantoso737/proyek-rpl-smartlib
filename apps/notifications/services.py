@@ -95,7 +95,7 @@ def sync_due_overdue(now=None):
     command (penjadwal eksternal di luar scope).
     """
     moment = now or timezone.now()
-    today = moment.date()
+    today = timezone.localdate(moment)
     created_due = created_overdue = 0
     loans = (
         Loan.objects.filter(status="ACTIVE", due_at__isnull=False)
@@ -103,7 +103,7 @@ def sync_due_overdue(now=None):
         .prefetch_related("items__book_copy__book")
     )
     for loan in loans:
-        days_left = (loan.due_at.date() - today).days
+        days_left = (timezone.localdate(loan.due_at) - today).days
         if days_left < 0:
             if not Notification.objects.filter(
                 user=loan.user,
@@ -145,8 +145,8 @@ def sync_due_overdue(now=None):
                     title="Jatuh tempo mendekat",
                     message=(
                         f"Pengajuan #{loan.pk} jatuh tempo "
-                        f"{loan.due_at.strftime('%d %b %Y')}. "
-                        "Segera kembalikan untuk menghindari denda."
+                        f"{timezone.localtime(loan.due_at).strftime('%d %b %Y')}."
+                        " Segera kembalikan untuk menghindari denda."
                     ),
                     reference_type="loan",
                     reference_id=loan.pk,

@@ -170,6 +170,24 @@ class NotificationTests(TestCase):
         self.assertIn("3 hari", notif.message)
         self.assertEqual(sync_due_overdue(), (0, 0))
 
+    def test_keterlambatan_memakai_batas_hari_wib(self):
+        loan = self._approved_active_loan()
+        Loan = loan.__class__
+        Loan.objects.filter(pk=loan.pk).update(
+            due_at=datetime.datetime(
+                2026, 10, 20, 16, 30, tzinfo=datetime.timezone.utc
+            )
+        )
+        moment = datetime.datetime(
+            2026, 10, 20, 17, 30, tzinfo=datetime.timezone.utc
+        )
+        due, overdue = sync_due_overdue(now=moment)
+        self.assertEqual((due, overdue), (0, 1))
+        notif = Notification.objects.get(
+            user=self.siswa, type="LOAN_OVERDUE"
+        )
+        self.assertIn("1 hari", notif.message)
+
     def test_tidak_ada_notif_bila_masih_lama(self):
         self._approved_active_loan()  # jatuh tempo +7 hari
         self.assertEqual(sync_due_overdue(), (0, 0))

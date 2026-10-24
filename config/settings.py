@@ -51,6 +51,19 @@ AI_NODE_TIMEOUT_SECONDS = float(
     os.getenv("AI_NODE_TIMEOUT_SECONDS", str(AI_TIMEOUT_SECONDS))
 )
 
+# Telegram Bot API: token hanya dari environment, tidak pernah di-hardcode.
+TELEGRAM_BOT_TOKEN = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
+TELEGRAM_BOT_USERNAME = (
+    (os.getenv("TELEGRAM_BOT_USERNAME") or "").strip().lstrip("@")
+)
+TELEGRAM_NOTIFICATIONS_ENABLED = (
+    os.getenv("TELEGRAM_NOTIFICATIONS_ENABLED", "False").lower() == "true"
+)
+TELEGRAM_API_BASE_URL = (
+    os.getenv("TELEGRAM_API_BASE_URL", "https://api.telegram.org").rstrip("/")
+)
+TELEGRAM_TIMEOUT_SECONDS = float(os.getenv("TELEGRAM_TIMEOUT_SECONDS", "10"))
+
 
 # Application definition
 
@@ -71,6 +84,7 @@ INSTALLED_APPS = [
     'apps.inventory',
     'apps.materials',
     'apps.notifications',
+    'apps.telegram',
     'apps.ai',
     'apps.reports',
 ]
@@ -162,7 +176,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Jakarta'
 
 USE_I18N = True
 

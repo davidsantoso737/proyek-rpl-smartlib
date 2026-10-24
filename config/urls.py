@@ -32,6 +32,7 @@ urlpatterns = [
     path("materi/", include("apps.materials.urls")),
     path("stok/", include("apps.inventory.urls")),
     path("notifikasi/", include("apps.notifications.urls")),
+    path("integrasi/telegram/", include("apps.telegram.urls")),
     path("laporan/", include("apps.reports.urls")),
     path("ai/", include("apps.ai.urls")),
     path("", include("apps.core.urls")),

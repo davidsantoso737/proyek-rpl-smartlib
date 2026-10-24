@@ -1,3 +1,4 @@
+import datetime
 import logging
 
 from django.contrib import messages
@@ -6,13 +7,14 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
-from django.db.models.functions import TruncMonth
+from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
+
+from apps.telegram.context import build_profile_context
 
 from .authorization import active_login_required, role_required
 from .excel_import import (
@@ -289,9 +291,9 @@ MONTH_LABELS = [
 
 
 def _six_month_keys():
-    """(tahun, bulan) enam bulan terakhir, urut lama ke baru."""
-    now = timezone.now()
-    year, month = now.year, now.month
+    """(tahun, bulan) enam bulan terakhir menurut tanggal lokal."""
+    today = timezone.localdate()
+    year, month = today.year, today.month
     keys = []
     for _ in range(6):
         keys.append((year, month))
@@ -307,14 +309,18 @@ def _librarian_dashboard_stats():
 
     Definisi mengikuti tabel yang sudah ada: judul buku = baris Book,
     eksemplar = baris BookCopy per status, e-book = baris Ebook,
-    peminjaman aktif = Loan berstatus ACTIVE. Tren memakai tanggal
-    pengajuan (Loan.requested_at) dan pengembalian (LoanItem.returned_at)
-    agar konsisten dengan Laporan Peminjaman/Pengembalian.
+    peminjaman aktif = Loan berstatus ACTIVE. Metrik koleksi diambil dari
+    ``apps.catalog.statistics`` agar AI Assistant memakai angka yang sama.
+    Tren memakai tanggal pengajuan (Loan.requested_at) dan pengembalian
+    (LoanItem.returned_at) agar konsisten dengan Laporan
+    Peminjaman/Pengembalian.
     """
-    from apps.catalog.availability import STATUS_TERSEDIA
-    from apps.catalog.models import Book, BookCopy, Ebook
+    from apps.catalog.statistics import (
+        COPY_STATUS_ORDER,
+        collection_statistics,
+    )
     from apps.circulation.models import EbookLoan, Loan, LoanItem
-    from apps.circulation.services import EBOOK_APPROVED, LOAN_ACTIVE
+    from apps.circulation.services import EBOOK_APPROVED
 
     now = timezone.now()
     stats = {
@@ -332,29 +338,23 @@ def _librarian_dashboard_stats():
         "trend_return_total": 0,
     }
 
-    stats["total_books"] = Book.objects.count()
-    stats["total_ebooks"] = Ebook.objects.count()
-    stats["active_loans"] = Loan.objects.filter(status=LOAN_ACTIVE).count()
+    collection = collection_statistics(detail_limit=1)
+    stats["total_books"] = collection["titles_total"]
+    stats["total_ebooks"] = collection["ebooks_total"]
+    stats["active_loans"] = collection["active_loans"]
     stats["active_ebooks"] = EbookLoan.objects.filter(
         status=EBOOK_APPROVED,
         started_at__lte=now,
         expires_at__gt=now,
     ).count()
 
-    copy_rows = list(
-        BookCopy.objects.values("status").annotate(total=Count("pk"))
-    )
-    copy_counts = {row["status"]: row["total"] for row in copy_rows}
-    total_copies = sum(copy_counts.values())
+    copy_counts = collection["copy_status_counts"]
+    total_copies = collection["copies_total"]
     stats["total_copies"] = total_copies
-    stats["copies_available"] = copy_counts.get(STATUS_TERSEDIA, 0)
+    stats["copies_available"] = collection["copies_available"]
     stats["copy_status_total"] = total_copies
-    for code, label, tone in (
-        (STATUS_TERSEDIA, "Tersedia", "emerald"),
-        ("DIPINJAM", "Dipinjam", "blue"),
-        ("RUSAK", "Rusak", "amber"),
-        ("HILANG", "Hilang", "rose"),
-    ):
+    tones = ("emerald", "blue", "amber", "rose")
+    for (code, label), tone in zip(COPY_STATUS_ORDER, tones):
         value = copy_counts.get(code, 0)
         pct = round(value * 100 / total_copies) if total_copies else 0
         if value and not pct:
@@ -369,29 +369,24 @@ def _librarian_dashboard_stats():
         )
 
     keys = _six_month_keys()
-    start = timezone.now().replace(
-        year=keys[0][0],
-        month=keys[0][1],
-        day=1,
-        hour=0,
-        minute=0,
-        second=0,
-        microsecond=0,
-    )
-    loan_map = {
-        (row["month"].year, row["month"].month): row["total"]
-        for row in Loan.objects.filter(requested_at__gte=start)
-        .annotate(month=TruncMonth("requested_at"))
-        .values("month")
-        .annotate(total=Count("pk"))
-    }
-    return_map = {
-        (row["month"].year, row["month"].month): row["total"]
-        for row in LoanItem.objects.filter(returned_at__gte=start)
-        .annotate(month=TruncMonth("returned_at"))
-        .values("month")
-        .annotate(total=Count("pk"))
-    }
+    tz = timezone.get_current_timezone()
+    loan_map = {}
+    return_map = {}
+    for year, month in keys:
+        start = datetime.datetime(year, month, 1, tzinfo=tz)
+        if month == 12:
+            next_year, next_month = year + 1, 1
+        else:
+            next_year, next_month = year, month + 1
+        end = datetime.datetime(next_year, next_month, 1, tzinfo=tz)
+        loan_map[(year, month)] = Loan.objects.filter(
+            requested_at__gte=start,
+            requested_at__lt=end,
+        ).count()
+        return_map[(year, month)] = LoanItem.objects.filter(
+            returned_at__gte=start,
+            returned_at__lt=end,
+        ).count()
     months = []
     for year, month in keys:
         months.append(
@@ -462,7 +457,9 @@ def profile_view(request):
             return redirect("accounts:profile")
     else:
         form = ProfileForm(instance=request.user)
-    return render(request, "accounts/profile.html", {"form": form})
+    context = {"form": form}
+    context.update(build_profile_context(request))
+    return render(request, "accounts/profile.html", context)
 
 
 @active_login_required

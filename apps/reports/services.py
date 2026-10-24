@@ -5,6 +5,8 @@ laporan mendefinisikan kolom + builder baris dari queryset yang
 difilter. Tanpa model sendiri (tanpa migration).
 """
 
+from datetime import datetime, time, timedelta
+
 from django.db.models import Count, Q
 from django.utils import timezone
 
@@ -29,6 +31,29 @@ def _fmt_date(dt):
     return local.strftime("%d %b %Y")
 
 
+def _filter_local_dates(qs, field, filters):
+    """Filter rentang tanggal lokal tanpa CONVERT_TZ MySQL.
+
+    Batas hari dihitung di Python dari TIME_ZONE aktif, lalu dibandingkan
+    sebagai instant UTC. Ini tetap benar meski tabel zona waktu MySQL
+    belum dimuat.
+    """
+    tz = timezone.get_current_timezone()
+    date_from = filters.get("date_from")
+    date_to = filters.get("date_to")
+    if date_from:
+        start = timezone.make_aware(
+            datetime.combine(date_from, time.min), tz
+        )
+        qs = qs.filter(**{f"{field}__gte": start})
+    if date_to:
+        end = timezone.make_aware(
+            datetime.combine(date_to + timedelta(days=1), time.min), tz
+        )
+        qs = qs.filter(**{f"{field}__lt": end})
+    return qs
+
+
 def _loan_rows(filters):
     qs = (
         Loan.objects.select_related("user")
@@ -37,10 +62,7 @@ def _loan_rows(filters):
     )
     if filters.get("status"):
         qs = qs.filter(status=filters["status"])
-    if filters.get("date_from"):
-        qs = qs.filter(requested_at__date__gte=filters["date_from"])
-    if filters.get("date_to"):
-        qs = qs.filter(requested_at__date__lte=filters["date_to"])
+    qs = _filter_local_dates(qs, "requested_at", filters)
     if filters.get("q"):
         q = filters["q"]
         qs = qs.filter(
@@ -69,10 +91,7 @@ def _return_rows(filters):
         .select_related("loan__user", "book_copy__book")
         .order_by("-returned_at")
     )
-    if filters.get("date_from"):
-        qs = qs.filter(returned_at__date__gte=filters["date_from"])
-    if filters.get("date_to"):
-        qs = qs.filter(returned_at__date__lte=filters["date_to"])
+    qs = _filter_local_dates(qs, "returned_at", filters)
     if filters.get("q"):
         q = filters["q"]
         qs = qs.filter(
@@ -163,10 +182,7 @@ def _ebook_loan_rows(filters):
     )
     if filters.get("status"):
         qs = qs.filter(status=filters["status"])
-    if filters.get("date_from"):
-        qs = qs.filter(requested_at__date__gte=filters["date_from"])
-    if filters.get("date_to"):
-        qs = qs.filter(requested_at__date__lte=filters["date_to"])
+    qs = _filter_local_dates(qs, "requested_at", filters)
     if filters.get("q"):
         q = filters["q"]
         qs = qs.filter(

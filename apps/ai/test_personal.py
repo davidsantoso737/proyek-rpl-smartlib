@@ -200,9 +200,9 @@ class PersonalContextTests(TestCase):
     def test_konteks_lanjutan_tanpa_ulang(self):
         ask(self.siswa_a, "Buku apa saja yang sedang saya pinjam?")
         result = ask(self.siswa_a, "Kapan harus dikembalikan?")
-        due = Loan.objects.get(pk=self.loan_active.pk).due_at.strftime(
-            "%d %b %Y"
-        )
+        due = timezone.localtime(
+            Loan.objects.get(pk=self.loan_active.pk).due_at
+        ).strftime("%d %b %Y")
         self.assertIn(due, result["answer"])
         self.assertIn("Petualangan A", result["answer"])
 
