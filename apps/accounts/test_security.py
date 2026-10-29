@@ -28,6 +28,9 @@ from apps.core.models import LibrarySetting
 User = get_user_model()
 
 
+@override_settings(
+    AI_PROVIDER_BASE_URL="", AI_API_KEY="", AI_MODEL=""
+)
 class SecurityTests(TestCase):
     def setUp(self):
         cache.clear()

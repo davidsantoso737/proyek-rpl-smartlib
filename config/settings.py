@@ -40,6 +40,24 @@ AI_API_KEY = os.getenv("AI_API_KEY", "")
 AI_MODEL = os.getenv("AI_MODEL", "")
 AI_TIMEOUT_SECONDS = float(os.getenv("AI_TIMEOUT_SECONDS", "15"))
 AI_MAX_CONTEXT_ITEMS = int(os.getenv("AI_MAX_CONTEXT_ITEMS", "8"))
+# Kunci Fernet untuk enkripsi API key yang disimpan lewat UI. Bila kosong,
+# kunci diturunkan dari SECRET_KEY yang sudah ada di environment.
+AI_SETTINGS_ENCRYPTION_KEY = os.getenv("AI_SETTINGS_ENCRYPTION_KEY", "")
+# Uji konfigurasi memakai inference nyata, jadi beri ruang lebih besar dari
+# timeout Assistant normal. Nilai ini tetap bisa diturunkan lewat environment.
+AI_CONFIG_TEST_TIMEOUT_SECONDS = float(
+    os.getenv("AI_CONFIG_TEST_TIMEOUT_SECONDS", "60")
+)
+# Discovery daftar model memakai timeout sendiri agar tidak memperpanjang
+# timeout Assistant. Host privat hanya diizinkan bila didaftarkan eksplisit.
+AI_MODEL_DISCOVERY_TIMEOUT_SECONDS = float(
+    os.getenv("AI_MODEL_DISCOVERY_TIMEOUT_SECONDS", "15")
+)
+AI_PROVIDER_ALLOWED_HOSTS = [
+    host.strip().lower()
+    for host in os.getenv("AI_PROVIDER_ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+]
 
 # Node.js AI gateway (opsional, default mati): bila AI_NODE_URL dan
 # AI_NODE_SHARED_SECRET diisi, pemanggilan provider dialihkan lewat

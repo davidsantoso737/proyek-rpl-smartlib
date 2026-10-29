@@ -71,7 +71,8 @@ class NodeProviderTests(TestCase):
         provider = NodeProvider(NODE_URL, NODE_SECRET, 5)
         cases = (
             (_http_error(429), AIProviderError.RATE_LIMITED),
-            (_http_error(504), AIProviderError.TIMEOUT),
+            (_http_error(408), AIProviderError.HTTP_TIMEOUT),
+            (_http_error(504), AIProviderError.HTTP_TIMEOUT),
             (_http_error(500), AIProviderError.UNAVAILABLE),
             (_http_error(401), AIProviderError.UNAVAILABLE),
         )

@@ -1,112 +1,611 @@
 {% extends "base.html" %}
 
-{% block title %}Konfigurasi Kebijakan - Digital Library{% endblock %}
+{% block title %}Konfigurasi - Digital Library{% endblock %}
 
 {% block content %}
+<div class="mx-auto max-w-5xl">
+    <div class="mb-6">
+        <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">Konfigurasi</h1>
+        <p class="mt-1 max-w-2xl text-sm text-slate-500">
+            Kelola kebijakan perpustakaan dan pengaturan AI Assistant di satu tempat.
+        </p>
+    </div>
 
-<div class="mb-6">
-    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-        Konfigurasi Kebijakan
-    </h1>
-    <p class="text-slate-500 text-sm mt-1">
-        Perubahan berlaku untuk transaksi baru; denda, jatuh tempo, dan masa akses yang sudah tercatat tidak berubah.
-    </p>
-</div>
+    <div class="space-y-6">
+        <section aria-labelledby="policy-heading" class="rounded-xl border border-slate-200 bg-white">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-6">
+                <div>
+                    <h2 id="policy-heading" class="text-base font-semibold text-slate-900">Kebijakan perpustakaan</h2>
+                    <p class="mt-0.5 text-sm text-slate-500">
+                        Berlaku untuk transaksi baru. Denda, jatuh tempo, dan masa akses yang sudah tercatat tidak berubah.
+                    </p>
+                </div>
+                {% if active %}
+                    <p class="text-xs text-slate-500">
+                        Aktif sejak
+                        <span class="font-medium text-slate-700">{{ active.effective_from|date:"d M Y H:i" }}</span>
+                    </p>
+                {% endif %}
+            </div>
 
-<div class="space-y-6">
-    <div class="grid gap-6 md:grid-cols-2">
-        <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
-            <h2 class="text-base font-semibold text-slate-900 mb-3">Konfigurasi aktif</h2>
-            {% if active %}
-                <dl class="text-sm space-y-2 mb-6">
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-slate-500">Durasi pinjam fisik</dt>
-                        <dd class="font-medium">{{ active.physical_loan_duration }} hari</dd>
-                    </div>
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-slate-500">Durasi akses e-book</dt>
-                        <dd class="font-medium">{{ active.ebook_access_duration }} hari</dd>
-                    </div>
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-slate-500">Masa berlaku QR Pickup</dt>
-                        <dd class="font-medium">{{ active.pickup_qr_validity }} menit</dd>
-                    </div>
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-slate-500">Tarif denda</dt>
-                        <dd class="font-medium">Rp{{ active.fine_rate_per_day }}/hari</dd>
-                    </div>
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-slate-500">Berlaku sejak</dt>
-                        <dd class="font-medium">{{ active.effective_from|date:"d M Y H:i" }}</dd>
-                    </div>
-                </dl>
-            {% else %}
-                <p class="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2.5 rounded-xl text-sm mb-6">
-                    Belum ada konfigurasi. Isi form untuk membuat versi pertama.
+            <div class="grid gap-6 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-8">
+                <div class="lg:border-r lg:border-slate-100 lg:pr-8">
+                    <h3 class="text-sm font-semibold text-slate-900">Nilai aktif</h3>
+                    {% if active %}
+                        <dl class="mt-3 grid grid-cols-2 gap-x-6 gap-y-4">
+                            <div>
+                                <dt class="text-xs text-slate-500">Pinjam fisik</dt>
+                                <dd class="mt-0.5 text-sm font-semibold text-slate-900">{{ active.physical_loan_duration }} hari</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs text-slate-500">Akses e-book</dt>
+                                <dd class="mt-0.5 text-sm font-semibold text-slate-900">{{ active.ebook_access_duration }} hari</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs text-slate-500">QR Pickup</dt>
+                                <dd class="mt-0.5 text-sm font-semibold text-slate-900">{{ active.pickup_qr_validity }} menit</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs text-slate-500">Denda</dt>
+                                <dd class="mt-0.5 text-sm font-semibold text-slate-900">Rp{{ active.fine_rate_per_day }}/hari</dd>
+                            </div>
+                        </dl>
+                    {% else %}
+                        <p class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+                            Belum ada konfigurasi. Isi form untuk membuat versi pertama.
+                        </p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-900">Perbarui kebijakan</h3>
+                    {% if form.non_field_errors %}
+                        <div role="alert" class="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-800">
+                            {% for error in form.non_field_errors %}
+                                <p>{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    <form method="post" action="{% url 'core:policy' %}" class="mt-3 space-y-4">
+                        {% csrf_token %}
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            {% for field in form %}
+                                <div class="min-w-0">
+                                    <label for="{{ field.id_for_label }}" class="mb-1.5 block text-sm font-medium text-slate-700">
+                                        {{ field.label }}
+                                    </label>
+                                    {{ field }}
+                                    {% if field.help_text %}
+                                        <p class="mt-1 text-xs text-slate-500">{{ field.help_text }}</p>
+                                    {% endif %}
+                                    {% for error in field.errors %}
+                                        <p class="mt-1 text-sm text-red-700">{{ error }}</p>
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <button type="submit"
+                                class="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700">
+                            Simpan sebagai versi baru
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <section aria-labelledby="ai-heading" class="rounded-xl border border-slate-200 bg-white">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-6">
+                <div>
+                    <h2 id="ai-heading" class="text-base font-semibold text-slate-900">AI Assistant</h2>
+                    <p class="mt-0.5 text-sm text-slate-500">
+                        Atur endpoint, API key, dan model yang dipakai asisten. Perubahan berlaku untuk permintaan berikutnya tanpa restart server.
+                    </p>
+                </div>
+                <p class="inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-medium
+                    {% if ai_status.effective.source == 'database' %}
+                        border-emerald-200 bg-emerald-50 text-emerald-800
+                    {% elif ai_status.effective %}
+                        border-blue-200 bg-blue-50 text-blue-800
+                    {% else %}
+                        border-slate-200 bg-slate-50 text-slate-700
+                    {% endif %}">
+                    {% if ai_status.effective.source == "database" %}
+                        Aktif dari konfigurasi tersimpan
+                    {% elif ai_status.effective.source == "environment_gateway" %}
+                        Aktif dari environment (gateway)
+                    {% elif ai_status.effective.source == "environment" %}
+                        Aktif dari environment
+                    {% else %}
+                        Belum aktif, mode lokal
+                    {% endif %}
                 </p>
-            {% endif %}
+            </div>
 
-            <h2 class="text-base font-semibold text-slate-900 mb-3">Riwayat versi</h2>
+            <div class="grid gap-6 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-8">
+                <div class="lg:border-r lg:border-slate-100 lg:pr-8">
+                    <h3 class="text-sm font-semibold text-slate-900">Status konfigurasi</h3>
+                    <dl class="mt-3 space-y-3 text-sm">
+                        <div class="flex items-start justify-between gap-4">
+                            <dt class="text-slate-500">Model aktif</dt>
+                            <dd class="min-w-0 break-words text-right font-medium text-slate-900">{{ ai_status.effective.model|default:"-" }}</dd>
+                        </div>
+                        <div class="flex items-start justify-between gap-4">
+                            <dt class="text-slate-500">API key tersimpan</dt>
+                            <dd class="min-w-0 break-words text-right font-medium text-slate-900">
+                                {% if ai_status.saved_key_present %}Tersimpan{% else %}Belum ada{% endif %}
+                            </dd>
+                        </div>
+                        <div class="flex items-start justify-between gap-4">
+                            <dt class="text-slate-500">Fallback environment</dt>
+                            <dd class="min-w-0 break-words text-right font-medium text-slate-900">
+                                {% if ai_status.environment_configured %}Tersedia{% else %}Tidak tersedia{% endif %}
+                            </dd>
+                        </div>
+                        {% if ai_status.saved %}
+                            <div class="flex items-start justify-between gap-4">
+                                <dt class="text-slate-500">Terakhir diperbarui</dt>
+                                <dd class="min-w-0 break-words text-right font-medium text-slate-900">
+                                    {{ ai_status.saved.updated_at|date:"d M Y H:i" }}
+                                    {% if ai_status.saved.updated_by %}
+                                        <span class="block text-xs font-normal text-slate-500">oleh {{ ai_status.saved.updated_by.full_name|default:ai_status.saved.updated_by.username }}</span>
+                                    {% endif %}
+                                </dd>
+                            </div>
+                            <div class="flex items-start justify-between gap-4">
+                                <dt class="text-slate-500">Terakhir diverifikasi</dt>
+                                <dd class="min-w-0 break-words text-right font-medium text-slate-900">
+                                    {% if ai_status.saved.last_validated_at %}
+                                        {{ ai_status.saved.last_validated_at|date:"d M Y H:i" }}
+                                    {% else %}
+                                        Belum diverifikasi
+                                    {% endif %}
+                                </dd>
+                            </div>
+                        {% endif %}
+                    </dl>
+
+                    {% if ai_status.saved_problem %}
+                        <p role="alert" class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+                            {{ ai_status.saved_problem }}
+                            {% if ai_status.effective %}Sistem memakai konfigurasi environment yang tersedia.{% endif %}
+                        </p>
+                    {% endif %}
+
+                    <p class="mt-4 text-xs leading-relaxed text-slate-500">
+                        API key tidak pernah ditampilkan kembali. Biarkan kolom API key kosong untuk mempertahankan key yang sudah tersimpan.
+                        Konfigurasi baru hanya diaktifkan setelah uji koneksi berhasil.
+                    </p>
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-900">Ubah konfigurasi</h3>
+                    {% if ai_form.non_field_errors %}
+                        <div role="alert" class="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-800">
+                            {% for error in ai_form.non_field_errors %}
+                                <p>{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    <form id="ai-config-form" method="post" action="{% url 'core:ai_config_save' %}" class="mt-3 space-y-4">
+                        {% csrf_token %}
+                        {% include "partials/_form_field.html" with field=ai_form.base_url %}
+                        {% include "partials/_form_field.html" with field=ai_form.api_key %}
+                        <div class="min-w-0">
+                            <div class="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                                <label for="{{ ai_form.model.id_for_label }}" class="block text-sm font-medium text-slate-700">
+                                    {{ ai_form.model.label }}
+                                </label>
+                                <button id="ai-model-load" type="button"
+                                        aria-controls="ai-model-discovery" aria-expanded="false"
+                                        class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
+                                    Muat model
+                                </button>
+                            </div>
+                            {{ ai_form.model }}
+                            {% if ai_form.model.help_text %}
+                                <p class="mt-1 text-xs text-slate-500">{{ ai_form.model.help_text }}</p>
+                            {% endif %}
+                            {% for error in ai_form.model.errors %}
+                                <p class="mt-1 text-sm text-red-700">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                        <div id="ai-model-discovery" class="rounded-xl border border-slate-200 bg-slate-50 p-3" hidden>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <label for="ai-model-search" class="mb-1 block text-xs font-medium text-slate-700">
+                                        Cari model
+                                    </label>
+                                    <input id="ai-model-search" type="search" autocomplete="off"
+                                           placeholder="Cari ID atau penyedia"
+                                           aria-describedby="ai-model-note ai-model-status"
+                                           class="block min-h-[44px] w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                                </div>
+                                <div>
+                                    <label for="ai-model-select" class="mb-1 block text-xs font-medium text-slate-700">
+                                        Pilih model
+                                    </label>
+                                    <select id="ai-model-select"
+                                            aria-describedby="ai-model-note ai-model-status"
+                                            class="block min-h-[44px] w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"></select>
+                                </div>
+                            </div>
+                            <p id="ai-model-note" class="mt-2 text-xs text-slate-500">
+                                Daftar berasal dari endpoint <code class="rounded bg-white px-1 py-0.5">/models</code> penyedia.
+                                Memuat daftar tidak menguji inference; jalankan Uji konfigurasi sebelum menyimpan.
+                            </p>
+                        </div>
+                        <p id="ai-model-status" role="status" aria-live="polite" class="mt-2 text-xs text-slate-500"></p>
+                        <div class="flex items-start gap-3">
+                            {{ ai_form.is_enabled }}
+                            <div class="min-w-0">
+                                <label for="{{ ai_form.is_enabled.id_for_label }}" class="text-sm font-medium text-slate-700">
+                                    {{ ai_form.is_enabled.label }}
+                                </label>
+                                {% if ai_form.is_enabled.help_text %}
+                                    <p class="mt-0.5 text-xs text-slate-500">{{ ai_form.is_enabled.help_text }}</p>
+                                {% endif %}
+                                {% for error in ai_form.is_enabled.errors %}
+                                    <p class="mt-1 text-sm text-red-700">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div id="ai-config-status" role="status" aria-live="polite" hidden></div>
+
+                        <div class="flex flex-wrap items-center gap-3">
+                            <button id="ai-config-save" type="submit"
+                                    class="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+                                Simpan konfigurasi
+                            </button>
+                            <button id="ai-config-test" type="submit"
+                                    formaction="{% url 'core:ai_config_test' %}" formmethod="post" formnovalidate
+                                    class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
+                                Uji konfigurasi
+                            </button>
+                        </div>
+                    </form>
+
+                    {% if ai_status.saved %}
+                        <div class="mt-5 border-t border-slate-100 pt-4">
+                            <p class="text-xs text-slate-500">
+                                Hapus konfigurasi tersimpan untuk kembali sepenuhnya ke konfigurasi environment.
+                            </p>
+                            <form id="ai-config-reset-form" method="post" action="{% url 'core:ai_config_reset' %}" class="mt-2">
+                                {% csrf_token %}
+                                <input type="hidden" name="confirm" value="1">
+                                <button type="submit"
+                                        class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50">
+                                    Hapus konfigurasi tersimpan
+                                </button>
+                            </form>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+
+        <section aria-labelledby="history-heading" class="rounded-xl border border-slate-200 bg-white">
+            <div class="border-b border-slate-100 px-4 py-4 sm:px-6">
+                <h2 id="history-heading" class="text-base font-semibold text-slate-900">Riwayat kebijakan</h2>
+                <p class="mt-0.5 text-sm text-slate-500">Sepuluh versi terbaru, terbaru di atas.</p>
+            </div>
             {% if history %}
-                <div class="rounded-xl border border-slate-200 overflow-x-auto" tabindex="0" role="region" aria-label="Tabel riwayat kebijakan, dapat digeser horizontal">
-                    <table class="w-full text-xs">
+                <div class="overflow-x-auto" tabindex="0" role="region" aria-label="Tabel riwayat kebijakan, dapat digeser horizontal">
+                    <table class="w-full min-w-[38rem] text-xs sm:text-sm">
                         <thead>
                             <tr class="bg-slate-50 text-left text-slate-500">
-                                <th scope="col" class="px-3 py-2 font-medium">Berlaku</th>
-                                <th scope="col" class="px-3 py-2 font-medium">Durasi</th>
-                                <th scope="col" class="px-3 py-2 font-medium">Denda/hari</th>
+                                <th scope="col" class="px-4 py-2.5 font-medium sm:px-6">Berlaku</th>
+                                <th scope="col" class="px-3 py-2.5 font-medium">Pinjam fisik</th>
+                                <th scope="col" class="px-3 py-2.5 font-medium">Akses e-book</th>
+                                <th scope="col" class="px-3 py-2.5 font-medium">QR Pickup</th>
+                                <th scope="col" class="px-4 py-2.5 font-medium sm:px-6">Denda/hari</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             {% for version in history %}
                                 <tr>
-                                    <td class="px-3 py-2">{{ version.effective_from|date:"d M Y H:i" }}{% if version.effective_until %} s/d {{ version.effective_until|date:"d M Y H:i" }}{% else %} &middot; aktif{% endif %}</td>
-                                    <td class="px-3 py-2">{{ version.physical_loan_duration }} hr</td>
-                                    <td class="px-3 py-2">Rp{{ version.fine_rate_per_day }}</td>
+                                    <td class="px-4 py-2.5 sm:px-6">
+                                        {{ version.effective_from|date:"d M Y H:i" }}
+                                        {% if version.effective_until %}
+                                            <span class="block text-xs text-slate-500">sampai {{ version.effective_until|date:"d M Y H:i" }}</span>
+                                        {% else %}
+                                            <span class="block text-xs font-medium text-emerald-700">Aktif</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-3 py-2.5">{{ version.physical_loan_duration }} hari</td>
+                                    <td class="px-3 py-2.5">{{ version.ebook_access_duration }} hari</td>
+                                    <td class="px-3 py-2.5">{{ version.pickup_qr_validity }} menit</td>
+                                    <td class="px-4 py-2.5 sm:px-6">Rp{{ version.fine_rate_per_day }}</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             {% else %}
-                <p class="text-sm text-slate-500">Belum ada riwayat.</p>
+                <p class="px-4 py-4 text-sm text-slate-500 sm:px-6">Belum ada riwayat.</p>
             {% endif %}
-        </div>
-
-        <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
-            <h2 class="text-base font-semibold text-slate-900 mb-3">Ubah kebijakan</h2>
-            {% if form.non_field_errors %}
-                <div role="alert" class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm mb-4">
-                    {% for error in form.non_field_errors %}
-                        <p>{{ error }}</p>
-                    {% endfor %}
-                </div>
-            {% endif %}
-            <form method="post" action="{% url 'core:policy' %}" class="space-y-4">
-                {% csrf_token %}
-                {% for field in form %}
-                    <div>
-                        <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1.5">
-                            {{ field.label }}
-                        </label>
-                        {{ field }}
-                        {% if field.help_text %}
-                            <p class="text-slate-500 text-xs mt-1">{{ field.help_text }}</p>
-                        {% endif %}
-                        {% for error in field.errors %}
-                            <p class="text-red-700 text-sm mt-1">{{ error }}</p>
-                        {% endfor %}
-                    </div>
-                {% endfor %}
-                <div class="flex flex-wrap items-center gap-3 pt-1">
-                    <button type="submit"
-                            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm">
-                        Simpan sebagai versi baru
-                    </button>
-                </div>
-            </form>
-        </div>
+        </section>
     </div>
 </div>
 
+<script>
+(function () {
+    var form = document.getElementById("ai-config-form");
+    if (!form) {
+        return;
+    }
+    var statusBox = document.getElementById("ai-config-status");
+    var saveButton = document.getElementById("ai-config-save");
+    var testButton = document.getElementById("ai-config-test");
+    var loadButton = document.getElementById("ai-model-load");
+    var resetForm = document.getElementById("ai-config-reset-form");
+    var discoveryPanel = document.getElementById("ai-model-discovery");
+    var modelStatus = document.getElementById("ai-model-status");
+    var modelSearch = document.getElementById("ai-model-search");
+    var modelSelect = document.getElementById("ai-model-select");
+    var modelInput = document.getElementById("id_model");
+    var baseUrlInput = document.getElementById("id_base_url");
+    var apiKeyInput = document.getElementById("id_api_key");
+    var csrf = form.querySelector("[name=csrfmiddlewaretoken]").value;
+    var modelCatalog = [];
+    var catalogStale = false;
+
+    function showStatus(kind, message) {
+        statusBox.hidden = false;
+        statusBox.textContent = message;
+        statusBox.className = "mt-4 rounded-xl border px-4 py-2.5 text-sm " + (
+            kind === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : kind === "info"
+                    ? "border-slate-200 bg-slate-50 text-slate-700"
+                    : "border-red-200 bg-red-50 text-red-800"
+        );
+    }
+
+    function showModelStatus(kind, message) {
+        modelStatus.textContent = message;
+        modelStatus.className = "mt-2 rounded-lg border px-3 py-2 text-xs " + (
+            kind === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : kind === "info"
+                    ? "border-slate-200 bg-slate-50 text-slate-700"
+                    : "border-red-200 bg-red-50 text-red-800"
+        );
+    }
+
+    function setBusy(activeButton, busy) {
+        saveButton.disabled = busy;
+        testButton.disabled = busy;
+        loadButton.disabled = busy;
+        if (activeButton === "save") {
+            saveButton.textContent = busy ? "Menyimpan..." : "Simpan konfigurasi";
+        }
+        if (activeButton === "test") {
+            testButton.textContent = busy ? "Menguji..." : "Uji konfigurasi";
+        }
+        if (activeButton === "models") {
+            loadButton.textContent = busy ? "Memuat..." : "Muat model";
+        }
+        if (busy) {
+            modelSearch.disabled = true;
+            modelSelect.disabled = true;
+        } else if (activeButton !== "models") {
+            renderModelOptions();
+        }
+    }
+
+    function readResponse(response) {
+        return response.json().catch(function () {
+            return {};
+        }).then(function (data) {
+            return {
+                ok: response.ok && data.ok === true,
+                data: data
+            };
+        });
+    }
+
+    function errorMessage(data) {
+        if (data.errors) {
+            for (var key in data.errors) {
+                if (data.errors[key] && data.errors[key].length) {
+                    return data.errors[key][0];
+                }
+            }
+        }
+        return data.message || "Terjadi kesalahan saat menghubungi server.";
+    }
+
+    function submit(url) {
+        return fetch(url, {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": csrf,
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: new FormData(form)
+        }).then(readResponse);
+    }
+
+    function filteredModels() {
+        var query = (modelSearch.value || "").trim().toLowerCase();
+        if (!query) {
+            return modelCatalog;
+        }
+        return modelCatalog.filter(function (model) {
+            return model.id.toLowerCase().indexOf(query) !== -1 ||
+                (model.name || "").toLowerCase().indexOf(query) !== -1 ||
+                (model.owned_by || "").toLowerCase().indexOf(query) !== -1;
+        });
+    }
+
+    function renderModelOptions() {
+        var models = filteredModels();
+        modelSelect.innerHTML = "";
+        var placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = models.length
+            ? "Pilih model..."
+            : "Tidak ada model yang cocok";
+        modelSelect.appendChild(placeholder);
+        models.forEach(function (model) {
+            var option = document.createElement("option");
+            option.value = model.id;
+            option.textContent = model.id +
+                (model.owned_by ? " (" + model.owned_by + ")" : "");
+            option.title = model.name && model.name !== model.id
+                ? model.name
+                : model.id;
+            modelSelect.appendChild(option);
+        });
+        var current = (modelInput.value || "").trim();
+        if (current && models.some(function (model) {
+            return model.id === current;
+        })) {
+            modelSelect.value = current;
+        }
+        modelSelect.disabled = catalogStale || models.length === 0;
+        modelSearch.disabled = catalogStale || modelCatalog.length === 0;
+    }
+
+    function markCatalogStale() {
+        if (!modelCatalog.length) {
+            return;
+        }
+        catalogStale = true;
+        renderModelOptions();
+        showModelStatus(
+            "info",
+            "URL atau API key berubah. Muat ulang daftar model sebelum memilih."
+        );
+    }
+
+    function loadModels() {
+        modelCatalog = [];
+        catalogStale = false;
+        discoveryPanel.hidden = true;
+        loadButton.setAttribute("aria-expanded", "false");
+        modelSelect.innerHTML = "";
+        modelSearch.value = "";
+        setBusy("models", true);
+        showModelStatus("info", "Memuat daftar model dari penyedia...");
+        submit("{% url 'core:ai_config_models' %}")
+            .then(function (result) {
+                if (!result.ok) {
+                    loadButton.setAttribute("aria-expanded", "false");
+                    showModelStatus("error", errorMessage(result.data));
+                    return;
+                }
+                modelCatalog = Array.isArray(result.data.models)
+                    ? result.data.models
+                    : [];
+                if (!modelCatalog.length) {
+                    loadButton.setAttribute("aria-expanded", "false");
+                    showModelStatus(
+                        "info",
+                        "Tidak ada model ditemukan. Masukkan ID model secara manual."
+                    );
+                    return;
+                }
+                discoveryPanel.hidden = false;
+                loadButton.setAttribute("aria-expanded", "true");
+                catalogStale = false;
+                renderModelOptions();
+                showModelStatus(
+                    "success",
+                    (result.data.message || "Daftar model dimuat.") +
+                    " Pilih model atau tetap isi manual."
+                );
+            })
+            .catch(function () {
+                loadButton.setAttribute("aria-expanded", "false");
+                showModelStatus(
+                    "error",
+                    "Tidak dapat menghubungi server. Coba lagi."
+                );
+            })
+            .finally(function () {
+                setBusy("models", false);
+                if (!modelCatalog.length) {
+                    modelSearch.disabled = true;
+                    modelSelect.disabled = true;
+                }
+            });
+    }
+
+    loadButton.addEventListener("click", function (event) {
+        event.preventDefault();
+        loadModels();
+    });
+
+    modelSearch.addEventListener("input", renderModelOptions);
+
+    modelSelect.addEventListener("change", function () {
+        if (!modelSelect.value) {
+            return;
+        }
+        modelInput.value = modelSelect.value;
+        showModelStatus(
+            "info",
+            "Model dipilih. Jalankan Uji konfigurasi sebelum menyimpan."
+        );
+    });
+
+    baseUrlInput.addEventListener("input", markCatalogStale);
+    apiKeyInput.addEventListener("input", markCatalogStale);
+
+    testButton.addEventListener("click", function (event) {
+        event.preventDefault();
+        setBusy("test", true);
+        showStatus("info", "Menguji koneksi ke penyedia...");
+        submit("{% url 'core:ai_config_test' %}")
+            .then(function (result) {
+                if (result.ok) {
+                    showStatus("success", result.data.message);
+                } else {
+                    showStatus("error", errorMessage(result.data));
+                }
+            })
+            .catch(function () {
+                showStatus("error", "Tidak dapat menghubungi server. Coba lagi.");
+            })
+            .finally(function () {
+                setBusy("test", false);
+            });
+    });
+
+    form.addEventListener("submit", function (event) {
+        if (event.submitter === testButton) {
+            return;
+        }
+        event.preventDefault();
+        setBusy("save", true);
+        showStatus("info", "Memvalidasi dan menyimpan konfigurasi...");
+        submit("{% url 'core:ai_config_save' %}")
+            .then(function (result) {
+                if (result.ok) {
+                    window.location.reload();
+                    return;
+                }
+                showStatus("error", errorMessage(result.data));
+                setBusy("save", false);
+            })
+            .catch(function () {
+                showStatus("error", "Tidak dapat menghubungi server. Coba lagi.");
+                setBusy("save", false);
+            });
+    });
+
+    if (resetForm) {
+        resetForm.addEventListener("submit", function (event) {
+            var confirmed = window.confirm(
+                "Hapus konfigurasi AI tersimpan? Sistem akan memakai konfigurasi environment bila tersedia."
+            );
+            if (!confirmed) {
+                event.preventDefault();
+            }
+        });
+    }
+})();
+</script>
 {% endblock %}
