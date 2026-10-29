@@ -57,10 +57,13 @@
                                     <td class="px-4 py-3">
                                         <div class="flex justify-end items-center gap-1.5">
                                             <a href="{% url 'circulation:copy_label' copy.pk %}" target="_blank" rel="noopener" title="Label QR"
-                                               class="inline-flex items-center min-h-[44px] rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium px-3.5 transition">QR</a>
+                                               aria-label="Buka label QR {{ copy.copy_code }}"
+                                               class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-slate-100 text-slate-700 transition hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+                                                <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5Z"/><path d="M3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5Z"/><path d="M13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z"/><path d="M6 6.75h2.25v2.25H6zM6 17.25h2.25v2.25H6zM15.75 6.75h2.25v2.25h-2.25zM13.5 13.5h2.25v2.25H13.5zM18 13.5h2.25v2.25H18zM13.5 18h2.25v2.25H13.5zM18 18h2.25v2.25H18z"/></svg>
+                                            </a>
                                             <a href="{% url 'catalog:manage_copy_update' copy.pk %}" title="Ubah"
                                                aria-label="Ubah {{ copy.copy_code }}"
-                                               class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 transition">
+                                               class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
                                                 <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"/></svg>
                                             </a>
                                         </div>

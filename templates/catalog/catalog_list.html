@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Katalog - Digital Library{% endblock %}
 
@@ -7,7 +8,7 @@
 {% if user.role == "PUSTAKAWAN" %}
 <div class="space-y-5">
     <div class="rounded-xl border border-slate-200/80 bg-white px-4 sm:px-5 py-4 shadow-sm">
-        <form method="get" action="{% url 'catalog:catalog' %}" aria-label="Pencarian katalog" class="flex flex-col md:flex-row md:items-center gap-3">
+        <form method="get" action="{% url 'catalog:catalog' %}" aria-label="Pencarian katalog" class="flex flex-col md:flex-row md:items-center gap-3" data-live-filter>
             <div class="relative flex-1 min-w-0">
                 <svg class="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
                 <label class="sr-only" for="catalog-q">Cari katalog</label>
@@ -15,7 +16,7 @@
                        class="w-full min-w-0 border border-slate-300 rounded-xl pl-9 pr-3.5 py-2.5 text-sm bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-1 focus:border-blue-500">
             </div>
             <label class="sr-only" for="catalog-category">Filter kategori</label>
-            <select id="catalog-category" name="category"
+            <select id="catalog-category" name="category" data-live-filter-select
                     class="w-full md:w-auto md:max-w-56 min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-1 focus:border-blue-500">
                 <option value="">Semua kategori</option>
                 {% for category in categories %}
@@ -34,13 +35,13 @@
                 <div id="catalog-filter-panel" class="hidden absolute right-0 top-full z-20 mt-2 w-64 rounded-xl border border-slate-200/80 bg-white p-4 shadow-lg">
                     <p class="text-xs font-semibold text-slate-500 mb-2" id="catalog-filter-caption">Jenis koleksi</p>
                     <label class="sr-only" for="catalog-type">Filter tipe koleksi</label>
-                    <select id="catalog-type" name="type" aria-describedby="catalog-filter-caption"
+                    <select id="catalog-type" name="type" aria-describedby="catalog-filter-caption" data-live-filter-select
                             class="w-full min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-1 focus:border-blue-500">
                         <option value="" {% if kind == "" %}selected{% endif %}>Fisik + E-Book</option>
                         <option value="book" {% if kind == "book" %}selected{% endif %}>Buku Fisik</option>
                         <option value="ebook" {% if kind == "ebook" %}selected{% endif %}>E-Book</option>
                     </select>
-                    <p class="mt-2 text-xs text-slate-500">Pilih jenis, lalu tekan Cari.</p>
+                    <p class="mt-2 text-xs text-slate-500">Filter langsung diterapkan saat pilihan berubah.</p>
                 </div>
             </div>
             <div class="flex gap-2">
@@ -147,7 +148,7 @@
     </div>
 
     <div class="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
-        <form method="get" action="{% url 'catalog:catalog' %}" aria-label="Pencarian katalog" class="flex flex-col md:flex-row md:items-center gap-3">
+        <form method="get" action="{% url 'catalog:catalog' %}" aria-label="Pencarian katalog" class="flex flex-col md:flex-row md:items-center gap-3" data-live-filter>
             <div class="relative flex-1 min-w-0">
                 <svg class="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
                 <label class="sr-only" for="catalog-q">Cari katalog</label>
@@ -163,7 +164,7 @@
                 </button>
                 <div id="catalog-filter-panel" class="hidden absolute left-0 right-0 top-full z-20 mt-2 rounded-xl border border-slate-200/80 bg-white p-4 shadow-lg md:left-auto md:right-0 md:w-72">
                     <label for="catalog-category" class="block text-xs font-semibold text-slate-500 mb-2">Kategori</label>
-                    <select id="catalog-category" name="category"
+                    <select id="catalog-category" name="category" data-live-filter-select
                             class="w-full min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-1 focus:border-blue-500">
                         <option value="">Semua kategori</option>
                         {% for category in categories %}
@@ -171,14 +172,14 @@
                         {% endfor %}
                     </select>
                     <label for="catalog-type" class="mt-3 block text-xs font-semibold text-slate-500 mb-2">Jenis koleksi</label>
-                    <select id="catalog-type" name="type"
+                    <select id="catalog-type" name="type" data-live-filter-select
                             class="w-full min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-1 focus:border-blue-500">
                         <option value="" {% if kind == "" %}selected{% endif %}>Fisik + E-Book</option>
                         <option value="book" {% if kind == "book" %}selected{% endif %}>Buku Fisik</option>
                         <option value="ebook" {% if kind == "ebook" %}selected{% endif %}>E-Book</option>
                     </select>
                     <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
-                        <p class="text-xs text-slate-500">Pilih filter, lalu tekan Cari.</p>
+                        <p class="text-xs text-slate-500">Filter langsung diterapkan saat pilihan berubah.</p>
                         {% if q or category_id or kind %}
                             <a href="{% url 'catalog:catalog' %}" class="text-xs font-medium text-blue-600 hover:underline">Reset filter</a>
                         {% endif %}
@@ -275,4 +276,8 @@
 </script>
 {% endif %}
 
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/live-filter.js' %}"></script>
 {% endblock %}

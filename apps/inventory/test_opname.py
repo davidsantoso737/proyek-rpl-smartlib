@@ -107,6 +107,16 @@ class OpnameTests(TestCase):
         with self.assertRaises(OpnameError):
             start_opname(self.pus)
 
+    def test_detail_opname_memakai_filter_buku_realtime(self):
+        opname = start_opname(self.pus)
+        self.client.force_login(self.pus)
+        response = self.client.get(
+            reverse("inventory:opname_detail", args=[opname.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-live-filter")
+        self.assertContains(response, "data-live-filter-select")
+
     def test_unauthorized(self):
         self.assertEqual(
             self.client.get(reverse("inventory:opname_list")).status_code,

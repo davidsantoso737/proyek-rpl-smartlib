@@ -301,6 +301,14 @@ class ReturnTests(TestCase):
         self.assertIn("print:hidden", html)
         self.assertIn("RT-001", html)
 
+    def test_label_batch_memakai_filter_buku_realtime(self):
+        batch = reverse("circulation:copy_label_batch")
+        self.client.force_login(self.pus)
+        response = self.client.get(batch)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-live-filter")
+        self.assertContains(response, "data-live-filter-select")
+
     def test_label_batch_filter_per_buku(self):
         batch = reverse("circulation:copy_label_batch")
         self.client.force_login(self.pus)

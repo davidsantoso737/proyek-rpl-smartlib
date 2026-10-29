@@ -41,19 +41,21 @@
                     </a>
                 </div>
             {% else %}
-                <form method="get" action="{% url 'inventory:opname_detail' opname.pk %}" class="flex flex-col sm:flex-row gap-2">
+                <form method="get" action="{% url 'inventory:opname_detail' opname.pk %}" class="flex flex-col sm:flex-row gap-2" data-live-filter>
                     <label class="sr-only" for="opname-book">Pilih buku</label>
-                    <select id="opname-book" name="book"
+                    <select id="opname-book" name="book" data-live-filter-select
                             class="flex-1 min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         <option value="">Pilih buku untuk diperiksa...</option>
                         {% for book in books %}
                             <option value="{{ book.pk }}">{{ book.title }}</option>
                         {% endfor %}
                     </select>
-                    <button type="submit"
-                            class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 py-2.5 min-h-[44px] rounded-xl transition shadow-sm">
-                        Tampilkan
-                    </button>
+                    <noscript>
+                        <button type="submit"
+                                class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 py-2.5 min-h-[44px] rounded-xl transition shadow-sm">
+                            Tampilkan
+                        </button>
+                    </noscript>
                 </form>
             {% endif %}
         </section>
@@ -175,4 +177,8 @@
 <script src="{% static 'js/html5-qrcode.min.js' %}"></script>
 <script src="{% static 'js/qr-scan.js' %}"></script>
 
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/live-filter.js' %}"></script>
 {% endblock %}

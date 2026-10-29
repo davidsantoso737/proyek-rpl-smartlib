@@ -339,3 +339,25 @@ class UserAdminTests(TestCase):
             ).status_code,
             404,
         )
+
+    def test_filter_role_menjaga_kata_kunci(self):
+        self.client.force_login(self.pus)
+        response = self.client.get(
+            reverse("accounts:user_list"), {"role": "GURU", "q": "guru"}
+        )
+        self.assertEqual(response.status_code, 200)
+        usernames = [
+            account.username
+            for account in response.context["page_obj"].object_list
+        ]
+        self.assertEqual(usernames, ["guru1"])
+        self.assertContains(response, 'value="guru"')
+
+    def test_daftar_pengguna_menyediakan_filter_role_realtime(self):
+        self.client.force_login(self.pus)
+        response = self.client.get(reverse("accounts:user_list"))
+        self.assertContains(response, "data-live-filter")
+        self.assertContains(response, "data-live-filter-select")
+        self.assertContains(response, 'aria-label="Ubah akun siswa1"')
+        self.assertContains(response, 'aria-label="Reset kredensial akun siswa1"')
+        self.assertContains(response, 'aria-label="Nonaktifkan akun siswa1"')

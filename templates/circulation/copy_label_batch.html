@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Cetak Label Massal - Digital Library{% endblock %}
 
@@ -16,9 +17,9 @@
     </div>
 
     <div class="px-4 sm:px-5 py-4 space-y-4">
-        <form method="get" action="{% url 'circulation:copy_label_batch' %}" class="flex flex-col sm:flex-row gap-2">
+        <form method="get" action="{% url 'circulation:copy_label_batch' %}" class="flex flex-col sm:flex-row gap-2" data-live-filter>
             <label class="sr-only" for="batch-book">Pilih buku</label>
-            <select id="batch-book" name="book"
+            <select id="batch-book" name="book" data-live-filter-select
                     class="flex-1 min-w-0 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 <option value="">Pilih buku...</option>
                 {% for book in books %}
@@ -27,10 +28,12 @@
                     </option>
                 {% endfor %}
             </select>
-            <button type="submit"
-                    class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
-                Tampilkan eksemplar
-            </button>
+            <noscript>
+                <button type="submit"
+                        class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm">
+                    Tampilkan eksemplar
+                </button>
+            </noscript>
         </form>
 
         {% if selected_book %}
@@ -62,4 +65,8 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/live-filter.js' %}"></script>
 {% endblock %}

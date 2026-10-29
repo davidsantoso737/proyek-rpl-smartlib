@@ -218,3 +218,22 @@ class CatalogViewTests(TestCase):
         response = self._get(reverse("catalog:catalog"), {"page": 2})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Halaman 2 dari 2")
+
+    def test_filter_kategori_tipe_dan_kata_kunci_digabung(self):
+        response = self._get(
+            reverse("catalog:catalog"),
+            {
+                "category": self.fiksi.id,
+                "type": "book",
+                "q": "Laskar",
+            },
+        )
+        self.assertContains(response, "Laskar Pelangi")
+        self.assertNotContains(response, "Fisika Dasar")
+        self.assertNotContains(response, "Matematika Digital")
+
+    def test_katalog_menyediakan_filter_realtime(self):
+        response = self._get(reverse("catalog:catalog"))
+        self.assertContains(response, "data-live-filter")
+        self.assertContains(response, "data-live-filter-select")
+        self.assertContains(response, "Filter langsung diterapkan")

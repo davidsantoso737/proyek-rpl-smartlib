@@ -185,3 +185,18 @@ class ReportTests(TestCase):
             ).status_code,
             403,
         )
+
+    def test_form_laporan_tetap_manual(self):
+        self.client.force_login(self.pus)
+        response = self.client.get(REPORT_URL)
+        self.assertNotContains(response, "data-live-filter")
+        self.assertNotContains(response, "live-filter.js")
+        self.assertContains(response, "Tampilkan")
+
+    def test_perubahan_filter_tanpa_tombol_tidak_membuat_laporan(self):
+        self.client.force_login(self.pus)
+        response = self.client.get(
+            REPORT_URL, {"status": "ACTIVE", "category": "1"}
+        )
+        self.assertFalse(response.context["generated"])
+        self.assertContains(response, "Belum ada pratinjau laporan")
