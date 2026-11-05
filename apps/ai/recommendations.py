@@ -191,11 +191,20 @@ def narrate(provider, user_display, recommendation):
     )
     try:
         return provider.complete(
-            "Anda asisten perpustakaan. Sajikan daftar rekomendasi berikut "
-            "secara ramah dalam Bahasa Indonesia, tanpa menambah judul baru "
-            "dan tanpa menjanjikan transaksi.",
-            f"Pengguna: {user_display}\n{listing}",
-            {"count": len(recommendation["items"])},
+            "Anda asisten perpustakaan. Tulis ringkasan rekomendasi dalam "
+            "1-2 paragraf Bahasa Indonesia yang ramah, mengalir, dan mudah "
+            "dipahami. Sebutkan bahwa rekomendasi mempertimbangkan riwayat "
+            "peminjaman bila basisnya personal. Jangan menambah judul atau "
+            "penulis di luar daftar. Jangan menampilkan JSON, nama field, "
+            "skor, nilai true/false, alasan mentah, karakter escape, atau "
+            "proses analisis internal. Jangan menjanjikan peminjaman atau "
+            "akses.",
+            f"Pengguna: {user_display}\nDaftar rekomendasi:\n{listing}",
+            {
+                "jumlah_rekomendasi": len(recommendation["items"]),
+                "basis": recommendation.get("basis"),
+                "jumlah_riwayat": recommendation.get("history_count", 0),
+            },
         )
     except Exception:
         return None

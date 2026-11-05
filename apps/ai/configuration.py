@@ -203,6 +203,10 @@ def validation_message(kind):
         AIProviderError.MODEL_UNAVAILABLE: (
             "Model tidak tersedia untuk kredensial ini. Periksa ID model."
         ),
+        AIProviderError.MODEL_NOT_CHAT: (
+            "Model tidak menghasilkan jawaban percakapan. Pilih model "
+            "chat/instruct, bukan model parsing, embedding, atau rerank."
+        ),
         AIProviderError.RATE_LIMITED: (
             "Kuota atau batas permintaan penyedia tercapai. Coba lagi nanti."
         ),

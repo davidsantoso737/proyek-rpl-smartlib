@@ -209,10 +209,12 @@ class ProbeTests(TestCase):
         dns.start()
         self.addCleanup(dns.stop)
 
-    def test_probe_uses_small_bounded_request(self):
+    def test_probe_uses_small_bounded_chat_request(self):
         with mock.patch(
             "apps.ai.providers.urllib.request.urlopen",
-            return_value=FakeResponse({"choices": [{"message": {"content": "ok"}}]}),
+            return_value=FakeResponse(
+                {"choices": [{"message": {"content": "Jakarta."}}]}
+            ),
         ) as urlopen:
             self.assertTrue(
                 probe_configuration(
@@ -222,8 +224,23 @@ class ProbeTests(TestCase):
         request = urlopen.call_args[0][0]
         payload = json.loads(request.data)
         self.assertEqual(payload["model"], "model-uji")
-        self.assertEqual(payload["max_tokens"], 1)
+        self.assertLessEqual(payload["max_tokens"], 32)
         self.assertEqual(len(payload["messages"]), 1)
+        self.assertIn("kalimat", payload["messages"][0]["content"])
+
+    def test_probe_rejects_non_chat_output(self):
+        garbage = "\\_ 2 **_ < \\_ & & & & & & } } } } } }"
+        with mock.patch(
+            "apps.ai.providers.urllib.request.urlopen",
+            return_value=FakeResponse(
+                {"choices": [{"message": {"content": garbage}}]}
+            ),
+        ):
+            with self.assertRaises(AIProviderError) as ctx:
+                probe_configuration(
+                    "https://provider.example/v1", "key-uji", "model-uji"
+                )
+        self.assertEqual(ctx.exception.kind, AIProviderError.MODEL_NOT_CHAT)
 
     def test_probe_classifies_auth_error(self):
         for code in (401, 403):

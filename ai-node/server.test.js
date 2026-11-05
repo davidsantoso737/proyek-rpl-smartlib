@@ -183,3 +183,42 @@ test('extractText parity edge cases', () => {
     'x',
   );
 });
+
+test('extractText reads content parts and ignores reasoning', () => {
+  assert.equal(
+    extractText({
+      choices: [{
+        message: {
+          content: [
+            { type: 'text', text: 'Halo ' },
+            { type: 'text', text: 'dunia.' },
+          ],
+          reasoning_content: 'analisis internal',
+        },
+      }],
+    }),
+    'Halo dunia.',
+  );
+  assert.equal(
+    extractText({
+      choices: [{ message: { content: '', reasoning_content: 'internal' } }],
+    }),
+    null,
+  );
+});
+
+test('extractText reads Gemini candidates parts', () => {
+  assert.equal(
+    extractText({
+      candidates: [{
+        content: {
+          parts: [
+            { thought: true, text: 'berpikir' },
+            { text: 'Jawaban final.' },
+          ],
+        },
+      }],
+    }),
+    'Jawaban final.',
+  );
+});

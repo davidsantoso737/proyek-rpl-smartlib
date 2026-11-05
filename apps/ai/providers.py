@@ -8,6 +8,7 @@ log, atau respons.
 
 import json
 import logging
+import re
 import socket
 import time
 import urllib.error
@@ -16,6 +17,24 @@ import urllib.request
 from abc import ABC, abstractmethod
 
 logger = logging.getLogger(__name__)
+
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+_ALPHA_WORD_RE = re.compile(r"[^\W\d_]{2,}", re.UNICODE)
+_REASONING_PART_TYPES = frozenset(
+    {"reasoning", "thinking", "thought", "analysis", "tool_call", "function_call"}
+)
+_TEXT_FIELDS = ("answer", "text", "content", "response", "jawaban", "output_text")
+_INTERNAL_FIELDS = frozenset(
+    {
+        "is_listing",
+        "personal_intent",
+        "statistics_intents",
+        "data_saya",
+        "koleksi_fisik",
+        "fakta_sistem",
+        "peminjaman_saya",
+    }
+)
 
 
 class AIProviderError(Exception):
@@ -29,12 +48,165 @@ class AIProviderError(Exception):
     NO_KEY = "no_key"
     AUTH = "auth"
     MODEL_UNAVAILABLE = "model_unavailable"
+    MODEL_NOT_CHAT = "model_not_chat"
     BAD_REQUEST = "bad_request"
     DISCOVERY_UNSUPPORTED = "discovery_unsupported"
 
     def __init__(self, kind, detail=""):
         self.kind = kind
         super().__init__(detail or kind)
+
+
+def _iter_text_parts(value):
+    """Ambil teks final dari string/list/dict respons provider.
+
+    Bagian reasoning/thinking dan tool call sengaja dilewati: isi itu bukan
+    jawaban untuk pengguna. Bentuk list mendukung ``content`` OpenAI maupun
+    ``parts`` Gemini.
+    """
+    if isinstance(value, str):
+        yield value
+        return
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            yield from _iter_text_parts(item)
+        return
+    if not isinstance(value, dict):
+        return
+    part_type = str(value.get("type") or "").lstrip("$").lower()
+    if value.get("thought") is True or part_type in _REASONING_PART_TYPES:
+        return
+    for key in ("text", "content", "value"):
+        if key in value:
+            yield from _iter_text_parts(value[key])
+            return
+
+
+def _unwrap_text_payload(text):
+    """Buka satu lapis pembungkus teks yang lazim, tanpa menghapus isi sah.
+
+    Hanya membuka code fence tunggal, string JSON ganda, atau objek JSON yang
+    jelas merupakan pembungkus jawaban (mis. ``{"answer": "..."}``). Objek
+    berisi field internal tidak dibuka; validasi berikutnya akan menolaknya.
+    """
+    stripped = text.strip()
+    if stripped.startswith("```") and stripped.endswith("```"):
+        lines = stripped.splitlines()
+        if len(lines) >= 2:
+            body = "\n".join(lines[1:-1]).strip()
+            if body:
+                stripped = body
+    if stripped.startswith('"') and stripped.endswith('"'):
+        try:
+            decoded = json.loads(stripped)
+        except (TypeError, ValueError):
+            return stripped
+        if isinstance(decoded, str):
+            return decoded.strip()
+        return stripped
+    if not (stripped.startswith("{") or stripped.startswith("[")):
+        return stripped
+    try:
+        decoded = json.loads(stripped)
+    except (TypeError, ValueError):
+        return stripped
+    if isinstance(decoded, dict):
+        keys = {str(key).lower() for key in decoded}
+        text_keys = keys.intersection(_TEXT_FIELDS)
+        if len(text_keys) == 1 and not keys.intersection(_INTERNAL_FIELDS):
+            for key, value in decoded.items():
+                if str(key).lower() in _TEXT_FIELDS and isinstance(value, str):
+                    return value.strip()
+    return stripped
+
+
+def _clean_text(text):
+    text = str(text).replace("\r\n", "\n").replace("\r", "\n")
+    text = _CONTROL_CHARS_RE.sub("", text)
+    for _ in range(2):
+        unwrapped = _unwrap_text_payload(text)
+        if unwrapped == text:
+            break
+        text = unwrapped
+    return text.strip()
+
+
+def looks_like_natural_text(text):
+    """True bila teks cukup wajar sebagai jawaban percakapan.
+
+    Tidak menghapus karakter sah. Teks ditolak hanya bila nyaris tidak berisi
+    kata (mis. keluaran parser ``\\_ & & ...``), berupa JSON mentah, boolean
+    tunggal, atau escape/struktur yang mendominasi.
+    """
+    if not isinstance(text, str):
+        return False
+    plain = text.strip()
+    if not plain:
+        return False
+    token = plain.strip(" .,!:;\"'").casefold()
+    if token in {"true", "false", "null", "none"}:
+        return False
+    letters = sum(1 for char in plain if char.isalpha())
+    visible = len(plain)
+    if letters < 2 or not _ALPHA_WORD_RE.search(plain):
+        return False
+    if letters / visible < 0.25:
+        return False
+    structural = sum(plain.count(char) for char in "\\{}[]<>|&")
+    if structural > letters * 2:
+        return False
+    if plain.count("\\") >= 4 and '\\"' in plain:
+        return False
+    if plain.startswith(("{", "[")) and plain.endswith(("}", "]")):
+        try:
+            decoded = json.loads(plain)
+        except (TypeError, ValueError):
+            pass
+        else:
+            if isinstance(decoded, (dict, list)):
+                return False
+    return True
+
+
+def normalize_answer_text(text, error_kind=AIProviderError.MALFORMED):
+    """Bersihkan dan validasi teks jawaban; raise bila bukan percakapan."""
+    cleaned = _clean_text(text)
+    if not looks_like_natural_text(cleaned):
+        raise AIProviderError(error_kind)
+    return cleaned
+
+
+def normalize_response_text(data, error_kind=AIProviderError.MALFORMED):
+    """Ekstrak jawaban final dari bentuk respons provider yang berbeda."""
+    if not isinstance(data, dict):
+        raise AIProviderError(error_kind)
+    candidates = []
+    choices = data.get("choices")
+    if isinstance(choices, list) and choices:
+        first = choices[0]
+        if isinstance(first, dict):
+            message = first.get("message")
+            if isinstance(message, dict):
+                candidates.append(message.get("content"))
+            if first.get("text") is not None:
+                candidates.append(first.get("text"))
+    native = data.get("candidates")
+    if isinstance(native, list) and native:
+        first = native[0]
+        if isinstance(first, dict):
+            content = first.get("content")
+            if isinstance(content, dict):
+                candidates.append(content.get("parts"))
+            else:
+                candidates.append(content)
+    for key in ("output_text", "response", "content", "text"):
+        if key in data:
+            candidates.append(data.get(key))
+    for candidate in candidates:
+        text = "".join(_iter_text_parts(candidate)).strip()
+        if text:
+            return normalize_answer_text(text, error_kind=error_kind)
+    raise AIProviderError(error_kind)
 
 
 class AIProvider(ABC):
@@ -219,7 +391,10 @@ class OpenAICompatibleProvider(AIProvider):
                 {
                     "role": "user",
                     "content": (
-                        f"Konteks sistem (faktual, jangan dikarang di luar ini):\n"
+                        "Referensi fakta sistem (gunakan hanya sebagai sumber "
+                        "fakta; JANGAN disalin mentah dan jangan tampilkan "
+                        "JSON, nama field, nilai true/false, atau proses "
+                        f"analisis):\n"
                         f"{json.dumps(context, ensure_ascii=False)}\n\n"
                         f"Pertanyaan pengguna:\n{user_text}"
                     ),
@@ -230,17 +405,37 @@ class OpenAICompatibleProvider(AIProvider):
         body = self._send(payload)
         try:
             data = json.loads(body)
-            return data["choices"][0]["message"]["content"].strip()
-        except (ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
+            return normalize_response_text(data)
+        except (ValueError, TypeError) as exc:
             raise AIProviderError(AIProviderError.MALFORMED) from exc
+        except AIProviderError as exc:
+            logger.warning(
+                "AI provider answer rejected: model=%s category=%s",
+                self.model or "-",
+                exc.kind,
+            )
+            raise
 
     def probe(self):
-        """Cek autentikasi + ketersediaan model dengan permintaan sangat kecil."""
+        """Cek kredensial + apakah model benar-benar menghasilkan jawaban chat.
+
+        Bukan sekadar memastikan ``choices`` ada: model parsing/embedding juga
+        bisa mengembalikan struktur itu, tetapi isinya simbol/escape yang tidak
+        layak ditampilkan ke pengguna.
+        """
         body = self._send(
             {
                 "model": self.model,
-                "messages": [{"role": "user", "content": "ping"}],
-                "max_tokens": 1,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": (
+                            "Jawab dengan satu kalimat pendek: apa ibu kota "
+                            "Indonesia?"
+                        ),
+                    }
+                ],
+                "max_tokens": 32,
                 "temperature": 0,
             }
         )
@@ -248,8 +443,7 @@ class OpenAICompatibleProvider(AIProvider):
             data = json.loads(body)
         except (ValueError, TypeError) as exc:
             raise AIProviderError(AIProviderError.MALFORMED) from exc
-        if not isinstance(data, dict) or not data.get("choices"):
-            raise AIProviderError(AIProviderError.MALFORMED)
+        normalize_response_text(data, error_kind=AIProviderError.MODEL_NOT_CHAT)
         return True
 
 
@@ -304,12 +498,14 @@ class NodeProvider(AIProvider):
             raise AIProviderError(AIProviderError.UNAVAILABLE)
         try:
             data = json.loads(body)
-            text = data["text"]
-            if not isinstance(text, str) or not text.strip():
-                raise AIProviderError(AIProviderError.MALFORMED)
-            return text.strip()
-        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            return normalize_response_text(data)
+        except (ValueError, TypeError) as exc:
             raise AIProviderError(AIProviderError.MALFORMED) from exc
+        except AIProviderError as exc:
+            logger.warning(
+                "AI node answer rejected: category=%s", exc.kind
+            )
+            raise
 
 
 def get_provider():

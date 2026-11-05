@@ -67,13 +67,70 @@ function readBody(req, maxBytes) {
   });
 }
 
-function extractText(providerBody) {
-  const text = providerBody?.choices?.[0]?.message?.content;
-  if (typeof text !== 'string') {
-    return null;
+const REASONING_PART_TYPES = new Set([
+  'reasoning',
+  'thinking',
+  'thought',
+  'analysis',
+  'tool_call',
+  'function_call',
+]);
+
+function textFromContent(value) {
+  if (typeof value === 'string') {
+    return value;
   }
-  const trimmed = text.trim();
-  return trimmed === '' ? null : trimmed;
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => textFromContent(item))
+      .filter(Boolean)
+      .join('');
+  }
+  if (!value || typeof value !== 'object') {
+    return '';
+  }
+  const type = String(value.type || '')
+    .replace(/^\$/, '')
+    .toLowerCase();
+  if (value.thought === true || REASONING_PART_TYPES.has(type)) {
+    return '';
+  }
+  for (const key of ['text', 'content', 'value']) {
+    if (key in value) {
+      return textFromContent(value[key]);
+    }
+  }
+  return '';
+}
+
+function extractText(providerBody) {
+  const choices = providerBody?.choices;
+  if (Array.isArray(choices) && choices.length > 0) {
+    const first = choices[0] || {};
+    const fromMessage = textFromContent(first.message?.content);
+    const fromText = textFromContent(first.text);
+    const chosen = (fromMessage || fromText || '').trim();
+    if (chosen !== '') {
+      return chosen;
+    }
+  }
+  const candidates = providerBody?.candidates;
+  if (Array.isArray(candidates) && candidates.length > 0) {
+    const first = candidates[0] || {};
+    const content = first.content;
+    const parts = content && typeof content === 'object' ? content.parts : content;
+    const chosen = textFromContent(parts).trim();
+    if (chosen !== '') {
+      return chosen;
+    }
+  }
+  for (const key of ['output_text', 'response', 'content', 'text']) {
+    const chosen = textFromContent(providerBody?.[key]).trim();
+    if (chosen !== '') {
+      return chosen;
+    }
+  }
+  return null;
 }
 
 async function callProvider(config, { systemPrompt, userText, context }) {
@@ -84,7 +141,9 @@ async function callProvider(config, { systemPrompt, userText, context }) {
       {
         role: 'user',
         content:
-          'Konteks sistem (faktual, jangan dikarang di luar ini):\n' +
+          'Referensi fakta sistem (gunakan hanya sebagai sumber fakta; ' +
+          'JANGAN disalin mentah dan jangan tampilkan JSON, nama field, ' +
+          'nilai true/false, atau proses analisis):\n' +
           `${JSON.stringify(context)}\n\nPertanyaan pengguna:\n${userText}`,
       },
     ],
