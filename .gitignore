@@ -1,40 +1,65 @@
-# Python
+
+# ==============================
+# PYTHON
+# ==============================
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Virtual environment
+# Virtual environments
 .venv/
 venv/
 env/
 
-# Operational backups (Task Scheduler XML, etc.)
-backups/
-
-# Django
+# ==============================
+# DJANGO
+# ==============================
 db.sqlite3
-*.log
+staticfiles/
 
-# Environment variables
+# ==============================
+# ENVIRONMENT & SECRETS
+# ==============================
 .env
 .env.*
+!.env.example
+!.env.example.*
 
-# Static / media
-staticfiles/
+# ==============================
+# LOGS & OPERATIONAL BACKUPS
+# ==============================
+logs/
+*.log
+*.log.*
+backups/
+
+# ==============================
+# USER UPLOADS / PRIVATE DATA
+# ==============================
 media/
 private_files/
 
-# Node
+# ==============================
+# NODE.JS
+# ==============================
 node_modules/
 
-# IDE
+# ==============================
+# IDE & EDITORS
+# ==============================
 .vscode/
 .idea/
 
+# ==============================
 # OS
+# ==============================
 .DS_Store
 Thumbs.db
 
-# Reference 
-docs
-reference
+# ==============================
+# BUILD OUTPUT
+# ==============================
+dist/
+build/
+.next/
+.vercel/
