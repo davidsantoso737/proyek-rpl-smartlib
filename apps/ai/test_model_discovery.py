@@ -10,6 +10,7 @@ from django.urls import reverse
 from apps.ai.configuration import (
     ConfigurationError,
     discover_models,
+    encrypt_api_key,
     model_discovery_message,
 )
 from apps.ai.models import AIConfiguration
@@ -177,6 +178,24 @@ class DiscoverModelsTests(TestCase):
             discover_models("https://provider.example/v1", "")
         request, _ = opener.calls[0]
         self.assertEqual(request.headers["Authorization"], "Bearer key-lama")
+
+    def test_uses_selected_provider_key_when_form_key_empty(self):
+        make_saved_config()
+        other = AIConfiguration.objects.create(
+            name="Provider Lain",
+            provider=AIConfiguration.PROVIDER_OPENAI_COMPATIBLE,
+            base_url="https://other.example/v1",
+            model="model-other",
+            api_key_encrypted=encrypt_api_key("key-other"),
+            is_enabled=False,
+        )
+        opener, opener_patch = patch_opener()
+        with patch_dns(), opener_patch:
+            discover_models(other.base_url, "", other.pk)
+        request, _ = opener.calls[0]
+        self.assertEqual(
+            request.headers["Authorization"], "Bearer key-other"
+        )
 
     def test_form_key_wins_over_saved_key(self):
         make_saved_config()
@@ -371,9 +390,44 @@ class ModelDiscoveryViewTests(TestCase):
         self.assertEqual(data["count"], 2)
         self.assertEqual(data["models"], models)
         discover.assert_called_once_with(
-            "https://provider.example/v1", "key-form"
+            "https://provider.example/v1", "key-form", None
         )
         self.assertFalse(AIConfiguration.objects.exists())
+
+    def test_new_provider_model_load_requires_its_own_key(self):
+        make_saved_config()
+        self.client.force_login(self.pus)
+        with mock.patch(
+            "apps.core.views.discover_models"
+        ) as discover:
+            response = self.client.post(
+                MODELS_URL,
+                {
+                    "base_url": "https://baru.example/v1",
+                    "api_key": "",
+                    "create_new": "1",
+                },
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("api_key", response.json()["errors"])
+        discover.assert_not_called()
+
+    def test_selected_configuration_id_is_forwarded(self):
+        row = make_saved_config()
+        self.client.force_login(self.pus)
+        with mock.patch(
+            "apps.core.views.discover_models", return_value=[]
+        ) as discover:
+            response = self.client.post(
+                MODELS_URL,
+                self._post_data(api_key="", configuration_id=row.pk),
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+        self.assertEqual(response.status_code, 200)
+        discover.assert_called_once_with(
+            "https://provider.example/v1", "", row.pk
+        )
 
     def test_unauthorized_cannot_load_models(self):
         self.assertEqual(

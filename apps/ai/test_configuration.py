@@ -18,6 +18,7 @@ from apps.ai.configuration import (
     ConfigurationError,
     configuration_summary,
     decrypt_api_key,
+    delete_configuration,
     encrypt_api_key,
     probe_configuration,
     resolve_ai_configuration,
@@ -106,6 +107,7 @@ def make_policy():
 def make_saved_config(**overrides):
     values = {
         "pk": 1,
+        "name": "Provider Lama",
         "provider": AIConfiguration.PROVIDER_OPENAI_COMPATIBLE,
         "base_url": "https://provider.example/v1",
         "model": "model-lama",
@@ -503,7 +505,7 @@ class SaveConfigurationTests(TestCase):
                 "model-baru",
                 "key-baru",
             )
-        row = AIConfiguration.objects.get(pk=1)
+        row = AIConfiguration.objects.get()
         self.assertNotIn("key-baru", row.api_key_encrypted)
         self.assertEqual(decrypt_api_key(row.api_key_encrypted), "key-baru")
 
@@ -519,7 +521,196 @@ class SaveConfigurationTests(TestCase):
                 enabled=False,
             )
         probe.assert_not_called()
-        self.assertFalse(AIConfiguration.objects.get(pk=1).is_enabled)
+        self.assertFalse(AIConfiguration.objects.get().is_enabled)
+
+
+@override_settings(**EMPTY_AI_SETTINGS)
+class MultiProviderConfigurationTests(TestCase):
+    def setUp(self):
+        self.pus = make_user("pus-multi", User.Role.PUSTAKAWAN)
+        self.nvidia = make_saved_config(name="NVIDIA")
+        self.gemini = AIConfiguration.objects.create(
+            name="Google Gemini",
+            provider=AIConfiguration.PROVIDER_OPENAI_COMPATIBLE,
+            base_url=(
+                "https://generativelanguage.googleapis.com/v1beta/openai"
+            ),
+            model="gemini-2.0-flash",
+            api_key_encrypted=encrypt_api_key("key-gemini"),
+            is_enabled=False,
+            last_validated_at=timezone.now(),
+        )
+
+    def test_assistant_uses_the_active_provider(self):
+        resolved = resolve_ai_configuration()
+        self.assertEqual(resolved.model, "model-lama")
+        self.assertEqual(resolved.api_key, "key-lama")
+
+    def test_inactive_save_keeps_the_current_active_provider(self):
+        with mock.patch(
+            "apps.ai.configuration.probe_configuration"
+        ) as probe:
+            save_configuration(
+                self.pus,
+                self.gemini.base_url,
+                "gemini-pro",
+                "",
+                enabled=False,
+                configuration_id=self.gemini.pk,
+            )
+        probe.assert_not_called()
+        self.nvidia.refresh_from_db()
+        self.gemini.refresh_from_db()
+        self.assertTrue(self.nvidia.is_enabled)
+        self.assertFalse(self.gemini.is_enabled)
+        self.assertEqual(self.gemini.model, "gemini-pro")
+        self.assertIsNone(self.gemini.last_validated_at)
+        self.assertEqual(
+            decrypt_api_key(self.gemini.api_key_encrypted), "key-gemini"
+        )
+
+    def test_name_only_save_keeps_verification(self):
+        with mock.patch(
+            "apps.ai.configuration.probe_configuration"
+        ) as probe:
+            save_configuration(
+                self.pus,
+                self.gemini.base_url,
+                self.gemini.model,
+                "",
+                enabled=False,
+                name="Gemini Baru",
+                configuration_id=self.gemini.pk,
+            )
+        probe.assert_not_called()
+        self.gemini.refresh_from_db()
+        self.assertEqual(self.gemini.name, "Gemini Baru")
+        self.assertIsNotNone(self.gemini.last_validated_at)
+
+    def test_activating_second_provider_deactivates_the_first(self):
+        with mock.patch(
+            "apps.ai.configuration.probe_configuration", return_value=None
+        ) as probe:
+            save_configuration(
+                self.pus,
+                self.gemini.base_url,
+                "gemini-pro",
+                "",
+                enabled=True,
+                configuration_id=self.gemini.pk,
+            )
+        self.assertEqual(probe.call_args[0][1], "key-gemini")
+        self.nvidia.refresh_from_db()
+        self.gemini.refresh_from_db()
+        self.assertFalse(self.nvidia.is_enabled)
+        self.assertTrue(self.gemini.is_enabled)
+        self.assertEqual(
+            AIConfiguration.objects.filter(is_enabled=True).count(), 1
+        )
+        resolved = resolve_ai_configuration()
+        self.assertEqual(resolved.model, "gemini-pro")
+        self.assertEqual(resolved.api_key, "key-gemini")
+
+    def test_new_provider_is_created_without_activating_it(self):
+        with mock.patch(
+            "apps.ai.configuration.probe_configuration", return_value=None
+        ):
+            row = save_configuration(
+                self.pus,
+                "https://api.juanrouter.com/v1",
+                "juan-model",
+                "key-juan",
+                enabled=False,
+                name="JuanRouter",
+                create_new=True,
+            )
+        self.nvidia.refresh_from_db()
+        self.assertTrue(self.nvidia.is_enabled)
+        self.assertEqual(row.name, "JuanRouter")
+        self.assertFalse(row.is_enabled)
+        self.assertEqual(
+            decrypt_api_key(row.api_key_encrypted), "key-juan"
+        )
+
+    def test_selected_key_is_used_when_field_is_empty(self):
+        with mock.patch(
+            "apps.ai.configuration.probe_configuration"
+        ) as probe:
+            test_configuration(
+                self.gemini.base_url,
+                self.gemini.model,
+                "",
+                configuration_id=self.gemini.pk,
+            )
+        self.assertEqual(probe.call_args[0][1], "key-gemini")
+
+    def test_missing_selected_key_does_not_fall_back_to_other_provider(self):
+        empty = AIConfiguration.objects.create(
+            name="Tanpa Key",
+            provider=AIConfiguration.PROVIDER_OPENAI_COMPATIBLE,
+            base_url="https://empty.example/v1",
+            model="model-empty",
+            api_key_encrypted="",
+            is_enabled=False,
+        )
+        with self.assertRaises(ConfigurationError):
+            test_configuration(
+                empty.base_url,
+                empty.model,
+                "",
+                configuration_id=empty.pk,
+            )
+
+    def test_activation_requires_successful_probe(self):
+        with mock.patch(
+            "apps.ai.configuration.probe_configuration",
+            side_effect=AIProviderError(AIProviderError.AUTH),
+        ):
+            with self.assertRaises(AIProviderError):
+                save_configuration(
+                    self.pus,
+                    self.gemini.base_url,
+                    "gemini-pro",
+                    "",
+                    enabled=True,
+                    configuration_id=self.gemini.pk,
+                )
+        self.nvidia.refresh_from_db()
+        self.gemini.refresh_from_db()
+        self.assertTrue(self.nvidia.is_enabled)
+        self.assertFalse(self.gemini.is_enabled)
+
+    def test_delete_active_provider_is_blocked(self):
+        with self.assertRaises(ConfigurationError):
+            delete_configuration(self.nvidia.pk)
+        self.assertTrue(
+            AIConfiguration.objects.filter(pk=self.nvidia.pk).exists()
+        )
+
+    def test_delete_inactive_provider_keeps_active_provider(self):
+        delete_configuration(self.gemini.pk)
+        self.assertFalse(
+            AIConfiguration.objects.filter(pk=self.gemini.pk).exists()
+        )
+        self.nvidia.refresh_from_db()
+        self.assertTrue(self.nvidia.is_enabled)
+
+    def test_page_loads_selected_provider_without_key(self):
+        self.client.force_login(self.pus)
+        response = self.client.get(
+            POLICY_URL, {"provider": self.gemini.pk}
+        )
+        self.assertContains(response, self.gemini.base_url)
+        self.assertContains(response, self.gemini.model)
+        self.assertContains(response, "Google Gemini")
+        self.assertNotContains(response, "key-gemini")
+
+    def test_add_provider_page_renders_empty_form(self):
+        self.client.force_login(self.pus)
+        response = self.client.get(POLICY_URL, {"provider": "new"})
+        self.assertContains(response, "Tambah provider")
+        self.assertContains(response, 'name="create_new"')
+        self.assertContains(response, 'id="id_name"')
 
 
 @override_settings(**EMPTY_AI_SETTINGS)
@@ -544,6 +735,7 @@ class ConfigurationViewTests(TestCase):
 
     def _post_data(self, **overrides):
         data = {
+            "name": "Provider Uji",
             "base_url": "https://provider.example/v1",
             "model": "model-baru",
             "api_key": "key-baru",
@@ -558,6 +750,12 @@ class ConfigurationViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "AI Assistant")
         self.assertContains(response, "Konfigurasi")
+
+    def test_first_provider_page_opens_add_mode(self):
+        self.client.force_login(self.pus)
+        response = self.client.get(POLICY_URL)
+        self.assertContains(response, "Tambah provider")
+        self.assertContains(response, 'name="create_new"')
 
     def test_unauthorized_cannot_read_or_mutate(self):
         self.assertEqual(self.client.get(POLICY_URL).status_code, 302)
@@ -645,10 +843,89 @@ class ConfigurationViewTests(TestCase):
             )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["ok"])
-        row = AIConfiguration.objects.get(pk=1)
+        row = AIConfiguration.objects.get()
         self.assertEqual(row.model, "model-baru")
         self.assertEqual(decrypt_api_key(row.api_key_encrypted), "key-baru")
         self.assertEqual(row.updated_by, self.pus)
+
+    def test_save_endpoint_creates_additional_provider(self):
+        make_saved_config()
+        self.client.force_login(self.pus)
+        with mock.patch(
+            "apps.ai.configuration.probe_configuration", return_value=None
+        ):
+            response = self.client.post(
+                SAVE_URL,
+                {
+                    "name": "Google Gemini",
+                    "base_url": "https://gemini.example/v1",
+                    "model": "gemini-pro",
+                    "api_key": "key-gemini",
+                    "create_new": "1",
+                },
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["ok"])
+        self.assertEqual(AIConfiguration.objects.count(), 2)
+        active = AIConfiguration.objects.get(is_enabled=True)
+        self.assertEqual(active.name, "Provider Lama")
+        created = AIConfiguration.objects.get(name="Google Gemini")
+        self.assertFalse(created.is_enabled)
+        self.assertEqual(
+            decrypt_api_key(created.api_key_encrypted), "key-gemini"
+        )
+
+    def test_save_endpoint_requires_name_for_new_provider(self):
+        self.client.force_login(self.pus)
+        response = self.client.post(
+            SAVE_URL,
+            {
+                "name": "",
+                "base_url": "https://gemini.example/v1",
+                "model": "gemini-pro",
+                "api_key": "key-gemini",
+                "create_new": "1",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("name", response.json()["errors"])
+        self.assertFalse(AIConfiguration.objects.exists())
+
+    def test_delete_endpoint_blocks_active_provider(self):
+        row = make_saved_config()
+        self.client.force_login(self.pus)
+        response = self.client.post(
+            reverse("core:ai_config_delete"),
+            {"configuration_id": row.pk, "confirm": "1"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.json()["ok"])
+        self.assertTrue(AIConfiguration.objects.filter(pk=row.pk).exists())
+
+    def test_delete_endpoint_removes_inactive_provider(self):
+        make_saved_config()
+        other = AIConfiguration.objects.create(
+            name="Cadangan",
+            provider=AIConfiguration.PROVIDER_OPENAI_COMPATIBLE,
+            base_url="https://cadangan.example/v1",
+            model="model-cadangan",
+            api_key_encrypted=encrypt_api_key("key-cadangan"),
+            is_enabled=False,
+        )
+        self.client.force_login(self.pus)
+        response = self.client.post(
+            reverse("core:ai_config_delete"),
+            {"configuration_id": other.pk, "confirm": "1"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["ok"])
+        self.assertFalse(
+            AIConfiguration.objects.filter(pk=other.pk).exists()
+        )
 
     def test_save_failure_does_not_replace_active_configuration(self):
         make_saved_config()
@@ -696,6 +973,27 @@ class ConfigurationViewTests(TestCase):
             )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(probe.call_args[0][1], "key-lama")
+
+    def test_new_provider_test_requires_its_own_key(self):
+        make_saved_config()
+        self.client.force_login(self.pus)
+        with mock.patch(
+            "apps.ai.configuration.probe_configuration"
+        ) as probe:
+            response = self.client.post(
+                TEST_URL,
+                {
+                    "name": "Provider Baru",
+                    "base_url": "https://baru.example/v1",
+                    "model": "model-baru",
+                    "api_key": "",
+                    "create_new": "1",
+                },
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("api_key", response.json()["errors"])
+        probe.assert_not_called()
 
     def test_test_endpoint_uses_form_key(self):
         self.client.force_login(self.pus)

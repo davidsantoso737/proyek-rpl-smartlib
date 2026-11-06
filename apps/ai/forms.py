@@ -12,6 +12,10 @@ INPUT_CLASS = (
 class _AIProviderConnectionForm(forms.Form):
     """Field koneksi yang dipakai bersama oleh uji dan discovery model."""
 
+    configuration_id = forms.IntegerField(
+        required=False,
+        widget=forms.HiddenInput(),
+    )
     base_url = forms.URLField(
         label="URL endpoint provider",
         max_length=255,
@@ -37,10 +41,15 @@ class _AIProviderConnectionForm(forms.Form):
         ),
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, provider_name="", **kwargs):
         super().__init__(*args, **kwargs)
         for name in ("base_url", "api_key"):
             self.fields[name].widget.attrs.update({"class": INPUT_CLASS})
+        if provider_name:
+            self.fields["api_key"].widget.attrs["placeholder"] = (
+                "Kosongkan untuk memakai API key tersimpan "
+                f"{provider_name}"
+            )
 
     def clean_base_url(self):
         value = (self.cleaned_data.get("base_url") or "").strip().rstrip("/")
@@ -63,6 +72,15 @@ class _AIProviderConnectionForm(forms.Form):
 class AIConfigurationForm(_AIProviderConnectionForm):
     """Form konfigurasi AI. API key tidak pernah diisi ulang dari server."""
 
+    name = forms.CharField(
+        label="Nama provider",
+        max_length=100,
+        required=False,
+        help_text=(
+            "Nama yang mudah dikenali, misalnya NVIDIA, Google Gemini, "
+            "atau JuanRouter."
+        ),
+    )
     model = forms.CharField(
         label="ID model",
         max_length=120,
@@ -72,17 +90,29 @@ class AIConfigurationForm(_AIProviderConnectionForm):
         ),
     )
     is_enabled = forms.BooleanField(
-        label="Aktifkan konfigurasi tersimpan",
+        label="Jadikan provider aktif setelah disimpan",
         required=False,
-        initial=True,
+        initial=False,
         help_text=(
-            "Bila dinonaktifkan, sistem memakai konfigurasi environment "
-            "sebagai fallback."
+            "Hanya satu provider yang aktif. Bila tidak dicentang, provider "
+            "disimpan sebagai nonaktif; Assistant memakai provider aktif "
+            "lain atau fallback environment."
         ),
+    )
+    create_new = forms.BooleanField(
+        required=False,
+        widget=forms.HiddenInput(),
     )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["name"].widget.attrs.update(
+            {
+                "class": INPUT_CLASS,
+                "placeholder": "Contoh: NVIDIA",
+                "autocomplete": "off",
+            }
+        )
         self.fields["model"].widget.attrs.update({"class": INPUT_CLASS})
         self.fields["is_enabled"].widget.attrs.update(
             {
@@ -92,6 +122,9 @@ class AIConfigurationForm(_AIProviderConnectionForm):
                 )
             }
         )
+
+    def clean_name(self):
+        return (self.cleaned_data.get("name") or "").strip()
 
     def clean_model(self):
         value = (self.cleaned_data.get("model") or "").strip()

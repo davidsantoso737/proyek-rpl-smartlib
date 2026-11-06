@@ -95,12 +95,37 @@ def decrypt_api_key(value):
         ) from exc
 
 
-def _saved_row():
-    return AIConfiguration.objects.filter(pk=1).first()
+def _active_row():
+    return (
+        AIConfiguration.objects.filter(is_enabled=True)
+        .order_by("-updated_at", "-pk")
+        .first()
+    )
 
 
-def saved_configuration_status():
-    row = _saved_row()
+def _legacy_row():
+    """Baris yang dipakai pemanggil lama tanpa ID provider eksplisit."""
+    return (
+        _active_row()
+        or AIConfiguration.objects.filter(pk=1).first()
+        or AIConfiguration.objects.order_by("pk").first()
+    )
+
+
+def _configuration_by_id(configuration_id):
+    if not configuration_id:
+        return None
+    try:
+        return AIConfiguration.objects.filter(pk=configuration_id).first()
+    except (TypeError, ValueError):
+        return None
+
+
+def saved_configuration_status(configuration_id=None):
+    if configuration_id:
+        row = _configuration_by_id(configuration_id)
+    else:
+        row = _legacy_row()
     status = {
         "row": row,
         "key_present": False,
@@ -152,29 +177,27 @@ def _environment_configuration():
 
 def resolve_ai_configuration():
     """Konfigurasi efektif saat ini, atau None untuk mode lokal."""
-    status = saved_configuration_status()
-    row = status["row"]
-    if row is not None and row.is_enabled:
+    row = _active_row()
+    if row is not None:
+        try:
+            api_key = decrypt_api_key(row.api_key_encrypted)
+        except ConfigurationError:
+            api_key = ""
         if (
-            status["readable"]
-            and (row.base_url or "").strip()
+            (row.base_url or "").strip()
             and (row.model or "").strip()
+            and api_key
         ):
-            try:
-                api_key = decrypt_api_key(row.api_key_encrypted)
-            except ConfigurationError:
-                api_key = ""
-            if api_key:
-                return ResolvedAIConfiguration(
-                    source=SOURCE_DATABASE,
-                    provider=row.provider,
-                    base_url=row.base_url.strip(),
-                    model=row.model.strip(),
-                    api_key=api_key,
-                    timeout=float(
-                        getattr(settings, "AI_TIMEOUT_SECONDS", 15.0)
-                    ),
-                )
+            return ResolvedAIConfiguration(
+                source=SOURCE_DATABASE,
+                provider=row.provider,
+                base_url=row.base_url.strip(),
+                model=row.model.strip(),
+                api_key=api_key,
+                timeout=float(
+                    getattr(settings, "AI_TIMEOUT_SECONDS", 15.0)
+                ),
+            )
         logger.warning(
             "Konfigurasi AI tersimpan tidak dapat dipakai; "
             "memakai konfigurasi environment."
@@ -182,10 +205,28 @@ def resolve_ai_configuration():
     return _environment_configuration()
 
 
-def configuration_summary():
-    status = saved_configuration_status()
+def configuration_summary(selected_id=None):
+    configurations = list(
+        AIConfiguration.objects.order_by("-is_enabled", "name", "pk")
+    )
+    active = next(
+        (row for row in configurations if row.is_enabled), None
+    )
+    selected = None
+    if selected_id:
+        selected = _configuration_by_id(selected_id)
+    if selected is None:
+        selected = active or (
+            configurations[0] if configurations else None
+        )
+    status = saved_configuration_status(
+        selected.pk if selected is not None else None
+    )
     environment = _environment_configuration()
     return {
+        "configurations": configurations,
+        "active": active,
+        "selected": selected,
         "saved": status["row"],
         "saved_key_present": status["key_present"],
         "saved_readable": status["readable"],
@@ -368,20 +409,20 @@ def probe_configuration(base_url, api_key, model, timeout=None):
     return provider.probe()
 
 
-def _proposed_api_key(api_key):
+def _proposed_api_key(api_key, configuration_id=None):
     api_key = (api_key or "").strip()
     if api_key:
         return api_key
-    status = saved_configuration_status()
+    status = saved_configuration_status(configuration_id)
     if status["row"] is None:
         return ""
     return decrypt_api_key(status["row"].api_key_encrypted)
 
 
-def discover_models(base_url, api_key=""):
+def discover_models(base_url, api_key="", configuration_id=None):
     """Ambil katalog model tanpa menyimpan atau mengubah konfigurasi."""
     base_url = _clean_base_url(base_url)
-    key = _proposed_api_key(api_key)
+    key = _proposed_api_key(api_key, configuration_id)
     if not key:
         raise AIProviderError(AIProviderError.NO_KEY)
     _validate_provider_url(base_url)
@@ -395,23 +436,61 @@ def discover_models(base_url, api_key=""):
     return provider.list_models()
 
 
-def test_configuration(base_url, model, api_key=""):
+def test_configuration(
+    base_url, model, api_key="", configuration_id=None
+):
     """Uji kredensial yang diusulkan tanpa mengubah konfigurasi aktif."""
-    key = _proposed_api_key(api_key)
+    key = _proposed_api_key(api_key, configuration_id)
     probe_configuration(base_url, key, model)
 
 
-def save_configuration(user, base_url, model, api_key="", enabled=True):
+def _default_provider_name(base_url):
+    host = (urllib.parse.urlsplit(base_url).hostname or "").strip()
+    return (host or "Provider")[:100]
+
+
+def save_configuration(
+    user,
+    base_url,
+    model,
+    api_key="",
+    enabled=True,
+    name="",
+    configuration_id=None,
+    create_new=False,
+):
     """Validasi lalu simpan konfigurasi secara atomik.
 
-    API key kosong berarti "pertahankan key tersimpan". Konfigurasi baru
-    hanya diaktifkan setelah probe berhasil (kecuali disimpan nonaktif).
+    API key kosong berarti "pertahankan key milik baris ini". Baris yang
+    diaktifkan menonaktifkan provider lain dalam transaksi yang sama.
+    Konfigurasi baru hanya diaktifkan setelah probe berhasil.
     """
     base_url = _clean_base_url(base_url)
     model = _clean_model(model)
     api_key = (api_key or "").strip()
-    existing = _saved_row()
+    if create_new:
+        existing = None
+    elif configuration_id:
+        existing = _configuration_by_id(configuration_id)
+        if existing is None:
+            raise ConfigurationError(
+                "Konfigurasi provider tidak ditemukan."
+            )
+    else:
+        existing = _legacy_row()
+    name = (
+        (name or "").strip()
+        or (existing.name if existing is not None else "")
+        or _default_provider_name(base_url)
+    )
+    name = name[:100]
     existing_cipher = existing.api_key_encrypted if existing else ""
+    changed = (
+        existing is None
+        or (existing.base_url or "") != base_url
+        or (existing.model or "") != model
+        or bool(api_key)
+    )
     existing_key = ""
     if existing is not None:
         try:
@@ -427,21 +506,28 @@ def save_configuration(user, base_url, model, api_key="", enabled=True):
         probe_configuration(base_url, effective_key, model)
     try:
         with transaction.atomic():
-            row = (
-                AIConfiguration.objects.select_for_update()
-                .filter(pk=1)
-                .first()
-            )
-            if row is None:
-                if existing_cipher:
+            row = None
+            if existing is not None:
+                row = (
+                    AIConfiguration.objects.select_for_update()
+                    .filter(pk=existing.pk)
+                    .first()
+                )
+                if row is None:
                     raise ConfigurationError(
                         "Konfigurasi baru saja berubah. Silakan muat ulang."
                     )
-                row = AIConfiguration(pk=1)
-            elif not api_key and row.api_key_encrypted != existing_cipher:
-                raise ConfigurationError(
-                    "Konfigurasi baru saja berubah. Silakan muat ulang."
-                )
+                if (
+                    not api_key
+                    and row.api_key_encrypted != existing_cipher
+                ):
+                    raise ConfigurationError(
+                        "Konfigurasi baru saja berubah. "
+                        "Silakan muat ulang."
+                    )
+            else:
+                row = AIConfiguration()
+            row.name = name
             row.provider = AIConfiguration.PROVIDER_OPENAI_COMPATIBLE
             row.base_url = base_url
             row.model = model
@@ -455,7 +541,16 @@ def save_configuration(user, base_url, model, api_key="", enabled=True):
             row.updated_by = user
             if enabled:
                 row.last_validated_at = timezone.now()
+            elif changed:
+                row.last_validated_at = None
             row.save()
+            if enabled:
+                (
+                    AIConfiguration.objects.select_for_update()
+                    .filter(is_enabled=True)
+                    .exclude(pk=row.pk)
+                    .update(is_enabled=False)
+                )
     except IntegrityError as exc:
         raise ConfigurationError(
             "Konfigurasi baru saja diubah pengguna lain. Silakan ulangi."
@@ -463,6 +558,19 @@ def save_configuration(user, base_url, model, api_key="", enabled=True):
     return row
 
 
+def delete_configuration(configuration_id):
+    """Hapus satu provider. Provider aktif harus diganti lebih dulu."""
+    row = _configuration_by_id(configuration_id)
+    if row is None:
+        raise ConfigurationError("Konfigurasi provider tidak ditemukan.")
+    if row.is_enabled:
+        raise ConfigurationError(
+            "Provider aktif tidak dapat dihapus. Aktifkan provider lain "
+            "terlebih dahulu."
+        )
+    row.delete()
+
+
 def reset_configuration():
-    """Hapus konfigurasi tersimpan; environment kembali menjadi fallback."""
-    AIConfiguration.objects.filter(pk=1).delete()
+    """Hapus semua konfigurasi tersimpan; environment menjadi fallback."""
+    AIConfiguration.objects.all().delete()

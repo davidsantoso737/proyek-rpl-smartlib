@@ -98,7 +98,7 @@
                 <div>
                     <h2 id="ai-heading" class="text-base font-semibold text-slate-900">AI Assistant</h2>
                     <p class="mt-0.5 text-sm text-slate-500">
-                        Atur endpoint, API key, dan model yang dipakai asisten. Perubahan berlaku untuk permintaan berikutnya tanpa restart server.
+                        Simpan beberapa provider, lalu pilih salah satu tanpa mengetik ulang endpoint. Hanya satu provider yang aktif untuk Assistant.
                     </p>
                 </div>
                 <p class="inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-medium
@@ -122,63 +122,139 @@
             </div>
 
             <div class="grid gap-6 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-8">
-                <div class="lg:border-r lg:border-slate-100 lg:pr-8">
-                    <h3 class="text-sm font-semibold text-slate-900">Status konfigurasi</h3>
-                    <dl class="mt-3 space-y-3 text-sm">
-                        <div class="flex items-start justify-between gap-4">
-                            <dt class="text-slate-500">Model aktif</dt>
-                            <dd class="min-w-0 break-words text-right font-medium text-slate-900">{{ ai_status.effective.model|default:"-" }}</dd>
+                <div class="min-w-0 lg:border-r lg:border-slate-100 lg:pr-8">
+                    <h3 class="text-sm font-semibold text-slate-900">Provider tersimpan</h3>
+                    <form method="get" action="{% url 'core:policy' %}" class="mt-3">
+                        <label for="ai-provider-select" class="mb-1.5 block text-sm font-medium text-slate-700">
+                            Pilih provider
+                        </label>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <select id="ai-provider-select" name="provider"
+                                    class="min-h-[44px] min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                                {% for provider in ai_status.configurations %}
+                                    <option value="{{ provider.pk }}" {% if ai_selected and ai_selected.pk == provider.pk %}selected{% endif %}>
+                                        {{ provider.name }}{% if provider.is_enabled %} (aktif){% endif %}
+                                    </option>
+                                {% endfor %}
+                                <option value="new" {% if ai_create_new %}selected{% endif %}>Tambah provider baru</option>
+                            </select>
+                            <button type="submit"
+                                    class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
+                                Buka
+                            </button>
                         </div>
-                        <div class="flex items-start justify-between gap-4">
-                            <dt class="text-slate-500">API key tersimpan</dt>
-                            <dd class="min-w-0 break-words text-right font-medium text-slate-900">
-                                {% if ai_status.saved_key_present %}Tersimpan{% else %}Belum ada{% endif %}
-                            </dd>
+                        <p class="mt-2 text-xs text-slate-500">
+                            Pilih provider untuk memuat endpoint dan model tersimpan. Halaman dimuat ulang otomatis saat pilihan diganti.
+                        </p>
+                    </form>
+
+                    {% if ai_create_new %}
+                        <div class="mt-5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                            <p class="font-medium">Provider baru</p>
+                            <p class="mt-1 text-xs leading-relaxed text-blue-800">
+                                Isi nama, URL endpoint, API key, dan ID model. Setelah disimpan, provider langsung tersedia di daftar pilihan.
+                            </p>
                         </div>
-                        <div class="flex items-start justify-between gap-4">
-                            <dt class="text-slate-500">Fallback environment</dt>
-                            <dd class="min-w-0 break-words text-right font-medium text-slate-900">
-                                {% if ai_status.environment_configured %}Tersedia{% else %}Tidak tersedia{% endif %}
-                            </dd>
-                        </div>
-                        {% if ai_status.saved %}
+                    {% elif ai_selected %}
+                        <dl class="mt-5 space-y-3 text-sm">
                             <div class="flex items-start justify-between gap-4">
-                                <dt class="text-slate-500">Terakhir diperbarui</dt>
-                                <dd class="min-w-0 break-words text-right font-medium text-slate-900">
-                                    {{ ai_status.saved.updated_at|date:"d M Y H:i" }}
-                                    {% if ai_status.saved.updated_by %}
-                                        <span class="block text-xs font-normal text-slate-500">oleh {{ ai_status.saved.updated_by.full_name|default:ai_status.saved.updated_by.username }}</span>
+                                <dt class="text-slate-500">Status</dt>
+                                <dd class="min-w-0 text-right">
+                                    {% if ai_selected.is_enabled %}
+                                        <span class="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800">Aktif</span>
+                                    {% elif ai_selected.last_validated_at %}
+                                        <span class="inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">Tersimpan dan terverifikasi</span>
+                                    {% else %}
+                                        <span class="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">Tersimpan, belum diverifikasi</span>
                                     {% endif %}
+                                </dd>
+                            </div>
+                            <div class="flex items-start justify-between gap-4">
+                                <dt class="text-slate-500">URL endpoint</dt>
+                                <dd class="min-w-0 break-words text-right font-medium text-slate-900">{{ ai_selected.base_url }}</dd>
+                            </div>
+                            <div class="flex items-start justify-between gap-4">
+                                <dt class="text-slate-500">Model tersimpan</dt>
+                                <dd class="min-w-0 break-words text-right font-medium text-slate-900">{{ ai_selected.model|default:"-" }}</dd>
+                            </div>
+                            <div class="flex items-start justify-between gap-4">
+                                <dt class="text-slate-500">API key</dt>
+                                <dd class="min-w-0 break-words text-right font-medium text-slate-900">
+                                    {% if ai_status.saved_key_present %}Tersimpan{% else %}Belum ada{% endif %}
                                 </dd>
                             </div>
                             <div class="flex items-start justify-between gap-4">
                                 <dt class="text-slate-500">Terakhir diverifikasi</dt>
                                 <dd class="min-w-0 break-words text-right font-medium text-slate-900">
-                                    {% if ai_status.saved.last_validated_at %}
-                                        {{ ai_status.saved.last_validated_at|date:"d M Y H:i" }}
+                                    {% if ai_selected.last_validated_at %}
+                                        {{ ai_selected.last_validated_at|date:"d M Y H:i" }}
                                     {% else %}
                                         Belum diverifikasi
                                     {% endif %}
                                 </dd>
                             </div>
-                        {% endif %}
-                    </dl>
-
-                    {% if ai_status.saved_problem %}
-                        <p role="alert" class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
-                            {{ ai_status.saved_problem }}
-                            {% if ai_status.effective %}Sistem memakai konfigurasi environment yang tersedia.{% endif %}
+                            <div class="flex items-start justify-between gap-4">
+                                <dt class="text-slate-500">Terakhir diperbarui</dt>
+                                <dd class="min-w-0 break-words text-right font-medium text-slate-900">
+                                    {{ ai_selected.updated_at|date:"d M Y H:i" }}
+                                    {% if ai_selected.updated_by %}
+                                        <span class="block text-xs font-normal text-slate-500">oleh {{ ai_selected.updated_by.full_name|default:ai_selected.updated_by.username }}</span>
+                                    {% endif %}
+                                </dd>
+                            </div>
+                        </dl>
+                    {% else %}
+                        <p class="mt-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                            Belum ada provider tersimpan. Tambah provider untuk mengatur endpoint, API key, dan model.
                         </p>
                     {% endif %}
 
-                    <p class="mt-4 text-xs leading-relaxed text-slate-500">
-                        API key tidak pernah ditampilkan kembali. Biarkan kolom API key kosong untuk mempertahankan key yang sudah tersimpan.
-                        Konfigurasi baru hanya diaktifkan setelah uji koneksi berhasil.
-                    </p>
+                    <div class="mt-5 border-t border-slate-100 pt-4">
+                        <h3 class="text-sm font-semibold text-slate-900">Status sistem</h3>
+                        <dl class="mt-3 space-y-3 text-sm">
+                            <div class="flex items-start justify-between gap-4">
+                                <dt class="text-slate-500">Sumber aktif</dt>
+                                <dd class="min-w-0 break-words text-right font-medium text-slate-900">
+                                    {% if ai_status.effective.source == "database" %}
+                                        Provider tersimpan
+                                    {% elif ai_status.effective.source == "environment_gateway" %}
+                                        Environment (gateway)
+                                    {% elif ai_status.effective.source == "environment" %}
+                                        Environment
+                                    {% else %}
+                                        Mode lokal
+                                    {% endif %}
+                                </dd>
+                            </div>
+                            <div class="flex items-start justify-between gap-4">
+                                <dt class="text-slate-500">Model aktif</dt>
+                                <dd class="min-w-0 break-words text-right font-medium text-slate-900">{{ ai_status.effective.model|default:"-" }}</dd>
+                            </div>
+                            <div class="flex items-start justify-between gap-4">
+                                <dt class="text-slate-500">Fallback environment</dt>
+                                <dd class="min-w-0 break-words text-right font-medium text-slate-900">
+                                    {% if ai_status.environment_configured %}Tersedia{% else %}Tidak tersedia{% endif %}
+                                </dd>
+                            </div>
+                        </dl>
+
+                        {% if ai_status.saved_problem %}
+                            <p role="alert" class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+                                {{ ai_status.saved_problem }}
+                                {% if ai_status.effective %}Sistem memakai konfigurasi environment yang tersedia.{% endif %}
+                            </p>
+                        {% endif %}
+
+                        <p class="mt-4 text-xs leading-relaxed text-slate-500">
+                            API key tidak pernah ditampilkan kembali. Saat kolom API key dikosongkan, sistem memakai key milik provider yang sedang dipilih. Provider baru hanya menjadi aktif setelah uji koneksi berhasil.
+                        </p>
+                    </div>
                 </div>
 
-                <div>
-                    <h3 class="text-sm font-semibold text-slate-900">Ubah konfigurasi</h3>
+                <div class="min-w-0">
+                    <h3 class="text-sm font-semibold text-slate-900">
+                        {% if ai_create_new %}Tambah provider{% else %}Detail provider{% endif %}
+                    </h3>
                     {% if ai_form.non_field_errors %}
                         <div role="alert" class="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-800">
                             {% for error in ai_form.non_field_errors %}
@@ -188,6 +264,11 @@
                     {% endif %}
                     <form id="ai-config-form" method="post" action="{% url 'core:ai_config_save' %}" class="mt-3 space-y-4">
                         {% csrf_token %}
+                        {{ ai_form.configuration_id }}
+                        {% if ai_create_new %}
+                            <input type="hidden" name="create_new" value="1">
+                        {% endif %}
+                        {% include "partials/_form_field.html" with field=ai_form.name %}
                         {% include "partials/_form_field.html" with field=ai_form.base_url %}
                         {% include "partials/_form_field.html" with field=ai_form.api_key %}
                         <div class="min-w-0">
@@ -265,19 +346,30 @@
                         </div>
                     </form>
 
-                    {% if ai_status.saved %}
+                    {% if ai_selected and not ai_create_new %}
                         <div class="mt-5 border-t border-slate-100 pt-4">
-                            <p class="text-xs text-slate-500">
-                                Hapus konfigurasi tersimpan untuk kembali sepenuhnya ke konfigurasi environment.
-                            </p>
-                            <form id="ai-config-reset-form" method="post" action="{% url 'core:ai_config_reset' %}" class="mt-2">
-                                {% csrf_token %}
-                                <input type="hidden" name="confirm" value="1">
-                                <button type="submit"
-                                        class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50">
-                                    Hapus konfigurasi tersimpan
+                            {% if ai_selected.is_enabled %}
+                                <p class="text-xs leading-relaxed text-slate-500">
+                                    Provider ini sedang aktif. Aktifkan provider lain sebelum menghapus agar Assistant tidak kehilangan konfigurasi.
+                                </p>
+                                <button type="button" disabled
+                                        class="mt-2 inline-flex min-h-[44px] cursor-not-allowed items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-400">
+                                    Hapus provider
                                 </button>
-                            </form>
+                            {% else %}
+                                <p class="text-xs leading-relaxed text-slate-500">
+                                    Hapus provider ini dari daftar. Konfigurasi provider lain tidak berubah.
+                                </p>
+                                <form id="ai-config-delete-form" method="post" action="{% url 'core:ai_config_delete' %}" class="mt-2">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="configuration_id" value="{{ ai_selected.pk }}">
+                                    <input type="hidden" name="confirm" value="1">
+                                    <button type="submit"
+                                            class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2">
+                                        Hapus provider
+                                    </button>
+                                </form>
+                            {% endif %}
                         </div>
                     {% endif %}
                 </div>
@@ -338,7 +430,8 @@
     var saveButton = document.getElementById("ai-config-save");
     var testButton = document.getElementById("ai-config-test");
     var loadButton = document.getElementById("ai-model-load");
-    var resetForm = document.getElementById("ai-config-reset-form");
+    var deleteForm = document.getElementById("ai-config-delete-form");
+    var providerSelect = document.getElementById("ai-provider-select");
     var discoveryPanel = document.getElementById("ai-model-discovery");
     var modelStatus = document.getElementById("ai-model-status");
     var modelSearch = document.getElementById("ai-model-search");
@@ -349,6 +442,14 @@
     var csrf = form.querySelector("[name=csrfmiddlewaretoken]").value;
     var modelCatalog = [];
     var catalogStale = false;
+
+    if (providerSelect) {
+        providerSelect.addEventListener("change", function () {
+            if (providerSelect.value) {
+                providerSelect.form.submit();
+            }
+        });
+    }
 
     function showStatus(kind, message) {
         statusBox.hidden = false;
@@ -584,6 +685,11 @@
         submit("{% url 'core:ai_config_save' %}")
             .then(function (result) {
                 if (result.ok) {
+                    if (result.data.id) {
+                        window.location.href = window.location.pathname +
+                            "?provider=" + encodeURIComponent(result.data.id);
+                        return;
+                    }
                     window.location.reload();
                     return;
                 }
@@ -596,10 +702,10 @@
             });
     });
 
-    if (resetForm) {
-        resetForm.addEventListener("submit", function (event) {
+    if (deleteForm) {
+        deleteForm.addEventListener("submit", function (event) {
             var confirmed = window.confirm(
-                "Hapus konfigurasi AI tersimpan? Sistem akan memakai konfigurasi environment bila tersedia."
+                "Hapus provider ini? Konfigurasi provider lain tidak berubah."
             );
             if (!confirmed) {
                 event.preventDefault();

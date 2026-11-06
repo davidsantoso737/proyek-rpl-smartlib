@@ -22,6 +22,11 @@ urlpatterns = [
         name="ai_config_models",
     ),
     path(
+        "konfigurasi/ai/hapus/",
+        views.ai_config_delete_view,
+        name="ai_config_delete",
+    ),
+    path(
         "konfigurasi/ai/reset/",
         views.ai_config_reset_view,
         name="ai_config_reset",

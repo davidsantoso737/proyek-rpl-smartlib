@@ -5,9 +5,11 @@ from django.db import models
 class AIConfiguration(models.Model):
     """Konfigurasi AI Assistant yang dapat diubah pustakawan lewat UI.
 
-    Hanya satu baris (pk=1) yang dipakai. API key disimpan terenkripsi di
-    kolom ``api_key_encrypted``; nilai aslinya tidak pernah disimpan di
-    model ini dan tidak pernah dikirim ke template.
+    Setiap baris mewakili satu provider tersimpan. Hanya satu baris yang
+    boleh ``is_enabled=True`` dan baris itulah yang dipakai Assistant.
+    API key disimpan terenkripsi di kolom ``api_key_encrypted``; nilai
+    aslinya tidak pernah disimpan di model ini dan tidak pernah dikirim ke
+    template.
     """
 
     PROVIDER_OPENAI_COMPATIBLE = "openai_compatible"
@@ -18,6 +20,7 @@ class AIConfiguration(models.Model):
         ),
     ]
 
+    name = models.CharField(max_length=100)
     provider = models.CharField(
         max_length=40,
         choices=PROVIDER_CHOICES,
@@ -44,4 +47,4 @@ class AIConfiguration(models.Model):
         verbose_name_plural = "Konfigurasi AI"
 
     def __str__(self):
-        return f"{self.provider} / {self.model}"
+        return f"{self.name or self.base_url} / {self.model}"
