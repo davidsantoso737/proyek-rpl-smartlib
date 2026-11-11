@@ -145,6 +145,24 @@ class AssistantTests(TestCase):
         self.assertFalse(result["provider_used"])
         self.assertIn("Python", result["answer"])
 
+    def test_api_tidak_membocorkan_reasoning_provider(self):
+        fake = FakeProvider(
+            "<thought>\n"
+            "* User asks: siapa nama saya.\n"
+            "* data_saya.profil: {\"nama\": \"siswa1 Full\"}.\n"
+            "</thought>\n\n"
+            "Halo siswa1 Full! Kamu terdaftar sebagai siswa."
+        )
+        with mock.patch("apps.ai.services.get_provider", return_value=fake):
+            self.client.force_login(self.siswa)
+            response = self.client.post(
+                ASK_URL, {"question": "Siapa nama saya?"}
+            )
+        data = response.json()
+        self.assertNotIn("<thought>", data["answer"])
+        self.assertNotIn("data_saya", data["answer"])
+        self.assertIn("Halo siswa1 Full", data["answer"])
+
     def test_ai_cannot_change_transaction(self):
         before = (Loan.objects.count(), EbookLoan.objects.count())
         ask(self.siswa, "Pinjamkan saya buku Python sekarang juga!")

@@ -42,6 +42,14 @@ class FakeProviderCapture:
         return "Jawaban provider."
 
 
+class FakeProviderAnswer:
+    def __init__(self, answer):
+        self.answer = answer
+
+    def complete(self, system_prompt, user_text, context):
+        return self.answer
+
+
 @override_settings(
     AI_PROVIDER_BASE_URL="", AI_API_KEY="", AI_MODEL="",
     AI_TIMEOUT_SECONDS=5,
@@ -281,6 +289,33 @@ class PersonalContextTests(TestCase):
                 result = ask(self.siswa_a, question)
                 self.assertIn("siswaA Full", result["answer"])
                 self.assertIn("Siswa", result["answer"])
+
+    def test_provider_thought_dibersihkan_dari_jawaban_profil(self):
+        fake = FakeProviderAnswer(
+            "<thought>pakai data_saya.profil lalu tulis final.</thought>\n\n"
+            "Halo siswaA Full! Kamu siswa dengan NIS 10001."
+        )
+        with mock.patch(
+            "apps.ai.services.get_provider", return_value=fake
+        ):
+            result = ask(self.siswa_a, "Siapa saya?")
+        self.assertEqual(result["source"], "provider")
+        self.assertNotIn("<thought>", result["answer"])
+        self.assertNotIn("data_saya", result["answer"])
+        self.assertIn("Halo siswaA Full", result["answer"])
+        self.assertIn("NIS 10001", result["answer"])
+
+    def test_provider_hanya_reasoning_fallback_ke_data_aktual(self):
+        fake = FakeProviderAnswer(
+            "<thought>analisis internal tanpa jawaban final.</thought>"
+        )
+        with mock.patch(
+            "apps.ai.services.get_provider", return_value=fake
+        ):
+            result = ask(self.siswa_a, "Siapa saya?")
+        self.assertNotIn("<thought>", result["answer"])
+        self.assertIn("siswaA Full", result["answer"])
+        self.assertIn("NIS 10001", result["answer"])
 
     def test_ai_tetap_kecil_untuk_dirinya(self):
         # "kamu siapa?" menanyakan identitas AI, bukan pengguna.

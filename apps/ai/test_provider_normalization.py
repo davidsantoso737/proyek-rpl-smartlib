@@ -145,6 +145,130 @@ class ResponseExtractionTests(SimpleTestCase):
         self.assertFalse(looks_like_natural_text("........"))
         self.assertFalse(looks_like_natural_text("& & & & & & &"))
 
+    def test_blok_thought_dibuang_final_dipertahankan(self):
+        data = {
+            "choices": [
+                {
+                    "message": {
+                        "content": (
+                            "<thought>\n"
+                            "* User asks: siapa saya.\n"
+                            "* data_saya.profil: {\"nama\": \"Sugeng\"}.\n"
+                            "</thought>\n\n"
+                            "Halo Sugeng! Kamu siswa kelas XII-A jurusan IPA."
+                        )
+                    }
+                }
+            ]
+        }
+        answer = normalize_response_text(data)
+        self.assertEqual(
+            answer,
+            "Halo Sugeng! Kamu siswa kelas XII-A jurusan IPA.",
+        )
+        self.assertNotIn("data_saya", answer)
+        self.assertNotIn("<thought>", answer)
+
+    def test_tag_think_case_insensitive_dan_markdown_utuh(self):
+        data = {
+            "choices": [
+                {
+                    "message": {
+                        "content": (
+                            "<THINK>analisis internal</THINK>\n"
+                            "**Halo Sugeng!**\n\n"
+                            "- Kelas: XII-A\n"
+                            "- Jurusan: IPA"
+                        )
+                    }
+                }
+            ]
+        }
+        self.assertEqual(
+            normalize_response_text(data),
+            "**Halo Sugeng!**\n\n- Kelas: XII-A\n- Jurusan: IPA",
+        )
+
+    def test_beberapa_blok_thought_dibuang(self):
+        data = {
+            "choices": [
+                {
+                    "message": {
+                        "content": (
+                            "<thought>satu</thought>"
+                            "Jawaban final."
+                            "<thought>dua</thought>"
+                        )
+                    }
+                }
+            ]
+        }
+        self.assertEqual(normalize_response_text(data), "Jawaban final.")
+
+    def test_pembuka_tanpa_penutup_membuang_sisa_reasoning(self):
+        data = {
+            "choices": [
+                {
+                    "message": {
+                        "content": (
+                            "Halo Sugeng! Kamu siswa XII-A.\n"
+                            "<thought>\n* Constraint check: jangan tampilkan JSON.\n"
+                        )
+                    }
+                }
+            ]
+        }
+        self.assertEqual(
+            normalize_response_text(data),
+            "Halo Sugeng! Kamu siswa XII-A.",
+        )
+
+    def test_penutup_tanpa_pembuka_membuang_awalan_reasoning(self):
+        data = {
+            "choices": [
+                {
+                    "message": {
+                        "content": (
+                            "Analisis internal: pakai data_saya.profil.\n"
+                            "</thought>\n"
+                            "Halo Sugeng! Kamu siswa XII-A."
+                        )
+                    }
+                }
+            ]
+        }
+        self.assertEqual(
+            normalize_response_text(data),
+            "Halo Sugeng! Kamu siswa XII-A.",
+        )
+
+    def test_hanya_reasoning_tanpa_final_ditolak(self):
+        data = {
+            "choices": [
+                {
+                    "message": {
+                        "content": (
+                            "<thought>Hanya proses berpikir tanpa jawaban."
+                            "</thought>"
+                        )
+                    }
+                }
+            ]
+        }
+        with self.assertRaises(AIProviderError) as ctx:
+            normalize_response_text(data)
+        self.assertEqual(ctx.exception.kind, AIProviderError.MALFORMED)
+
+    def test_tag_non_reasoning_tidak_dihapus(self):
+        text = "Gunakan <b>tebal</b> pada Markdown bila perlu."
+        self.assertEqual(normalize_answer_text(text), text)
+
+    def test_gabungan_chunk_streaming_dinormalisasi_setelah_lengkap(self):
+        # Backend saat ini tidak memakai streaming; bila chunk digabung utuh
+        # sebelum normalisasi, blok reasoning tetap dibuang.
+        chunks = ["<tho", "ught>analisis", " internal</thou", "ght>\nHalo!"]
+        self.assertEqual(normalize_answer_text("".join(chunks)), "Halo!")
+
 
 class FakeResponse:
     status = 200

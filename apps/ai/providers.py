@@ -20,6 +20,41 @@ logger = logging.getLogger(__name__)
 
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 _ALPHA_WORD_RE = re.compile(r"[^\W\d_]{2,}", re.UNICODE)
+
+# Tag literal yang dipakai sebagian model untuk membungkus reasoning di dalam
+# ``message.content``. Hanya nama tag reasoning yang dikenal yang diproses,
+# sehingga tag lain dalam jawaban tidak ikut terhapus.
+_REASONING_TAG_NAMES = (
+    "think",
+    "thinking",
+    "thought",
+    "thoughts",
+    "reasoning",
+    "analysis",
+    "scratchpad",
+)
+_REASONING_TAG = (
+    r"(?:" + "|".join(_REASONING_TAG_NAMES) + r")"
+)
+_REASONING_BLOCK_RE = re.compile(
+    r"<\s*" + _REASONING_TAG + r"\b[^>]*>.*?<\s*/\s*" + _REASONING_TAG + r"\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
+# Pembuka tanpa penutup: sisa teks setelah tag tidak dapat dipastikan final,
+# jadi dibuang sampai akhir. Teks final sebelum tag tetap dipertahankan.
+_REASONING_OPEN_TAIL_RE = re.compile(
+    r"<\s*" + _REASONING_TAG + r"\b[^>]*>.*\Z",
+    re.IGNORECASE | re.DOTALL,
+)
+# Penutup tanpa pembuka: bagian sebelum penutup berasal dari reasoning.
+_REASONING_CLOSE_HEAD_RE = re.compile(
+    r"\A.*?<\s*/\s*" + _REASONING_TAG + r"\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
+_REASONING_CLOSE_RE = re.compile(
+    r"<\s*/\s*" + _REASONING_TAG + r"\s*>",
+    re.IGNORECASE,
+)
 _REASONING_PART_TYPES = frozenset(
     {"reasoning", "thinking", "thought", "analysis", "tool_call", "function_call"}
 )
@@ -120,14 +155,31 @@ def _unwrap_text_payload(text):
     return stripped
 
 
+def _strip_reasoning_tags(text):
+    """Buang blok reasoning bertag yang bocor ke dalam jawaban final.
+
+    Hanya tag bernama reasoning yang dikenal yang disentuh. Blok lengkap
+    dihapus; pembuka tanpa penutup membuang sisa teks (bukan jawaban final);
+    penutup tanpa pembuka membuang awalan reasoning. Tag lain dan Markdown
+    jawaban dibiarkan utuh.
+    """
+    text = _REASONING_BLOCK_RE.sub("", text)
+    text = _REASONING_CLOSE_HEAD_RE.sub("", text)
+    text = _REASONING_CLOSE_RE.sub("", text)
+    text = _REASONING_OPEN_TAIL_RE.sub("", text)
+    return text
+
+
 def _clean_text(text):
     text = str(text).replace("\r\n", "\n").replace("\r", "\n")
     text = _CONTROL_CHARS_RE.sub("", text)
+    text = _strip_reasoning_tags(text)
     for _ in range(2):
         unwrapped = _unwrap_text_payload(text)
         if unwrapped == text:
             break
         text = unwrapped
+    text = _strip_reasoning_tags(text)
     return text.strip()
 
 
