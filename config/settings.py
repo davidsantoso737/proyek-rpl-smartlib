@@ -81,6 +81,11 @@ TELEGRAM_API_BASE_URL = (
     os.getenv("TELEGRAM_API_BASE_URL", "https://api.telegram.org").rstrip("/")
 )
 TELEGRAM_TIMEOUT_SECONDS = float(os.getenv("TELEGRAM_TIMEOUT_SECONDS", "10"))
+# Alur tautan lama tanpa persetujuan pustakawan. Default mati agar tidak
+# menjadi jalan pintas verifikasi kontak baru.
+TELEGRAM_LEGACY_LINKING_ENABLED = (
+    os.getenv("TELEGRAM_LEGACY_LINKING_ENABLED", "False").lower() == "true"
+)
 
 
 # Application definition

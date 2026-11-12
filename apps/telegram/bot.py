@@ -7,6 +7,7 @@ from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
 
+from .connection import start_link_token, verify_contact
 from .linking import (
     STATUS_ALREADY_CLAIMED,
     STATUS_ALREADY_LINKED,
@@ -20,12 +21,64 @@ from .services import TelegramError
 logger = logging.getLogger(__name__)
 
 START_WITHOUT_CODE = (
-    "Untuk menautkan akun, buka halaman Profil SmartLib dan buat kode "
-    "tautan. Kirim kode itu ke bot ini dengan format /start KODE."
+    "Pengajuan penautan dibuat dari halaman Profil SmartLib dan harus "
+    "disetujui pustakawan terlebih dahulu. Setelah disetujui, buka "
+    "tombol Konfirmasi Telegram di halaman Profil untuk membuka bot ini."
 )
 CODE_INVALID = (
-    "Kode tautan tidak valid atau sudah kedaluwarsa. Buat kode baru "
-    "dari halaman Profil SmartLib."
+    "Tautan konfirmasi tidak valid atau sudah kedaluwarsa. Buat tautan "
+    "baru dari halaman Profil SmartLib."
+)
+CODE_PHONE_CHANGED = (
+    "Nomor HP di profil SmartLib berubah setelah pengajuan disetujui. "
+    "Ajukan penautan ulang dari halaman Profil SmartLib."
+)
+CONTACT_PROMPT = (
+    "Tautan dikenali. Bagikan nomor HP yang terdaftar di SmartLib "
+    "dengan tombol di bawah ini untuk membuktikan bahwa akun Telegram "
+    "ini milik Anda."
+)
+CONTACT_ACCEPTED = (
+    "Verifikasi berhasil. Akun Telegram ini kini aktif menerima "
+    "notifikasi SmartLib."
+)
+CONTACT_INVALID = (
+    "Kontak tidak valid. Gunakan tombol Bagikan nomor HP sehingga "
+    "bot menerima kontak Telegram Anda sendiri."
+)
+CONTACT_MISMATCH = (
+    "Nomor HP pada kontak tidak cocok dengan nomor di profil SmartLib. "
+    "Periksa nomor profil atau bagikan kontak yang benar."
+)
+CONTACT_TOO_MANY = (
+    "Terlalu banyak percobaan. Permintaan penautan dibatalkan. Buat "
+    "tautan baru dari halaman Profil SmartLib."
+)
+CONTACT_EXPIRED = (
+    "Tautan sudah kedaluwarsa. Buat tautan baru dari halaman Profil "
+    "SmartLib."
+)
+CONTACT_ALREADY_ACTIVE = (
+    "Akun SmartLib ini sudah memiliki tautan Telegram aktif."
+)
+CONTACT_CONFLICT = (
+    "Akun Telegram ini sudah terhubung ke akun SmartLib lain. Putuskan "
+    "tautan dari akun tersebut terlebih dahulu."
+)
+CONTACT_NO_PHONE = (
+    "Profil SmartLib belum memiliki nomor HP yang valid. Lengkapi "
+    "profil terlebih dahulu."
+)
+CONTACT_INACTIVE = (
+    "Akun SmartLib tidak aktif. Hubungi pustakawan untuk bantuan."
+)
+CONTACT_NO_SESSION = (
+    "Tidak ada penautan yang menunggu konfirmasi kontak. Buka tautan "
+    "baru dari halaman Profil SmartLib."
+)
+CONTACT_PHONE_CHANGED = (
+    "Nomor HP profil berubah sebelum konfirmasi selesai. Ajukan "
+    "penautan ulang dari halaman Profil SmartLib."
 )
 CODE_CLAIMED = (
     "Kode diterima. Buka halaman Profil SmartLib dan pilih Konfirmasi "
@@ -45,13 +98,106 @@ CODE_CONFLICT = (
 )
 
 
-def _reply(client, chat_id, text):
+def _reply(client, chat_id, text, *, reply_markup=None):
     try:
-        client.send_message(chat_id, text)
+        client.send_message(chat_id, text, reply_markup=reply_markup)
     except TelegramError as exc:
         logger.warning(
             "Gagal membalas chat Telegram: %s", type(exc).__name__
         )
+
+
+def _contact_keyboard():
+    return {
+        "keyboard": [
+            [{"text": "Bagikan nomor HP", "request_contact": True}]
+        ],
+        "resize_keyboard": True,
+        "one_time_keyboard": True,
+    }
+
+
+def _remove_keyboard():
+    return {"remove_keyboard": True}
+
+
+def _handle_contact(message, *, client, chat_id, telegram_user_id, sender):
+    contact = message.get("contact")
+    if not isinstance(contact, dict):
+        return False
+    try:
+        contact_user_id = int(contact.get("user_id"))
+    except (TypeError, ValueError):
+        contact_user_id = 0
+    result = verify_contact(
+        telegram_user_id=telegram_user_id,
+        chat_id=chat_id,
+        contact_user_id=contact_user_id,
+        phone_number=str(contact.get("phone_number") or ""),
+        username=str(sender.get("username") or ""),
+        first_name=str(sender.get("first_name") or ""),
+    )
+    if result.status == "ok":
+        _reply(
+            client,
+            chat_id,
+            CONTACT_ACCEPTED,
+            reply_markup=_remove_keyboard(),
+        )
+    elif result.status == "invalid":
+        _reply(client, chat_id, CONTACT_INVALID)
+    elif result.status in ("phone_mismatch", "contact_mismatch"):
+        text = CONTACT_MISMATCH
+        if result.attempts_left:
+            text = f"{text} Sisa percobaan: {result.attempts_left}."
+        _reply(client, chat_id, text)
+    elif result.status == "too_many":
+        _reply(
+            client,
+            chat_id,
+            CONTACT_TOO_MANY,
+            reply_markup=_remove_keyboard(),
+        )
+    elif result.status == "expired":
+        _reply(
+            client,
+            chat_id,
+            CONTACT_EXPIRED,
+            reply_markup=_remove_keyboard(),
+        )
+    elif result.status == "already_active":
+        _reply(
+            client,
+            chat_id,
+            CONTACT_ALREADY_ACTIVE,
+            reply_markup=_remove_keyboard(),
+        )
+    elif result.status == "conflict":
+        _reply(
+            client,
+            chat_id,
+            CONTACT_CONFLICT,
+            reply_markup=_remove_keyboard(),
+        )
+    elif result.status == "no_phone":
+        _reply(
+            client,
+            chat_id,
+            CONTACT_NO_PHONE,
+            reply_markup=_remove_keyboard(),
+        )
+    elif result.status == "phone_changed":
+        _reply(
+            client,
+            chat_id,
+            CONTACT_PHONE_CHANGED,
+            reply_markup=_remove_keyboard(),
+        )
+    elif result.status == "inactive":
+        _reply(client, chat_id, CONTACT_INACTIVE)
+    else:
+        _reply(client, chat_id, CONTACT_NO_SESSION)
+    return True
 
 
 def handle_update(update, *, client):
@@ -76,6 +222,15 @@ def handle_update(update, *, client):
     if chat_id != telegram_user_id:
         return False
 
+    if isinstance(message.get("contact"), dict):
+        return _handle_contact(
+            message,
+            client=client,
+            chat_id=chat_id,
+            telegram_user_id=telegram_user_id,
+            sender=sender,
+        )
+
     text = str(message.get("text") or "").strip()
     if not text:
         return False
@@ -89,20 +244,58 @@ def handle_update(update, *, client):
         _reply(client, chat_id, START_WITHOUT_CODE)
         return True
 
-    result = claim_link_code(
+    result = start_link_token(
         code,
         telegram_user_id=telegram_user_id,
         chat_id=chat_id,
         username=str(sender.get("username") or ""),
         first_name=str(sender.get("first_name") or ""),
     )
-    if result.status == STATUS_CLAIMED:
-        _reply(client, chat_id, CODE_CLAIMED)
-    elif result.status == STATUS_ALREADY_CLAIMED:
-        _reply(client, chat_id, CODE_ALREADY_CLAIMED)
-    elif result.status == STATUS_ALREADY_LINKED:
+    if result.status == "ok":
+        _reply(
+            client,
+            chat_id,
+            CONTACT_PROMPT,
+            reply_markup=_contact_keyboard(),
+        )
+        return True
+    if result.status == "expired":
+        _reply(client, chat_id, CONTACT_EXPIRED)
+        return True
+    if result.status == "already_active":
         _reply(client, chat_id, CODE_ALREADY_LINKED)
-    elif result.status == STATUS_CONFLICT:
+        return True
+    if result.status == "conflict":
+        _reply(client, chat_id, CODE_CONFLICT)
+        return True
+    if result.status == "phone_changed":
+        _reply(client, chat_id, CODE_PHONE_CHANGED)
+        return True
+    if result.status == "no_phone":
+        _reply(client, chat_id, CONTACT_NO_PHONE)
+        return True
+    if result.status == "inactive":
+        _reply(client, chat_id, CONTACT_INACTIVE)
+        return True
+    if result.status != "invalid":
+        _reply(client, chat_id, CODE_INVALID)
+        return True
+
+    # Kompatibilitas kode tautan lama. Alur baru selalu dicoba lebih dulu.
+    legacy = claim_link_code(
+        code,
+        telegram_user_id=telegram_user_id,
+        chat_id=chat_id,
+        username=str(sender.get("username") or ""),
+        first_name=str(sender.get("first_name") or ""),
+    )
+    if legacy.status == STATUS_CLAIMED:
+        _reply(client, chat_id, CODE_CLAIMED)
+    elif legacy.status == STATUS_ALREADY_CLAIMED:
+        _reply(client, chat_id, CODE_ALREADY_CLAIMED)
+    elif legacy.status == STATUS_ALREADY_LINKED:
+        _reply(client, chat_id, CODE_ALREADY_LINKED)
+    elif legacy.status == STATUS_CONFLICT:
         _reply(client, chat_id, CODE_CONFLICT)
     else:
         _reply(client, chat_id, CODE_INVALID)

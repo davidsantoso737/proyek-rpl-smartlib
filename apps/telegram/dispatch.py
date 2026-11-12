@@ -13,8 +13,12 @@ from django.db import DatabaseError, transaction
 from django.db.models import Count
 from django.utils import timezone
 
+from .connection import (
+    resolve_recipient,
+    resolve_recipient_for_user_id,
+)
 from .formatting import is_formatted_title
-from .models import TelegramAccount, TelegramOutbox
+from .models import TelegramOutbox
 from .preferences import should_send_telegram
 from .services import (
     PARSE_MODE_HTML,
@@ -67,11 +71,7 @@ def enqueue_telegram_notification(
     """
     if user is None or not getattr(user, "pk", None):
         return None
-    account = (
-        TelegramAccount.objects.select_related("user")
-        .filter(user_id=user.pk)
-        .first()
-    )
+    account = resolve_recipient(user)
     if not should_send_telegram(account, notification_type, message):
         return None
 
@@ -177,11 +177,15 @@ def _schedule_retry(outbox, now, error, retry_after=None):
 
 
 def _deliver(outbox, client):
-    account = (
-        TelegramAccount.objects.select_related("user")
-        .filter(user_id=outbox.user_id)
-        .first()
-    )
+    account = resolve_recipient_for_user_id(outbox.user_id)
+    if account is None or not account.chat_id:
+        _finish(
+            outbox,
+            TelegramOutbox.Status.SKIPPED,
+            timezone.now(),
+            error="Penerima tidak memiliki koneksi Telegram aktif.",
+        )
+        return TelegramOutbox.Status.SKIPPED
     if not should_send_telegram(
         account, outbox.notification_type, outbox.message
     ):

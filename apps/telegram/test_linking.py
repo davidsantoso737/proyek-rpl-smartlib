@@ -261,16 +261,19 @@ class TelegramPreferencesTests(TestCase):
         self.assertFalse(account.notify_overdue)
 
 
+@override_settings(TELEGRAM_LEGACY_LINKING_ENABLED=True)
 class TelegramProfileViewTests(TestCase):
     def setUp(self):
         self.user = make_user()
+        self.user.phone = "081234567890"
+        self.user.save(update_fields=["phone"])
         self.client.force_login(self.user)
 
     def test_profil_menampilkan_bagian_telegram(self):
         response = self.client.get(reverse("accounts:profile"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Belum terhubung")
-        self.assertContains(response, "Buat tautan Telegram")
+        self.assertContains(response, "Hubungkan Telegram")
 
     def test_mulai_tautan_membuat_kode_dan_sesi(self):
         response = self.client.post(reverse("telegram:link_start"))
@@ -285,7 +288,7 @@ class TelegramProfileViewTests(TestCase):
         self.client.post(reverse("telegram:link_start"))
         code = self.client.session.get("telegram_link_code")
         response = self.client.get(reverse("accounts:profile"))
-        self.assertContains(response, "Buka bot Telegram")
+        self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, code)
 
     @override_settings(TELEGRAM_BOT_USERNAME="smartlib_bot")
@@ -310,14 +313,13 @@ class TelegramProfileViewTests(TestCase):
         response = self.client.get(reverse("telegram:link_open"))
         self.assertRedirects(response, reverse("accounts:profile"))
 
-    def test_profil_menampilkan_konfirmasi_setelah_klaim(self):
+    def test_profil_tidak_menampilkan_kode_setelah_klaim(self):
         code, _token = create_link_token(self.user)
         claim_link_code(
             code, telegram_user_id=9001, chat_id=9001
         )
         response = self.client.get(reverse("accounts:profile"))
-        self.assertContains(response, "Tautan sudah dibuka di bot")
-        self.assertContains(response, "Konfirmasi tautan")
+        self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, code)
 
     def test_mulai_tautan_ditolak_jika_sudah_terhubung(self):

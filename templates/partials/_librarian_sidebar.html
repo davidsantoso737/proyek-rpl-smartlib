@@ -64,6 +64,17 @@
                 {% if pending_materials or pending_deletions %}<span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ pending_materials|add:pending_deletions }}</span>{% endif %}
             </a>
         </li>
+        <li>
+            <a href="{% url 'telegram:verification_list' %}"
+               class="flex items-center justify-between gap-2 min-h-[44px] rounded-lg px-3 py-2 text-sm {% if current_ns == 'telegram' and 'verification' in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}font-medium text-slate-700 hover:bg-slate-100{% endif %}"
+               {% if current_ns == "telegram" and "verification" in current_url %}aria-current="page"{% endif %}>
+                <span class="flex items-center gap-2.5">
+                    <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                    Verifikasi Telegram
+                </span>
+                {% if pending_telegram %}<span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ pending_telegram }}</span>{% endif %}
+            </a>
+        </li>
     </ul>
 
     <p class="px-3 pt-5 text-xs font-semibold text-slate-500">Sirkulasi</p>

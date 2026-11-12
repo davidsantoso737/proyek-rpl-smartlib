@@ -1,7 +1,7 @@
 {# Unified sidebar for all roles. Shows role-specific menu items. #}
 {# Included twice by base.html (desktop rail + mobile drawer). #}
 {# Contains no id attributes. #}
-{% with current_url=request.resolver_match.url_name|default:"" current_ns=request.resolver_match.namespace|default:"" %}
+{% with current_url=request.resolver_match.url_name|default:"" current_ns=request.resolver_match.namespace|default:"" materials_verification_urls="review_list review_detail verify deletion_review" %}
 {% url 'accounts:dashboard' as brand_href %}
 <div class="px-3 pb-1 pt-3">
 {% include "partials/_brand.html" with href=brand_href title_class="font-semibold text-[15px] text-slate-900" %}
@@ -49,13 +49,24 @@
         </li>
         <li>
             <a href="{% url 'materials:review_list' %}"
-               class="flex items-center justify-between gap-2 min-h-[44px] rounded-lg px-3 py-2 text-sm {% if 'review' in current_url or 'verif' in current_url or 'deletion' in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}font-medium text-slate-700 hover:bg-slate-100{% endif %}"
-               {% if "review" in current_url or "verif" in current_url or "deletion" in current_url %}aria-current="page"{% endif %}>
+               class="flex items-center justify-between gap-2 min-h-[44px] rounded-lg px-3 py-2 text-sm {% if current_ns == 'materials' and current_url in materials_verification_urls %}bg-blue-50 text-blue-700 font-semibold{% else %}font-medium text-slate-700 hover:bg-slate-100{% endif %}"
+               {% if current_ns == "materials" and current_url in materials_verification_urls %}aria-current="page"{% endif %}>
                 <span class="flex items-center gap-2.5">
                     <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.5 2.5 2.5 4.5-5.5"/></svg>
                     Verifikasi
                 </span>
                 {% if pending_materials or pending_deletions %}<span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ pending_materials|add:pending_deletions }}</span>{% endif %}
+            </a>
+        </li>
+        <li>
+            <a href="{% url 'telegram:verification_list' %}"
+               class="flex items-center justify-between gap-2 min-h-[44px] rounded-lg px-3 py-2 text-sm {% if current_ns == 'telegram' and 'verification' in current_url %}bg-blue-50 text-blue-700 font-semibold{% else %}font-medium text-slate-700 hover:bg-slate-100{% endif %}"
+               {% if current_ns == "telegram" and "verification" in current_url %}aria-current="page"{% endif %}>
+                <span class="flex items-center gap-2.5">
+                    <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                    Verifikasi Telegram
+                </span>
+                {% if pending_telegram %}<span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ pending_telegram }}</span>{% endif %}
             </a>
         </li>
     </ul>

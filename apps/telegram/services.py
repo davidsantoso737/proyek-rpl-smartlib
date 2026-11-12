@@ -351,6 +351,7 @@ class TelegramClient:
         *,
         disable_web_page_preview: bool = True,
         parse_mode: str | None = None,
+        reply_markup: dict[str, Any] | None = None,
     ) -> SentMessage:
         if (
             not isinstance(chat_id, int)
@@ -380,6 +381,12 @@ class TelegramClient:
                     "parse_mode Telegram hanya mendukung HTML."
                 )
             payload["parse_mode"] = parse_mode
+        if reply_markup is not None:
+            if not isinstance(reply_markup, dict) or not reply_markup:
+                raise TelegramValidationError(
+                    "reply_markup Telegram harus berupa objek."
+                )
+            payload["reply_markup"] = reply_markup
         result = self._request("sendMessage", payload)
         if not isinstance(result, dict):
             raise TelegramResponseError("Respons sendMessage tidak valid.")
@@ -425,6 +432,7 @@ def send_text_message(
     *,
     client: TelegramClient | None = None,
     require_enabled: bool = True,
+    reply_markup: dict[str, Any] | None = None,
 ) -> SentMessage:
     if require_enabled and not getattr(
         settings, "TELEGRAM_NOTIFICATIONS_ENABLED", False
@@ -434,4 +442,6 @@ def send_text_message(
             "Set TELEGRAM_NOTIFICATIONS_ENABLED=true untuk mengaktifkan."
         )
     sender = client or get_client()
-    return sender.send_message(chat_id, text)
+    return sender.send_message(
+        chat_id, text, reply_markup=reply_markup
+    )
