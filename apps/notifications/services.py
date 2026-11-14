@@ -159,3 +159,20 @@ def unread_count(user):
     if not getattr(user, "is_authenticated", False):
         return 0
     return Notification.objects.filter(user=user, is_read=False).count()
+
+
+def recent_for_panel(user, limit=6):
+    """Notifikasi terbaru milik pengguna untuk panel header (baca saja).
+
+    Hanya menyusun data tampilan; tidak mengubah status baca atau
+    logika notifikasi apa pun.
+    """
+    if not getattr(user, "is_authenticated", False):
+        return []
+    notifications = Notification.objects.filter(user=user).order_by(
+        "-created_at"
+    )[:limit]
+    return [
+        {"notif": notif, "url": reference_url(notif, user)}
+        for notif in notifications
+    ]

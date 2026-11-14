@@ -92,6 +92,34 @@ class NotificationTests(TestCase):
             "Pengajuan disetujui",
         )
 
+    # --- panel header ---
+
+    def test_panel_header_menampilkan_notifikasi_milik_sendiri(self):
+        loan = request_loan(self.siswa, [self.copy1.pk])
+        approve_loan(loan.pk, self.pus)
+        self.client.force_login(self.siswa)
+        response = self.client.get(reverse("notifications:list"))
+        self.assertContains(response, 'id="notification-panel"')
+        self.assertContains(response, "Pengajuan disetujui", count=2)
+        self.assertContains(response, "Lihat semua notifikasi")
+
+    def test_panel_header_tidak_menandai_dibaca(self):
+        loan = request_loan(self.siswa, [self.copy1.pk])
+        approve_loan(loan.pk, self.pus)
+        notif = Notification.objects.get(user=self.siswa)
+        self.client.force_login(self.siswa)
+        self.client.get(reverse("notifications:list"))
+        notif.refresh_from_db()
+        self.assertFalse(notif.is_read)
+        self.assertIsNone(notif.read_at)
+
+    def test_panel_header_tidak_membocorkan_notifikasi_pengguna_lain(self):
+        loan = request_loan(self.siswa, [self.copy1.pk])
+        approve_loan(loan.pk, self.pus)
+        self.client.force_login(self.siswa2)
+        response = self.client.get(reverse("notifications:list"))
+        self.assertNotContains(response, "Pengajuan disetujui")
+
     # --- baca ---
 
     def test_read_menandai_dan_ikut_referensi(self):

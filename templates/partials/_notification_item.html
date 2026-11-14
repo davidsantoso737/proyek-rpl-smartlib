@@ -1,0 +1,16 @@
+{# Shared notification row. Params: notif (required), url (optional), #}
+{# compact (optional). Keeps the existing POST read flow: clicking an #}
+{# actionable row marks it read and the existing view decides the redirect. #}
+{% if url or not notif.is_read %}
+<form method="post" action="{% url 'notifications:read' notif.pk %}" class="block">
+    {% csrf_token %}
+    <button type="submit"
+            class="notification-action flex w-full items-start gap-3 text-left transition hover:bg-slate-50 {% if compact %}px-4 py-3{% else %}px-4 py-4 sm:px-5{% endif %}">
+        {% include "partials/_notification_item_body.html" %}
+    </button>
+</form>
+{% else %}
+<div class="flex items-start gap-3 {% if compact %}px-4 py-3{% else %}px-4 py-4 sm:px-5{% endif %}">
+    {% include "partials/_notification_item_body.html" %}
+</div>
+{% endif %}

@@ -22,6 +22,41 @@
   outline-offset: 2px;
 }
 
+/* Header notification panel: visibility (not display) keeps the closed
+   panel out of the tab order and accessibility tree while allowing a
+   short open/close transition. Motion is removed when the user asks for
+   reduced motion. */
+.notification-panel {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 120ms ease, transform 120ms ease,
+    visibility 0s linear 120ms;
+}
+.notification-panel[data-open="true"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .notification-panel,
+  .notification-panel[data-open="true"] {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* The panel and list cards clip their rounded corners, so the shared
+   2px focus offset would be cut on the first and last row. Inset the
+   indicator by the same amount instead of removing it. */
+.notification-action:focus-visible,
+.notification-panel :is(a, button):focus-visible {
+  outline-offset: -2px;
+}
+
 /* Focus standard (audit-017): ONE indicator per control family.
    Proven by full-template scan: every text-like control (text, search,
    number, date, url, email, tel, password, file, select, textarea)

@@ -44,12 +44,61 @@
             <div class="flex-[7]" aria-hidden="true"></div>
             {% endif %}
             <div class="flex flex-[3] items-center justify-end gap-1.5 shrink-0 sm:gap-2">
-                <a href="{% url 'notifications:list' %}"
-                   class="relative inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-700 hover:bg-slate-100"
-                   aria-label="Notifikasi{% if unread_notifications %}, {{ unread_notifications }} belum dibaca{% endif %}">
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-                    {% if unread_notifications %}<span class="absolute right-1 top-1 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ unread_notifications }}</span>{% endif %}
-                </a>
+                <div class="relative">
+                    <button id="notif-toggle" type="button"
+                            class="relative inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-700 hover:bg-slate-100"
+                            aria-expanded="false" aria-controls="notification-panel" aria-haspopup="dialog"
+                            aria-label="Notifikasi{% if unread_notifications %}, {{ unread_notifications }} belum dibaca{% endif %}">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+                        {% if unread_notifications %}<span class="absolute right-0.5 top-0.5 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-xs font-semibold text-white ring-2 ring-white">{{ unread_notifications }}</span>{% endif %}
+                    </button>
+
+                    <section id="notification-panel" role="dialog" aria-labelledby="notification-panel-title"
+                             data-open="false" aria-hidden="true"
+                             class="notification-panel fixed inset-x-4 top-[4.75rem] z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg print:hidden sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[22rem]">
+                        <div class="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3">
+                            <div class="min-w-0">
+                                <p id="notification-panel-title" class="text-sm font-semibold text-slate-900">Notifikasi</p>
+                                <p class="mt-0.5 text-xs text-slate-500">
+                                    {% if unread_notifications %}{{ unread_notifications }} belum dibaca{% else %}Semua sudah dibaca{% endif %}
+                                </p>
+                            </div>
+                            {% if unread_notifications %}
+                            <form method="post" action="{% url 'notifications:read_all' %}" class="shrink-0">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        class="inline-flex min-h-[44px] items-center rounded-lg px-2.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-50">
+                                    Tandai semua dibaca
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+
+                        <div class="max-h-[min(22rem,55dvh)] overflow-y-auto">
+                            {% if notification_preview %}
+                                <ul class="divide-y divide-slate-100">
+                                    {% for entry in notification_preview %}
+                                        <li>{% include "partials/_notification_item.html" with notif=entry.notif url=entry.url compact=1 %}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <div class="px-6 py-8 text-center">
+                                    <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500" aria-hidden="true">
+                                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+                                    </span>
+                                    <p class="mt-2 text-sm font-semibold text-slate-900">Belum ada notifikasi</p>
+                                    <p class="mt-0.5 text-xs leading-5 text-slate-500">Aktivitas peminjaman dan persetujuan akan muncul di sini.</p>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <a href="{% url 'notifications:list' %}"
+                           class="flex min-h-[44px] items-center justify-between gap-2 border-t border-slate-100 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-slate-50">
+                            Lihat semua notifikasi
+                            <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+                        </a>
+                    </section>
+                </div>
                 <a href="{% url 'accounts:profile' %}"
                    class="flex min-h-[44px] items-center gap-2.5 rounded-xl py-1.5 pl-1.5 pr-1.5 hover:bg-slate-100 sm:pr-3"
                    aria-label="Profil {{ user.full_name }}">
@@ -110,6 +159,33 @@
     }
     var toggle = document.getElementById("nav-toggle");
     var panel = document.getElementById("mobile-nav");
+    var notifToggle = document.getElementById("notif-toggle");
+    var notifPanel = document.getElementById("notification-panel");
+
+    function notifIsOpen() {
+        return notifPanel && notifPanel.getAttribute("data-open") === "true";
+    }
+
+    function placeNotifPanel() {
+        if (!notifPanel) {
+            return;
+        }
+        if (window.matchMedia("(min-width: 640px)").matches) {
+            notifPanel.style.top = "";
+        } else {
+            notifPanel.style.top = (header.offsetHeight + 8) + "px";
+        }
+    }
+
+    function setNotifOpen(open) {
+        if (!notifToggle || !notifPanel) {
+            return;
+        }
+        notifPanel.setAttribute("data-open", open ? "true" : "false");
+        notifPanel.setAttribute("aria-hidden", open ? "false" : "true");
+        notifToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+
     function setPanel(open) {
         if (!toggle || !panel) {
             return;
@@ -125,7 +201,11 @@
         if (iconClose) {
             iconClose.classList.toggle("hidden", !open);
         }
+        if (open) {
+            setNotifOpen(false);
+        }
     }
+
     if (toggle && panel) {
         toggle.addEventListener("click", function (event) {
             event.stopPropagation();
@@ -137,16 +217,53 @@
             });
         });
     }
+
+    if (notifToggle && notifPanel) {
+        notifToggle.addEventListener("click", function (event) {
+            event.stopPropagation();
+            var open = !notifIsOpen();
+            if (open) {
+                setPanel(false);
+                placeNotifPanel();
+            }
+            setNotifOpen(open);
+        });
+        notifPanel.querySelectorAll("a[href]").forEach(function (link) {
+            link.addEventListener("click", function () {
+                setNotifOpen(false);
+            });
+        });
+    }
+
     document.addEventListener("click", function (event) {
-        if (!header.contains(event.target) && panel && !panel.classList.contains("hidden")) {
+        if (panel && !panel.classList.contains("hidden") && !header.contains(event.target)) {
             setPanel(false);
         }
+        if (notifIsOpen() && !notifPanel.contains(event.target) && !notifToggle.contains(event.target)) {
+            setNotifOpen(false);
+        }
     });
+
+    window.addEventListener("resize", function () {
+        if (notifIsOpen()) {
+            placeNotifPanel();
+        }
+    });
+
     document.addEventListener("keydown", function (event) {
-        if (event.key === "Escape" && panel && !panel.classList.contains("hidden")) {
+        if (event.key !== "Escape") {
+            return;
+        }
+        if (panel && !panel.classList.contains("hidden")) {
             setPanel(false);
             if (toggle) {
                 toggle.focus();
+            }
+        }
+        if (notifIsOpen()) {
+            setNotifOpen(false);
+            if (notifToggle) {
+                notifToggle.focus();
             }
         }
     });
