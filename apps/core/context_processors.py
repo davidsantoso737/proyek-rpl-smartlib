@@ -10,7 +10,7 @@ def librarian_pending(request):
         "pending_ebooks": 0,
         "pending_materials": 0,
         "pending_deletions": 0,
-        "pending_telegram": 0,
+        "pending_whatsapp": 0,
     }
     user = getattr(request, "user", None)
     if user is None or not user.is_authenticated:
@@ -23,7 +23,7 @@ def librarian_pending(request):
             MaterialDeletionRequest,
             TeachingMaterial,
         )
-        from apps.telegram.models import TelegramConnection
+        from apps.whatsapp.models import WhatsAppConnection
 
         loans = Loan.objects.filter(status="PENDING_APPROVAL").count()
         ebooks = EbookLoan.objects.filter(status="PENDING_APPROVAL").count()
@@ -31,16 +31,16 @@ def librarian_pending(request):
         deletions = MaterialDeletionRequest.objects.filter(
             status="MENUNGGU"
         ).count()
-        telegram = TelegramConnection.objects.filter(
+        whatsapp = WhatsAppConnection.objects.filter(
             status="pending"
         ).count()
     except Exception:
         return empty
     return {
-        "pending_total": loans + ebooks + materials + deletions + telegram,
+        "pending_total": loans + ebooks + materials + deletions + whatsapp,
         "pending_loans": loans,
         "pending_ebooks": ebooks,
         "pending_materials": materials,
         "pending_deletions": deletions,
-        "pending_telegram": telegram,
+        "pending_whatsapp": whatsapp,
     }

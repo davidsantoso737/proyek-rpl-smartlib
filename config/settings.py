@@ -69,22 +69,20 @@ AI_NODE_TIMEOUT_SECONDS = float(
     os.getenv("AI_NODE_TIMEOUT_SECONDS", str(AI_TIMEOUT_SECONDS))
 )
 
-# Telegram Bot API: token hanya dari environment, tidak pernah di-hardcode.
-TELEGRAM_BOT_TOKEN = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
-TELEGRAM_BOT_USERNAME = (
-    (os.getenv("TELEGRAM_BOT_USERNAME") or "").strip().lstrip("@")
+# WhatsApp via Fonnte: token hanya dari environment, tidak pernah
+# di-hardcode. Pengiriman eksternal dipisahkan dari notifikasi internal.
+FONNTE_API_TOKEN = (os.getenv("FONNTE_API_TOKEN") or "").strip()
+FONNTE_API_URL = (
+    os.getenv("FONNTE_API_URL", "https://api.fonnte.com/send") or ""
+).strip()
+FONNTE_COUNTRY_CODE = (
+    os.getenv("FONNTE_COUNTRY_CODE", "62") or "62"
+).strip()
+FONNTE_TIMEOUT_SECONDS = float(
+    os.getenv("FONNTE_TIMEOUT_SECONDS", "15")
 )
-TELEGRAM_NOTIFICATIONS_ENABLED = (
-    os.getenv("TELEGRAM_NOTIFICATIONS_ENABLED", "False").lower() == "true"
-)
-TELEGRAM_API_BASE_URL = (
-    os.getenv("TELEGRAM_API_BASE_URL", "https://api.telegram.org").rstrip("/")
-)
-TELEGRAM_TIMEOUT_SECONDS = float(os.getenv("TELEGRAM_TIMEOUT_SECONDS", "10"))
-# Alur tautan lama tanpa persetujuan pustakawan. Default mati agar tidak
-# menjadi jalan pintas verifikasi kontak baru.
-TELEGRAM_LEGACY_LINKING_ENABLED = (
-    os.getenv("TELEGRAM_LEGACY_LINKING_ENABLED", "False").lower() == "true"
+WHATSAPP_NOTIFICATIONS_ENABLED = (
+    os.getenv("WHATSAPP_NOTIFICATIONS_ENABLED", "True").lower() == "true"
 )
 
 
@@ -107,7 +105,7 @@ INSTALLED_APPS = [
     'apps.inventory',
     'apps.materials',
     'apps.notifications',
-    'apps.telegram',
+    'apps.whatsapp',
     'apps.ai',
     'apps.reports',
 ]

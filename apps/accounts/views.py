@@ -14,7 +14,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
-from apps.telegram.context import build_profile_context
+from apps.whatsapp.context import build_profile_context
 
 from .authorization import active_login_required, role_required
 from .excel_import import (

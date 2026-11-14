@@ -150,7 +150,7 @@
                     {% endif %}
                 </div>
                 {% if pending_total %}
-                    <p class="mt-2 text-[13px] text-slate-500">Ada {{ pending_total }} hal menunggu aksi: {{ pending_loans }} pengajuan pinjam, {{ pending_ebooks }} e-book, {{ pending_materials }} verifikasi materi, {{ pending_deletions }} permintaan hapus.</p>
+                    <p class="mt-2 text-[13px] text-slate-500">Ada {{ pending_total }} hal menunggu aksi: {{ pending_loans }} pengajuan pinjam, {{ pending_ebooks }} e-book, {{ pending_materials }} verifikasi materi, {{ pending_deletions }} permintaan hapus, {{ pending_whatsapp }} verifikasi WhatsApp.</p>
                 {% else %}
                     <p class="mt-2 text-[13px] text-slate-500">Semua pengajuan sudah diproses. Tidak ada antrean yang menunggu.</p>
                 {% endif %}
@@ -217,6 +217,19 @@
                                 {% if pending_deletions %}<span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Perlu tindakan</span>{% else %}<span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">Bersih</span>{% endif %}
                             </td>
                             <td class="px-3 py-3 text-right sm:px-5"><a href="{% url 'materials:review_list' %}" class="inline-flex min-h-[44px] items-center font-medium text-blue-600 hover:text-blue-700 hover:underline">Buka</a></td>
+                        </tr>
+                        <tr>
+                            <td class="px-3 py-3 sm:px-5">
+                                <p class="font-medium text-slate-800">Verifikasi WhatsApp</p>
+                                <p class="mt-0.5 text-xs text-slate-500">Integrasi</p>
+                            </td>
+                            <td class="px-3 py-3 sm:px-4">
+                                {% if pending_whatsapp %}<span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{{ pending_whatsapp }}</span>{% else %}<span class="inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-slate-100 px-1.5 text-xs font-semibold text-slate-600">0</span>{% endif %}
+                            </td>
+                            <td class="px-3 py-3 sm:px-4">
+                                {% if pending_whatsapp %}<span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Perlu tindakan</span>{% else %}<span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">Bersih</span>{% endif %}
+                            </td>
+                            <td class="px-3 py-3 text-right sm:px-5"><a href="{% url 'whatsapp:verification_list' %}" class="inline-flex min-h-[44px] items-center font-medium text-blue-600 hover:text-blue-700 hover:underline">Buka</a></td>
                         </tr>
                     </tbody>
                 </table>

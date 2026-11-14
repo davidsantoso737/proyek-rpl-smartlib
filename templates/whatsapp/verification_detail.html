@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Detail Verifikasi WhatsApp - Digital Library{% endblock %}
+
+{% block content %}
+
+<div class="mb-6">
+    <a href="{% url 'whatsapp:verification_list' %}"
+       class="inline-flex min-h-[44px] items-center text-sm font-semibold text-blue-700 transition hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+        Kembali ke daftar verifikasi
+    </a>
+    <h1 class="mt-2 text-xl font-semibold text-slate-900">
+        Detail Verifikasi WhatsApp
+    </h1>
+    <p class="text-slate-500 text-sm mt-1">
+        Periksa identitas pengguna dan nomor WhatsApp sebelum menyetujui penautan.
+    </p>
+</div>
+
+<div class="max-w-3xl space-y-4">
+    <section aria-labelledby="whatsapp-connection-heading" class="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+        <div class="flex flex-wrap items-start justify-between gap-3 px-4 sm:px-5 py-4 border-b border-slate-200/80">
+            <div class="min-w-0">
+                <h2 id="whatsapp-connection-heading" class="font-semibold text-slate-900">{{ connection.user.full_name }}</h2>
+                <p class="mt-0.5 text-xs text-slate-500">
+                    {{ connection.user.get_role_display }} &middot; @{{ connection.user.username }}
+                    {% if connection.user.nis %} &middot; NIS {{ connection.user.nis }}{% endif %}
+                    {% if connection.user.nip %} &middot; NIP {{ connection.user.nip }}{% endif %}
+                </p>
+            </div>
+            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold {% if connection.status == 'active' %}bg-emerald-50 text-emerald-800{% elif connection.status == 'approved' %}bg-blue-50 text-blue-800{% elif connection.status == 'pending' %}bg-amber-100 text-amber-800{% elif connection.status == 'rejected' %}bg-red-50 text-red-800{% else %}bg-slate-100 text-slate-700{% endif %}">
+                {{ connection.get_status_display }}
+            </span>
+        </div>
+
+        <dl class="grid gap-x-6 gap-y-3 px-4 sm:px-5 py-4 text-sm sm:grid-cols-2">
+            <div class="min-w-0">
+                <dt class="text-xs text-slate-500">Nomor WhatsApp diajukan</dt>
+                <dd class="mt-0.5 font-medium text-slate-900 break-words">{{ connection.phone }}</dd>
+            </div>
+            <div class="min-w-0">
+                <dt class="text-xs text-slate-500">Nomor di profil</dt>
+                <dd class="mt-0.5 text-slate-800 break-words">{{ connection.user.phone|default:"Belum diisi" }}</dd>
+            </div>
+            <div class="min-w-0">
+                <dt class="text-xs text-slate-500">Diajukan</dt>
+                <dd class="mt-0.5 text-slate-800">{{ connection.requested_at|date:"j M Y, H:i"|default:"-" }}</dd>
+            </div>
+            <div class="min-w-0">
+                <dt class="text-xs text-slate-500">Disetujui</dt>
+                <dd class="mt-0.5 text-slate-800">
+                    {% if connection.approved_at %}
+                        {{ connection.approved_at|date:"j M Y, H:i" }}
+                        {% if connection.approved_by %} oleh {{ connection.approved_by.full_name }}{% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </dd>
+            </div>
+            <div class="min-w-0">
+                <dt class="text-xs text-slate-500">Diverifikasi</dt>
+                <dd class="mt-0.5 text-slate-800">{{ connection.verified_at|date:"j M Y, H:i"|default:"-" }}</dd>
+            </div>
+            <div class="min-w-0">
+                <dt class="text-xs text-slate-500">Ditolak atau diputus</dt>
+                <dd class="mt-0.5 text-slate-800">
+                    {% if connection.rejected_at %}
+                        Ditolak {{ connection.rejected_at|date:"j M Y, H:i" }}
+                    {% elif connection.revoked_at %}
+                        Diputus {{ connection.revoked_at|date:"j M Y, H:i" }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </dd>
+            </div>
+            {% if connection.rejection_note %}
+                <div class="min-w-0 sm:col-span-2">
+                    <dt class="text-xs text-slate-500">Catatan</dt>
+                    <dd class="mt-0.5 text-slate-800 break-words">{{ connection.rejection_note }}</dd>
+                </div>
+            {% endif %}
+        </dl>
+
+        {% if connection.status == "pending" %}
+            <div class="border-t border-slate-200/80 px-4 sm:px-5 py-4">
+                <p class="text-sm text-slate-600">
+                    Menyetujui pengajuan ini akan mengirim kode OTP ke nomor tersebut. Notifikasi baru aktif setelah pengguna memasukkan kode dengan benar.
+                </p>
+                <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
+                    <form method="post" action="{% url 'whatsapp:verification_approve' connection.pk %}"
+                          onsubmit="return confirm('Setujui penautan WhatsApp dan kirim kode OTP ke nomor ini?');">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:w-auto">
+                            Setujui dan kirim OTP
+                        </button>
+                    </form>
+                    <form method="post" action="{% url 'whatsapp:verification_reject' connection.pk %}"
+                          class="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row">
+                        {% csrf_token %}
+                        <label for="whatsapp-detail-note" class="sr-only">Catatan penolakan</label>
+                        <input id="whatsapp-detail-note" type="text" name="note" maxlength="1000"
+                               placeholder="Catatan penolakan (opsional)"
+                               class="min-h-[44px] w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button type="submit"
+                                class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+                            Tolak
+                        </button>
+                    </form>
+                </div>
+            </div>
+        {% elif connection.status == "approved" %}
+            <div class="border-t border-slate-200/80 px-4 sm:px-5 py-4">
+                <p class="text-sm text-slate-600">
+                    Sudah disetujui. Menunggu pengguna memasukkan kode OTP. Pengguna dapat meminta kode baru dari halaman Profil bila kode tidak diterima.
+                </p>
+            </div>
+        {% endif %}
+    </section>
+
+    <section aria-labelledby="whatsapp-history-heading" class="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+        <div class="px-4 sm:px-5 py-3.5 border-b border-slate-200/80">
+            <h2 id="whatsapp-history-heading" class="text-sm font-semibold text-slate-900">Riwayat penautan pengguna ini</h2>
+        </div>
+        {% if history %}
+            <ul class="divide-y divide-slate-100">
+                {% for row in history %}
+                    <li class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 sm:px-5 py-3.5">
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium text-slate-900">
+                                {{ row.phone }}
+                                {% if row.pk == connection.pk %}
+                                    <span class="ml-1 text-xs font-semibold text-blue-700">(dibuka)</span>
+                                {% endif %}
+                            </p>
+                            <p class="mt-0.5 text-xs text-slate-500">
+                                Diajukan {{ row.requested_at|date:"j M Y, H:i"|default:"-" }}
+                                {% if row.approved_at %} &middot; diproses {{ row.approved_at|date:"j M Y, H:i" }}{% endif %}
+                                {% if row.approved_by %} oleh {{ row.approved_by.full_name }}{% endif %}
+                            </p>
+                            {% if row.rejection_note %}
+                                <p class="mt-1 text-xs text-slate-600 break-words">Catatan: {{ row.rejection_note }}</p>
+                            {% endif %}
+                        </div>
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {% if row.status == 'active' %}bg-emerald-50 text-emerald-800{% elif row.status == 'approved' %}bg-blue-50 text-blue-800{% elif row.status == 'pending' %}bg-amber-100 text-amber-800{% elif row.status == 'rejected' %}bg-red-50 text-red-800{% else %}bg-slate-100 text-slate-700{% endif %}">
+                            {{ row.get_status_display }}
+                        </span>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <div class="px-4 py-8 text-center">
+                <p class="text-sm text-slate-500">Belum ada riwayat penautan untuk pengguna ini.</p>
+            </div>
+        {% endif %}
+    </section>
+</div>
+
+{% endblock %}
