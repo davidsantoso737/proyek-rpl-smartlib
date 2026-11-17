@@ -6,7 +6,6 @@ from django.contrib.auth import get_user_model, login, logout, update_session_au
 from django.contrib.auth.forms import PasswordChangeForm
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
-from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -14,6 +13,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
+from apps.core.pagination import paginate_queryset
 from apps.whatsapp.context import build_profile_context
 
 from .authorization import active_login_required, role_required
@@ -288,6 +288,7 @@ MONTH_LABELS = [
     "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
     "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
 ]
+COPY_STATUS_TONES = ("emerald", "blue", "amber", "rose")
 
 
 def _six_month_keys():
@@ -302,6 +303,77 @@ def _six_month_keys():
             month = 12
             year -= 1
     return list(reversed(keys))
+
+
+def _percentage(value, total):
+    pct = round(value * 100 / total) if total else 0
+    return pct or (1 if value else 0)
+
+
+def _copy_status_rows(collection, status_order):
+    counts = collection["copy_status_counts"]
+    total = collection["copies_total"]
+    return [
+        {
+            "label": label,
+            "value": counts.get(code, 0),
+            "pct": _percentage(counts.get(code, 0), total),
+            "tone": tone,
+        }
+        for (code, label), tone in zip(status_order, COPY_STATUS_TONES)
+    ]
+
+
+def _month_bounds(year, month):
+    tz = timezone.get_current_timezone()
+    start = datetime.datetime(year, month, 1, tzinfo=tz)
+    if month == 12:
+        next_year, next_month = year + 1, 1
+    else:
+        next_year, next_month = year, month + 1
+    end = datetime.datetime(next_year, next_month, 1, tzinfo=tz)
+    return start, end
+
+
+def _loan_trend(keys):
+    from apps.circulation.models import Loan, LoanItem
+
+    loan_map = {}
+    return_map = {}
+    for year, month in keys:
+        start, end = _month_bounds(year, month)
+        loan_map[(year, month)] = Loan.objects.filter(
+            requested_at__gte=start,
+            requested_at__lt=end,
+        ).count()
+        return_map[(year, month)] = LoanItem.objects.filter(
+            returned_at__gte=start,
+            returned_at__lt=end,
+        ).count()
+    peak = max(
+        [row for row in loan_map.values()]
+        + [row for row in return_map.values()]
+        + [0]
+    )
+    months = []
+    for year, month in keys:
+        loans = loan_map.get((year, month), 0)
+        returns = return_map.get((year, month), 0)
+        months.append(
+            {
+                "label": MONTH_LABELS[month - 1],
+                "loans": loans,
+                "returns": returns,
+                "loans_pct": _percentage(loans, peak),
+                "returns_pct": _percentage(returns, peak),
+            }
+        )
+    return {
+        "trend_months": months,
+        "trend_max": peak,
+        "trend_loan_total": sum(row["loans"] for row in months),
+        "trend_return_total": sum(row["returns"] for row in months),
+    }
 
 
 def _librarian_dashboard_stats():
@@ -319,7 +391,7 @@ def _librarian_dashboard_stats():
         COPY_STATUS_ORDER,
         collection_statistics,
     )
-    from apps.circulation.models import EbookLoan, Loan, LoanItem
+    from apps.circulation.models import EbookLoan
     from apps.circulation.services import EBOOK_APPROVED
 
     now = timezone.now()
@@ -348,70 +420,14 @@ def _librarian_dashboard_stats():
         expires_at__gt=now,
     ).count()
 
-    copy_counts = collection["copy_status_counts"]
     total_copies = collection["copies_total"]
     stats["total_copies"] = total_copies
     stats["copies_available"] = collection["copies_available"]
     stats["copy_status_total"] = total_copies
-    tones = ("emerald", "blue", "amber", "rose")
-    for (code, label), tone in zip(COPY_STATUS_ORDER, tones):
-        value = copy_counts.get(code, 0)
-        pct = round(value * 100 / total_copies) if total_copies else 0
-        if value and not pct:
-            pct = 1
-        stats["copy_status_rows"].append(
-            {
-                "label": label,
-                "value": value,
-                "pct": pct,
-                "tone": tone,
-            }
-        )
-
-    keys = _six_month_keys()
-    tz = timezone.get_current_timezone()
-    loan_map = {}
-    return_map = {}
-    for year, month in keys:
-        start = datetime.datetime(year, month, 1, tzinfo=tz)
-        if month == 12:
-            next_year, next_month = year + 1, 1
-        else:
-            next_year, next_month = year, month + 1
-        end = datetime.datetime(next_year, next_month, 1, tzinfo=tz)
-        loan_map[(year, month)] = Loan.objects.filter(
-            requested_at__gte=start,
-            requested_at__lt=end,
-        ).count()
-        return_map[(year, month)] = LoanItem.objects.filter(
-            returned_at__gte=start,
-            returned_at__lt=end,
-        ).count()
-    months = []
-    for year, month in keys:
-        months.append(
-            {
-                "label": MONTH_LABELS[month - 1],
-                "loans": loan_map.get((year, month), 0),
-                "returns": return_map.get((year, month), 0),
-            }
-        )
-    peak = max(
-        [row["loans"] for row in months]
-        + [row["returns"] for row in months]
-        + [0]
+    stats["copy_status_rows"] = _copy_status_rows(
+        collection, COPY_STATUS_ORDER
     )
-    for row in months:
-        row["loans_pct"] = round(row["loans"] * 100 / peak) if peak else 0
-        row["returns_pct"] = round(row["returns"] * 100 / peak) if peak else 0
-        if row["loans"] and not row["loans_pct"]:
-            row["loans_pct"] = 1
-        if row["returns"] and not row["returns_pct"]:
-            row["returns_pct"] = 1
-    stats["trend_months"] = months
-    stats["trend_max"] = peak
-    stats["trend_loan_total"] = sum(row["loans"] for row in months)
-    stats["trend_return_total"] = sum(row["returns"] for row in months)
+    stats.update(_loan_trend(_six_month_keys()))
     return stats
 
 
@@ -513,10 +529,7 @@ def user_list_view(request):
             | Q(nip__icontains=q)
         )
     users = users.order_by("role", "username")
-    paginator = Paginator(users, USER_PAGE_SIZE)
-    page_obj = paginator.get_page(request.GET.get("page"))
-    params = request.GET.copy()
-    params.pop("page", None)
+    page_obj, querystring = paginate_queryset(request, users, USER_PAGE_SIZE)
     return render(
         request,
         "accounts/user_list.html",
@@ -524,8 +537,8 @@ def user_list_view(request):
             "page_obj": page_obj,
             "q": q,
             "role_filter": role_filter,
-            "querystring": params.urlencode(),
-            "result_count": paginator.count,
+            "querystring": querystring,
+            "result_count": page_obj.paginator.count,
         },
     )
 

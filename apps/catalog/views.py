@@ -1,6 +1,5 @@
 from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.db.models import Count, Prefetch, Q
 from django.db.models.deletion import ProtectedError
@@ -8,6 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from apps.accounts.authorization import active_login_required, role_required
+from apps.core.pagination import paginate_queryset
 
 from .availability import STATUS_TERSEDIA, count_available_copies
 from .forms import (
@@ -138,12 +138,7 @@ def catalog_list_view(request):
         kind = ""
     items.sort(key=lambda item: item["title"].lower())
 
-    paginator = Paginator(items, PAGE_SIZE)
-    page_obj = paginator.get_page(request.GET.get("page"))
-
-    params = request.GET.copy()
-    params.pop("page", None)
-    querystring = params.urlencode()
+    page_obj, querystring = paginate_queryset(request, items, PAGE_SIZE)
 
     return render(
         request,
@@ -155,7 +150,7 @@ def catalog_list_view(request):
             "kind": kind,
             "categories": Category.objects.order_by("name"),
             "querystring": querystring,
-            "result_count": paginator.count,
+            "result_count": page_obj.paginator.count,
         },
     )
 
@@ -164,11 +159,9 @@ def catalog_list_view(request):
 def book_detail_view(request, pk):
     """Detail koleksi fisik + ketersediaan aktual eksemplar (FR-10, FR-11)."""
     book = get_object_or_404(_book_queryset(), pk=pk)
-    page_obj = Paginator(book.copies.order_by("copy_code"), COPY_PAGE_SIZE).get_page(
-        request.GET.get("page")
+    page_obj, querystring = paginate_queryset(
+        request, book.copies.order_by("copy_code"), COPY_PAGE_SIZE
     )
-    params = request.GET.copy()
-    params.pop("page", None)
     return render(
         request,
         "catalog/book_detail.html",
@@ -178,7 +171,7 @@ def book_detail_view(request, pk):
             "page_obj": page_obj,
             "available": count_available_copies(book),
             "total": book.total_copies,
-            "querystring": params.urlencode(),
+            "querystring": querystring,
         },
     )
 
@@ -244,18 +237,15 @@ def manage_book_list_view(request):
         books = books.filter(
             Q(title__icontains=q) | Q(isbn__icontains=q)
         )
-    paginator = Paginator(books, PAGE_SIZE)
-    page_obj = paginator.get_page(request.GET.get("page"))
-    params = request.GET.copy()
-    params.pop("page", None)
+    page_obj, querystring = paginate_queryset(request, books, PAGE_SIZE)
     return render(
         request,
         "catalog/manage_book_list.html",
         {
             "page_obj": page_obj,
             "q": q,
-            "querystring": params.urlencode(),
-            "result_count": paginator.count,
+            "querystring": querystring,
+            "result_count": page_obj.paginator.count,
         },
     )
 
@@ -574,18 +564,15 @@ def manage_ebook_list_view(request):
         ebooks = ebooks.filter(
             Q(title__icontains=q) | Q(eisbn__icontains=q)
         )
-    paginator = Paginator(ebooks, PAGE_SIZE)
-    page_obj = paginator.get_page(request.GET.get("page"))
-    params = request.GET.copy()
-    params.pop("page", None)
+    page_obj, querystring = paginate_queryset(request, ebooks, PAGE_SIZE)
     return render(
         request,
         "catalog/manage_ebook_list.html",
         {
             "page_obj": page_obj,
             "q": q,
-            "querystring": params.urlencode(),
-            "result_count": paginator.count,
+            "querystring": querystring,
+            "result_count": page_obj.paginator.count,
         },
     )
 

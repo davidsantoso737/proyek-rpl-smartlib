@@ -87,6 +87,25 @@ def mark_all_read(user):
     return count
 
 
+def _loan_titles(loan):
+    return ", ".join(
+        sorted({item.book_copy.book.title for item in loan.items.all()})[:3]
+    )
+
+
+def _create_loan_notification(loan, notification_type, title, message):
+    reference = {
+        "user": loan.user,
+        "type": notification_type,
+        "reference_type": "loan",
+        "reference_id": loan.pk,
+    }
+    if Notification.objects.filter(**reference).exists():
+        return False
+    Notification.objects.create(title=title, message=message, **reference)
+    return True
+
+
 def sync_due_overdue(now=None):
     """Buat pengingat jatuh tempo & keterlambatan (FR-96, NFR-10).
 
@@ -105,52 +124,28 @@ def sync_due_overdue(now=None):
     for loan in loans:
         days_left = (timezone.localdate(loan.due_at) - today).days
         if days_left < 0:
-            if not Notification.objects.filter(
-                user=loan.user,
-                type="LOAN_OVERDUE",
-                reference_type="loan",
-                reference_id=loan.pk,
-            ).exists():
-                titles = ", ".join(
-                    sorted(
-                        {
-                            item.book_copy.book.title
-                            for item in loan.items.all()
-                        }
-                    )[:3]
-                )
-                Notification.objects.create(
-                    user=loan.user,
-                    type="LOAN_OVERDUE",
-                    title="Peminjaman melewati jatuh tempo",
-                    message=(
-                        f"Pengajuan #{loan.pk} ({titles}) terlambat "
-                        f"{-days_left} hari. Denda dihitung per hari "
-                        "keterlambatan."
-                    ),
-                    reference_type="loan",
-                    reference_id=loan.pk,
-                )
+            if _create_loan_notification(
+                loan,
+                "LOAN_OVERDUE",
+                "Peminjaman melewati jatuh tempo",
+                (
+                    f"Pengajuan #{loan.pk} ({_loan_titles(loan)}) terlambat "
+                    f"{-days_left} hari. Denda dihitung per hari "
+                    "keterlambatan."
+                ),
+            ):
                 created_overdue += 1
         elif days_left <= DUE_SOON_DAYS:
-            if not Notification.objects.filter(
-                user=loan.user,
-                type="LOAN_DUE_SOON",
-                reference_type="loan",
-                reference_id=loan.pk,
-            ).exists():
-                Notification.objects.create(
-                    user=loan.user,
-                    type="LOAN_DUE_SOON",
-                    title="Jatuh tempo mendekat",
-                    message=(
-                        f"Pengajuan #{loan.pk} jatuh tempo "
-                        f"{timezone.localtime(loan.due_at).strftime('%d %b %Y')}."
-                        " Segera kembalikan untuk menghindari denda."
-                    ),
-                    reference_type="loan",
-                    reference_id=loan.pk,
-                )
+            if _create_loan_notification(
+                loan,
+                "LOAN_DUE_SOON",
+                "Jatuh tempo mendekat",
+                (
+                    f"Pengajuan #{loan.pk} jatuh tempo "
+                    f"{timezone.localtime(loan.due_at).strftime('%d %b %Y')}."
+                    " Segera kembalikan untuk menghindari denda."
+                ),
+            ):
                 created_due += 1
     return created_due, created_overdue
 

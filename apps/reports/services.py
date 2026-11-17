@@ -10,9 +10,9 @@ from datetime import datetime, time, timedelta
 from django.db.models import Count, Q
 from django.utils import timezone
 
+from apps.catalog.availability import STATUS_TERSEDIA
 from apps.catalog.models import Book, Category
 from apps.circulation.models import EbookLoan, Loan, LoanItem
-from apps.circulation.services import STATUS_TERSEDIA
 
 MAX_ROWS = 2000
 
