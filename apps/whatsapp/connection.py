@@ -101,6 +101,31 @@ def _phone_in_use(phone, *, exclude_pk=None, include_pending=True):
     return queryset.exists()
 
 
+def _other_owner_connection(phone, user):
+    return (
+        WhatsAppConnection.objects.filter(phone=phone)
+        .exclude(user=user)
+        .filter(
+            status__in=[
+                WhatsAppConnection.Status.ACTIVE,
+                WhatsAppConnection.Status.PENDING,
+                WhatsAppConnection.Status.APPROVED,
+            ]
+        )
+        .first()
+    )
+
+
+def _same_user_connection(user, phone, status):
+    return (
+        WhatsAppConnection.objects.filter(
+            user=user, phone=phone, status=status
+        )
+        .order_by("-created_at")
+        .first()
+    )
+
+
 def _revoke_row(row, now, note=""):
     row.status = WhatsAppConnection.Status.REVOKED
     row.active_phone = None
@@ -152,42 +177,22 @@ def request_connection(user, phone):
             return RequestResult("already_active", connection=active)
 
         if _phone_in_use(normalized, exclude_pk=None):
-            other = (
-                WhatsAppConnection.objects.filter(phone=normalized)
-                .exclude(user=user)
-                .filter(
-                    status__in=[
-                        WhatsAppConnection.Status.ACTIVE,
-                        WhatsAppConnection.Status.PENDING,
-                        WhatsAppConnection.Status.APPROVED,
-                    ]
-                )
-                .first()
-            )
-            if other is not None:
+            if _other_owner_connection(normalized, user) is not None:
                 return RequestResult("phone_in_use")
 
-            pending_same = (
-                WhatsAppConnection.objects.filter(
-                    user=user,
-                    phone=normalized,
-                    status=WhatsAppConnection.Status.PENDING,
-                )
-                .order_by("-created_at")
-                .first()
+            pending_same = _same_user_connection(
+                user,
+                normalized,
+                WhatsAppConnection.Status.PENDING,
             )
             if pending_same is not None:
                 return RequestResult(
                     "already_pending", connection=pending_same
                 )
-            approved_same = (
-                WhatsAppConnection.objects.filter(
-                    user=user,
-                    phone=normalized,
-                    status=WhatsAppConnection.Status.APPROVED,
-                )
-                .order_by("-created_at")
-                .first()
+            approved_same = _same_user_connection(
+                user,
+                normalized,
+                WhatsAppConnection.Status.APPROVED,
             )
             if approved_same is not None:
                 return RequestResult(
