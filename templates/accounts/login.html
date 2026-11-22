@@ -1,74 +1,179 @@
 {% extends "base.html" %}
 
-{% block title %}Masuk - Digital Library{% endblock %}
+{% block title %}Masuk - SmartLib{% endblock %}
+
+{% block site_header %}{% endblock %}
+{% block site_footer %}{% endblock %}
 
 {% block content %}
 
-<div class="flex min-h-[calc(100dvh-10.125rem)] items-center justify-center py-8 sm:py-10">
-    <div class="w-full max-w-[27rem]">
-        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div class="bg-blue-600 px-6 py-6 sm:px-8 sm:py-7">
-                <h1 id="login-heading" class="text-xl font-bold tracking-tight text-white sm:text-2xl">
-                    Selamat datang di SmartLib
-                </h1>
-                <p class="mt-2 text-sm leading-6 text-blue-50">
-                    Masuk menggunakan akun perpustakaan Anda untuk melanjutkan.
+<div class="flex min-h-[calc(100dvh-3rem)] items-center justify-center">
+    <div class="grid w-full max-w-[68rem] overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_30px_80px_-40px_rgba(15,23,42,0.35)] sm:rounded-[30px] md:grid-cols-2">
+
+        <div class="min-w-0 p-7 sm:p-8 lg:p-12">
+            <div class="flex items-center gap-2.5">
+                <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white" aria-hidden="true">
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 6.5C10.5 5 8 4 4.5 4v14C8 18 10.5 19 12 20.5"/>
+                        <path d="M12 6.5C13.5 5 16 4 19.5 4v14C16 18 13.5 19 12 20.5"/>
+                    </svg>
+                </span>
+                <span class="leading-tight">
+                    <span class="block text-base font-bold text-slate-900">SmartLib</span>
+                    <span class="block text-xs text-slate-500">Perpustakaan Sekolah</span>
+                </span>
+            </div>
+
+            <h1 id="login-heading" class="mt-9 text-3xl font-bold tracking-tight text-slate-900 sm:mt-10 sm:text-[2rem]">
+                Selamat Datang Kembali!
+            </h1>
+            <p class="mt-3 max-w-md text-[15px] leading-7 text-slate-600">
+                Masuk ke akun SmartLib Anda untuk mengakses layanan perpustakaan digital sekolah.
+            </p>
+
+            {% if request.GET.logged_out %}
+                <p role="status" class="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                    Anda telah berhasil keluar.
                 </p>
-            </div>
+            {% endif %}
 
-            <div class="p-6 sm:p-8">
-                {% if request.GET.logged_out %}
-                    <p role="status" class="bg-emerald-50 border border-emerald-200 text-emerald-900 px-4 py-2.5 rounded-xl text-sm mb-5">
-                        Anda telah berhasil keluar.
-                    </p>
+            {% if form.non_field_errors %}
+                <div role="alert" class="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                    {% for error in form.non_field_errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <form method="post" action="{% url 'accounts:login' %}" class="mt-7 space-y-5 [&_input]:min-h-11 [&_input]:border-slate-500 [&_input]:bg-slate-50 [&_input:focus]:bg-white" aria-labelledby="login-heading">
+                {% csrf_token %}
+                {% if next %}
+                    <input type="hidden" name="next" value="{{ next }}">
                 {% endif %}
 
-                {% if form.non_field_errors %}
-                    <div role="alert" class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm mb-5">
-                        {% for error in form.non_field_errors %}
-                            <p>{{ error }}</p>
-                        {% endfor %}
-                    </div>
-                {% endif %}
+                <div>
+                    <label for="{{ form.username.id_for_label }}" class="mb-1.5 block text-sm font-medium text-slate-700">
+                        {{ form.username.label }}
+                    </label>
+                    {{ form.username }}
+                    {% for error in form.username.errors %}
+                        <p class="mt-1.5 text-sm text-red-700">{{ error }}</p>
+                    {% endfor %}
+                </div>
 
-                <form method="post" action="{% url 'accounts:login' %}" class="space-y-5 [&_input]:min-h-11" aria-labelledby="login-heading">
-                    {% csrf_token %}
-                    {% if next %}
-                        <input type="hidden" name="next" value="{{ next }}">
-                    {% endif %}
-
-                    <div>
-                        <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1.5">
-                            {{ form.username.label }}
-                        </label>
-                        {{ form.username }}
-                        {% for error in form.username.errors %}
-                            <p class="text-red-700 text-sm mt-1.5">{{ error }}</p>
-                        {% endfor %}
-                    </div>
-
-                    <div>
-                        <label for="{{ form.password.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1.5">
-                            {{ form.password.label }}
-                        </label>
+                <div>
+                    <label for="{{ form.password.id_for_label }}" class="mb-1.5 block text-sm font-medium text-slate-700">
+                        {{ form.password.label }}
+                    </label>
+                    <div class="relative [&_input]:pr-12">
                         {{ form.password }}
-                        {% for error in form.password.errors %}
-                            <p class="text-red-700 text-sm mt-1.5">{{ error }}</p>
-                        {% endfor %}
+                        <button id="toggle-password" type="button"
+                                class="absolute right-1.5 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-200/70 hover:text-slate-700"
+                                aria-controls="{{ form.password.id_for_label }}" aria-pressed="false" aria-label="Tampilkan password">
+                            <svg id="toggle-password-eye" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M2.04 12.32a1.01 1.01 0 0 1 0-.64C3.42 7.51 7.36 4.5 12 4.5c4.64 0 8.57 3.01 9.96 7.18.07.2.07.43 0 .64C20.58 16.49 16.64 19.5 12 19.5c-4.64 0-8.58-3.01-9.96-7.18Z"/>
+                                <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
+                            </svg>
+                            <svg id="toggle-password-eye-off" class="hidden h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="m3 3 18 18"/>
+                                <path d="M10.58 10.59a2 2 0 0 0 2.83 2.83"/>
+                                <path d="M9.36 5.37A9.47 9.47 0 0 1 12 5c4.64 0 8.57 3.01 9.96 7.18.07.2.07.43 0 .64a10.5 10.5 0 0 1-2.14 3.36"/>
+                                <path d="M6.61 6.61a10.5 10.5 0 0 0-4.57 5.07 1.01 1.01 0 0 0 0 .64C3.42 16.49 7.36 19.5 12 19.5c1.03 0 2.03-.15 2.98-.43"/>
+                            </svg>
+                        </button>
                     </div>
+                    {% for error in form.password.errors %}
+                        <p class="mt-1.5 text-sm text-red-700">{{ error }}</p>
+                    {% endfor %}
+                </div>
 
-                    <button type="submit"
-                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-3 rounded-xl transition-colors">
-                        Masuk
-                    </button>
-                </form>
-            </div>
+                <button type="submit"
+                        class="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:bg-blue-800">
+                    Masuk
+                </button>
+            </form>
+
+            <p class="mt-6 text-sm leading-6 text-slate-600">
+                Lupa password atau akun nonaktif? Hubungi pustakawan.
+            </p>
         </div>
 
-        <p class="text-center text-xs text-slate-600 mt-5">
-            Lupa password atau akun nonaktif? Hubungi pustakawan.
-        </p>
+        <aside aria-labelledby="panel-heading"
+               class="flex flex-col justify-center border-t border-blue-100/80 bg-gradient-to-b from-blue-50 via-blue-50/60 to-slate-50 p-7 sm:p-8 md:border-l md:border-t-0 lg:p-12">
+            <div class="max-w-md">
+                <h2 id="panel-heading" class="text-2xl font-bold tracking-tight text-slate-900">
+                    Jelajahi SmartLib
+                </h2>
+                <p class="mt-3 text-sm leading-6 text-slate-600">
+                    Satu platform untuk mendukung kegiatan literasi dan pengelolaan perpustakaan sekolah secara lebih mudah dan terorganisir.
+                </p>
+
+                <ul class="mt-7 divide-y divide-blue-100">
+                    <li class="flex gap-4 py-4 first:pt-0">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/80 text-blue-700 ring-1 ring-blue-100/80" aria-hidden="true">
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 10 12 5 2 10l10 5 10-5Z"/>
+                                <path d="M6 12v4.5c0 1.7 2.7 3 6 3s6-1.3 6-3V12"/>
+                            </svg>
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-slate-900">Siswa</p>
+                            <p class="mt-1 text-sm leading-6 text-slate-600">Akses katalog buku, kelola peminjaman, dan temukan koleksi bacaan.</p>
+                        </div>
+                    </li>
+                    <li class="flex gap-4 py-4">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/80 text-blue-700 ring-1 ring-blue-100/80" aria-hidden="true">
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 6.5C10.5 5 8 4 4.5 4v14C8 18 10.5 19 12 20.5"/>
+                                <path d="M12 6.5C13.5 5 16 4 19.5 4v14C16 18 13.5 19 12 20.5"/>
+                            </svg>
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-slate-900">Guru</p>
+                            <p class="mt-1 text-sm leading-6 text-slate-600">Jelajahi koleksi perpustakaan dan manfaatkan sumber literasi untuk mendukung pembelajaran.</p>
+                        </div>
+                    </li>
+                    <li class="flex gap-4 py-4 last:pb-0">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/80 text-blue-700 ring-1 ring-blue-100/80" aria-hidden="true">
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 21h18"/>
+                                <path d="M5 21V8l7-4 7 4v13"/>
+                                <path d="M9 21v-5h6v5"/>
+                            </svg>
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-slate-900">Pustakawan</p>
+                            <p class="mt-1 text-sm leading-6 text-slate-600">Kelola koleksi, transaksi peminjaman, pengembalian, dan administrasi perpustakaan.</p>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </aside>
     </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var input = document.getElementById("id_password");
+    var toggle = document.getElementById("toggle-password");
+    var eye = document.getElementById("toggle-password-eye");
+    var eyeOff = document.getElementById("toggle-password-eye-off");
+    if (!input || !toggle || !eye || !eyeOff) {
+        return;
+    }
+
+    toggle.addEventListener("click", function () {
+        var show = input.type === "password";
+        input.type = show ? "text" : "password";
+        toggle.setAttribute("aria-pressed", show ? "true" : "false");
+        toggle.setAttribute("aria-label", show ? "Sembunyikan password" : "Tampilkan password");
+        eye.classList.toggle("hidden", show);
+        eyeOff.classList.toggle("hidden", !show);
+        input.focus();
+    });
+})();
+</script>
 {% endblock %}
