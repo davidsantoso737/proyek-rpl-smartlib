@@ -11,6 +11,8 @@
     <span class="inline-flex items-center whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">Selesai</span>
 {% elif status == "REJECTED" %}
     <span class="inline-flex items-center whitespace-nowrap rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">Ditolak</span>
+{% elif status == "CANCELLED" %}
+    <span class="inline-flex items-center whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">Dibatalkan</span>
 {% else %}
     <span class="inline-flex items-center whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{{ status }}</span>
 {% endif %}

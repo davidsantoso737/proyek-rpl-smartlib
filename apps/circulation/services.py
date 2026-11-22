@@ -17,6 +17,7 @@ from datetime import timedelta
 
 import qrcode
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.catalog.availability import STATUS_TERSEDIA
@@ -31,14 +32,15 @@ LOAN_PENDING = "PENDING_APPROVAL"
 LOAN_APPROVED = "APPROVED"
 LOAN_REJECTED = "REJECTED"
 LOAN_ACTIVE = "ACTIVE"
+LOAN_CANCELLED = "CANCELLED"
+
+AUTO_EXPIRED_REASON = (
+    "Dibatalkan otomatis: batas waktu pengambilan QR Pickup telah berakhir."
+)
+EXPIRED_NOTIFICATION_TYPE = "LOAN_EXPIRED"
 
 # Status eksemplar saat dipinjam aktif (BR-13, BR-31).
 STATUS_DIPINJAM = "DIPINJAM"
-
-# Status loan yang masih "membawa" eksemplar sehingga eksemplar di
-# dalamnya tidak boleh diminta lagi. ACTIVE ikut terbuka karena
-# eksemplar baru bebas setelah pengembalian (checkpoint berikut).
-OPEN_LOAN_STATUSES = (LOAN_PENDING, LOAN_APPROVED, LOAN_ACTIVE)
 
 ITEM_RETURN_PENDING = "BELUM_KEMBALI"
 FINE_UNPAID = "BELUM_BAYAR"
@@ -56,6 +58,48 @@ class ApprovalError(LoanRequestError):
 
 class PickupTokenError(LoanRequestError):
     """Token QR Pickup tidak valid/kedaluarsa/sudah dipakai/salah state."""
+
+
+def _reservation_q(prefix="", now=None):
+    """Q untuk reservasi yang masih aktif pada waktu tertentu.
+
+    APPROVED hanya mereservasi sampai pickup_exp_at; setelah lewat,
+    pengajuan tidak boleh lagi menahan copy meski scheduler belum
+    sempat membatalkannya.
+    """
+    moment = now or timezone.now()
+    return (
+        Q(**{f"{prefix}status": LOAN_PENDING})
+        | Q(**{f"{prefix}status": LOAN_ACTIVE})
+        | Q(
+            **{
+                f"{prefix}status": LOAN_APPROVED,
+                f"{prefix}pickup_used_at__isnull": True,
+                f"{prefix}pickup_exp_at__gt": moment,
+            }
+        )
+    )
+
+
+def active_reservation_q(now=None):
+    """Q untuk LoanItem yang masih mereservasi copy."""
+    return _reservation_q("loan__", now)
+
+
+def active_reserved_copy_ids(now=None):
+    """Subquery ID copy yang masih terikat reservasi aktif."""
+    return LoanItem.objects.filter(active_reservation_q(now)).values(
+        "book_copy_id"
+    )
+
+
+def copy_has_active_reservation(copy, now=None):
+    """True bila copy terikat pengajuan/peminjaman yang masih berlaku."""
+    return (
+        LoanItem.objects.filter(book_copy=copy)
+        .filter(active_reservation_q(now))
+        .exists()
+    )
 
 
 def get_cart_ids(session):
@@ -79,13 +123,12 @@ def _validate_copy_for_cart(copy_id):
         raise LoanRequestError(
             f"Judul {copy.book.title} sedang tidak aktif."
         )
+    expire_pickup_loans(copy_ids=[copy.pk])
     if copy.status != STATUS_TERSEDIA:
         raise LoanRequestError(
             f"Eksemplar {copy.copy_code} sedang tidak tersedia."
         )
-    if LoanItem.objects.filter(
-        book_copy=copy, loan__status__in=OPEN_LOAN_STATUSES
-    ).exists():
+    if copy_has_active_reservation(copy):
         raise LoanRequestError(
             f"Eksemplar {copy.copy_code} sudah ada pada pengajuan aktif."
         )
@@ -160,6 +203,8 @@ def request_loan(user, copy_ids):
             "Pilih minimal satu buku untuk diajukan."
         )
 
+    expire_pickup_loans(copy_ids=ids)
+
     with transaction.atomic():
         copies = list(
             BookCopy.objects.select_for_update()
@@ -181,11 +226,7 @@ def request_loan(user, copy_ids):
                 raise LoanRequestError(
                     f"Eksemplar {copy.copy_code} sedang tidak tersedia."
                 )
-            if (
-                LoanItem.objects.filter(
-                    book_copy=copy, loan__status__in=OPEN_LOAN_STATUSES
-                ).exists()
-            ):
+            if copy_has_active_reservation(copy):
                 raise LoanRequestError(
                     f"Eksemplar {copy.copy_code} sudah ada pada "
                     "pengajuan aktif."
@@ -228,14 +269,11 @@ def available_substitutes(book, exclude_loan_pk=None):
     candidates = BookCopy.objects.filter(
         book=book, status=STATUS_TERSEDIA
     ).order_by("copy_code")
-    if exclude_loan_pk is None:
-        taken = LoanItem.objects.filter(
-            loan__status__in=OPEN_LOAN_STATUSES
-        ).values("book_copy_id")
-    else:
-        taken = LoanItem.objects.filter(
-            loan__status__in=OPEN_LOAN_STATUSES
-        ).exclude(loan_id=exclude_loan_pk).values("book_copy_id")
+    taken = LoanItem.objects.filter(active_reservation_q()).values(
+        "book_copy_id"
+    )
+    if exclude_loan_pk is not None:
+        taken = taken.exclude(loan_id=exclude_loan_pk)
     return candidates.exclude(pk__in=taken)
 
 
@@ -247,6 +285,7 @@ def approve_loan(loan_id, approver, substitutions=None):
     pickup_qr_validity (menit). Atomik + notifikasi peminjam.
     """
     substitutions = substitutions or {}
+    expire_pickup_loans()
     with transaction.atomic():
         try:
             loan = Loan.objects.select_for_update().get(pk=loan_id)
@@ -285,9 +324,8 @@ def approve_loan(loan_id, approver, substitutions=None):
                     f"Eksemplar {copy.copy_code} sedang tidak tersedia."
                 )
             if (
-                LoanItem.objects.filter(
-                    book_copy=copy, loan__status__in=OPEN_LOAN_STATUSES
-                )
+                LoanItem.objects.filter(book_copy=copy)
+                .filter(active_reservation_q())
                 .exclude(loan=loan)
                 .exists()
             ):
@@ -380,11 +418,106 @@ def reject_loan(loan_id, approver, reason):
     return loan
 
 
+def _notify_loan_expired(loan):
+    """Beri tahu peminjam bahwa pengajuan dibatalkan otomatis."""
+    title = "Pengajuan dibatalkan otomatis"
+    message = (
+        f"Pengajuan #{loan.pk} dibatalkan otomatis karena buku tidak "
+        "diambil sampai batas waktu QR Pickup. Copy buku kembali "
+        "tersedia untuk diajukan."
+    )
+    if not Notification.objects.filter(
+        user=loan.user,
+        type=EXPIRED_NOTIFICATION_TYPE,
+        reference_type="loan",
+        reference_id=loan.pk,
+    ).exists():
+        _notify(
+            loan.user,
+            EXPIRED_NOTIFICATION_TYPE,
+            title,
+            message,
+            loan,
+        )
+    whatsapp_message = formatting.format_loan_expired(
+        loan, loan.items.all()
+    )
+    enqueue_whatsapp_notification(
+        user=loan.user,
+        notification_type=EXPIRED_NOTIFICATION_TYPE,
+        title=whatsapp_message.title,
+        message=whatsapp_message.message,
+        reference_type="loan",
+        reference_id=loan.pk,
+        event_key="expired",
+    )
+
+
+def expire_pickup_loans(now=None, *, copy_ids=None, loan_ids=None):
+    """Batalkan APPROVED yang QR Pickup-nya sudah kedaluwarsa.
+
+    Idempoten: hanya transisi APPROVED -> CANCELLED yang diproses.
+    Reservasi copy dilepas karena LoanItem tidak lagi berada pada
+    status reservasi aktif. Peminjaman ACTIVE tidak pernah disentuh.
+    """
+    moment = now or timezone.now()
+    expired = Loan.objects.filter(
+        status=LOAN_APPROVED,
+        pickup_used_at__isnull=True,
+        pickup_exp_at__isnull=False,
+        pickup_exp_at__lte=moment,
+    )
+    if loan_ids is not None:
+        expired = expired.filter(pk__in=loan_ids)
+    if copy_ids is not None:
+        expired = expired.filter(
+            items__book_copy_id__in=copy_ids
+        ).distinct()
+    expired_ids = list(expired.values_list("pk", flat=True))
+    cancelled = 0
+    for loan_id in expired_ids:
+        with transaction.atomic():
+            try:
+                loan = (
+                    Loan.objects.select_for_update()
+                    .select_related("user")
+                    .prefetch_related("items__book_copy__book")
+                    .get(pk=loan_id)
+                )
+            except Loan.DoesNotExist:
+                continue
+            if not (
+                loan.status == LOAN_APPROVED
+                and loan.pickup_used_at is None
+                and loan.pickup_exp_at is not None
+                and loan.pickup_exp_at <= moment
+            ):
+                continue
+            loan.status = LOAN_CANCELLED
+            loan.rejected_at = moment
+            loan.rejection_reason = AUTO_EXPIRED_REASON
+            loan.save(
+                update_fields=[
+                    "status",
+                    "rejected_at",
+                    "rejection_reason",
+                    "updated_at",
+                ]
+            )
+            _notify_loan_expired(loan)
+            cancelled += 1
+    return cancelled
+
+
 def _ensure_pickup_usable(loan):
     """Aturan validitas QR Pickup (BR-39 – BR-42, NFR-17).
 
     Dipakai verifikasi biasa maupun handover terkunci.
     """
+    if loan.status == LOAN_CANCELLED:
+        if loan.rejection_reason == AUTO_EXPIRED_REASON:
+            raise PickupTokenError("QR Pickup sudah kedaluwarsa.")
+        raise PickupTokenError("QR Pickup sudah dibatalkan.")
     if loan.status != LOAN_APPROVED:
         raise PickupTokenError(
             "QR Pickup hanya berlaku pada pengajuan yang disetujui "
@@ -393,7 +526,7 @@ def _ensure_pickup_usable(loan):
     if loan.pickup_used_at is not None:
         raise PickupTokenError("QR Pickup sudah digunakan.")
     if loan.pickup_exp_at is None or loan.pickup_exp_at <= timezone.now():
-        raise PickupTokenError("QR Pickup sudah kedaluarsa.")
+        raise PickupTokenError("QR Pickup sudah kedaluwarsa.")
 
 
 def verify_pickup_token(token):
@@ -408,11 +541,19 @@ def verify_pickup_token(token):
         loan = Loan.objects.select_related("user").get(pickup_token=token)
     except (Loan.DoesNotExist, ValueError):
         raise PickupTokenError("QR Pickup tidak dikenal.")
+    if (
+        loan.status == LOAN_APPROVED
+        and loan.pickup_used_at is None
+        and loan.pickup_exp_at is not None
+        and loan.pickup_exp_at <= timezone.now()
+    ):
+        expire_pickup_loans(loan_ids=[loan.pk])
+        raise PickupTokenError("QR Pickup sudah kedaluwarsa.")
     _ensure_pickup_usable(loan)
     return loan
 
 
-def activate_handover(token, librarian):
+def _activate_handover_locked(token, librarian):
     """Aktifkan peminjaman saat buku diserahkan (FR-21 – FR-28, BR-19 – BR-24).
 
     Satu batas transaksi untuk loan + items + copies + token (NFR-16):
@@ -493,6 +634,24 @@ def activate_handover(token, librarian):
             event_key="active",
         )
     return loan
+
+
+def activate_handover(token, librarian):
+    """Aktifkan peminjaman dan batalkan QR yang sudah kedaluwarsa."""
+    token = (token or "").strip()
+    loan_id = None
+    if token:
+        loan_id = (
+            Loan.objects.filter(pickup_token=token)
+            .values_list("pk", flat=True)
+            .first()
+        )
+    try:
+        return _activate_handover_locked(token, librarian)
+    except PickupTokenError:
+        if loan_id is not None:
+            expire_pickup_loans(loan_ids=[loan_id])
+        raise
 
 
 def make_qr_png(data):

@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class Loan(models.Model):
@@ -33,6 +34,15 @@ class Loan(models.Model):
 
     class Meta:
         db_table = "loans"
+
+    @property
+    def pickup_is_active(self):
+        return (
+            self.status == "APPROVED"
+            and self.pickup_used_at is None
+            and self.pickup_exp_at is not None
+            and self.pickup_exp_at > timezone.now()
+        )
 
 
 class LoanItem(models.Model):

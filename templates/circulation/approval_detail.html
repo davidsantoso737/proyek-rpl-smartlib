@@ -82,6 +82,18 @@
             Disetujui {{ loan.approved_at|date:"d M Y H:i" }}. QR Pickup berlaku sampai
             {{ loan.pickup_exp_at|date:"d M Y H:i" }}.
         </p>
+    {% elif loan.status == "CANCELLED" %}
+        <div class="m-4 sm:m-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p class="font-semibold">Masa pengambilan telah berakhir</p>
+            <p class="mt-1">
+                Pengajuan dibatalkan otomatis karena QR Pickup kedaluwarsa. QR dan token lama sudah tidak berlaku.
+            </p>
+            {% if loan.pickup_exp_at %}
+                <p class="mt-1 text-xs text-amber-800">
+                    Batas waktu pengambilan: {{ loan.pickup_exp_at|date:"d M Y H:i" }}
+                </p>
+            {% endif %}
+        </div>
     {% elif loan.status == "REJECTED" %}
         <p class="bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-xl text-sm m-4 sm:m-5">
             Ditolak{% if loan.rejection_reason %}: {{ loan.rejection_reason }}{% endif %}

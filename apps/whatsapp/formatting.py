@@ -168,6 +168,38 @@ def format_loan_rejected(loan, reason):
     )
 
 
+def format_loan_expired(loan, items=None):
+    items = list(items or [])
+    parts = [
+        f"Halo *{_user_name(loan.user)}*, pengajuan peminjaman Anda "
+        "dibatalkan otomatis karena buku tidak diambil sampai batas waktu."
+    ]
+    summary = [
+        "*Ringkasan*",
+        f"- Nomor pengajuan: #{loan.pk}",
+    ]
+    if items:
+        summary.append(f"- Jumlah buku: {len(items)}")
+        summary.extend(_item_lines(items))
+    summary.append("- Status: *Dibatalkan (kedaluwarsa)*")
+    parts.append("\n".join(summary))
+    if getattr(loan, "pickup_exp_at", None):
+        parts.append(
+            "*Batas pengambilan*\n"
+            f"{format_date(loan.pickup_exp_at, include_time=True)}"
+        )
+    parts.append(
+        "*Informasi*\n"
+        "Copy buku telah kembali ke daftar ketersediaan dan dapat "
+        "diajukan kembali."
+    )
+    parts.append(FOOTER)
+    return WhatsAppMessage(
+        _title("Pengajuan dibatalkan otomatis"),
+        _join(*parts),
+    )
+
+
 def format_loan_active(loan, items=None):
     items = list(items or [])
     parts = [

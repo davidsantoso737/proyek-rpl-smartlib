@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Exists, OuterRef, Prefetch, Q
 from django.db.models.deletion import ProtectedError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -29,6 +29,9 @@ COPY_PAGE_SIZE = 4
 
 
 def _book_queryset():
+    from apps.circulation.services import active_reserved_copy_ids
+
+    reserved_ids = active_reserved_copy_ids()
     return (
         Book.objects.filter(is_active=True)
         .select_related("category")
@@ -42,7 +45,8 @@ def _book_queryset():
             total_copies=Count("copies", distinct=True),
             available_copies=Count(
                 "copies",
-                filter=Q(copies__status=STATUS_TERSEDIA),
+                filter=Q(copies__status=STATUS_TERSEDIA)
+                & ~Q(copies__pk__in=reserved_ids),
                 distinct=True,
             ),
         )
@@ -158,9 +162,19 @@ def catalog_list_view(request):
 @active_login_required
 def book_detail_view(request, pk):
     """Detail koleksi fisik + ketersediaan aktual eksemplar (FR-10, FR-11)."""
+    from apps.circulation.models import LoanItem
+    from apps.circulation.services import active_reservation_q
+
     book = get_object_or_404(_book_queryset(), pk=pk)
+    copies = book.copies.annotate(
+        is_reserved=Exists(
+            LoanItem.objects.filter(book_copy=OuterRef("pk")).filter(
+                active_reservation_q()
+            )
+        )
+    ).order_by("copy_code")
     page_obj, querystring = paginate_queryset(
-        request, book.copies.order_by("copy_code"), COPY_PAGE_SIZE
+        request, copies, COPY_PAGE_SIZE
     )
     return render(
         request,
@@ -301,13 +315,9 @@ def manage_book_copies_view(request, pk):
 
 
 def _copy_bound_to_open_loan(copy):
-    from apps.circulation.models import LoanItem
-    from apps.circulation.services import OPEN_LOAN_STATUSES
+    from apps.circulation.services import copy_has_active_reservation
 
-    return LoanItem.objects.filter(
-        book_copy=copy,
-        loan__status__in=OPEN_LOAN_STATUSES,
-    ).exists()
+    return copy_has_active_reservation(copy)
 
 
 def _create_copies_bulk(request, form, book):

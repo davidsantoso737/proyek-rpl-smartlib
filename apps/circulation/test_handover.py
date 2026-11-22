@@ -134,9 +134,9 @@ class HandoverTests(TestCase):
         response = self.client.post(
             reverse("circulation:handover"), {"token": loan.pickup_token}
         )
-        self.assertContains(response, "kedaluarsa")
+        self.assertContains(response, "kedaluwarsa")
         loan.refresh_from_db()
-        self.assertEqual(loan.status, "APPROVED")
+        self.assertEqual(loan.status, "CANCELLED")
 
     def test_reused_pickup_ditolak(self):
         loan = self._approved_loan()

@@ -5,6 +5,7 @@ from .models import WhatsAppConnection
 CATEGORY_BY_NOTIFICATION = {
     "LOAN_APPROVED": (WhatsAppConnection.Category.LOAN,),
     "LOAN_REJECTED": (WhatsAppConnection.Category.LOAN,),
+    "LOAN_EXPIRED": (WhatsAppConnection.Category.LOAN,),
     "LOAN_ACTIVE": (WhatsAppConnection.Category.LOAN,),
     "EBOOK_APPROVED": (WhatsAppConnection.Category.LOAN,),
     "EBOOK_REJECTED": (WhatsAppConnection.Category.LOAN,),

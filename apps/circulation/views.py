@@ -36,6 +36,7 @@ from .services import (
     cart_copies,
     cart_remove,
     confirm_fine_payment,
+    expire_pickup_loans,
     get_active_ebook_loan,
     get_cart_ids,
     lookup_return,
@@ -115,6 +116,7 @@ def loan_list_view(request):
     """Riwayat/status pengajuan milik sendiri."""
     from apps.notifications.services import sync_due_overdue
 
+    expire_pickup_loans()
     sync_due_overdue()
     loans = (
         Loan.objects.filter(user=request.user)
@@ -136,6 +138,8 @@ def loan_detail_view(request, pk):
         pk=pk,
         user=request.user,
     )
+    expire_pickup_loans(loan_ids=[loan.pk])
+    loan.refresh_from_db()
     return render(
         request, "circulation/loan_detail.html", {"loan": loan}
     )
@@ -168,6 +172,8 @@ def approval_list_view(request):
 def approval_detail_view(request, pk):
     """Periksa pengajuan + tetapkan eksemplar (FR-17 – FR-18)."""
     loan = _approval_loan_or_404(pk)
+    expire_pickup_loans(loan_ids=[loan.pk])
+    loan.refresh_from_db()
     return _render_approval_detail(request, loan)
 
 
@@ -241,6 +247,8 @@ def pickup_qr_image_view(request, pk):
     loan = get_object_or_404(Loan, pk=pk, pickup_token__isnull=False)
     if request.user.role != User.Role.PUSTAKAWAN and loan.user_id != request.user.pk:
         raise Http404("Tidak ditemukan.")
+    expire_pickup_loans(loan_ids=[loan.pk])
+    loan.refresh_from_db()
     if loan.status != LOAN_APPROVED or not loan.pickup_token:
         raise Http404("Tidak ditemukan.")
     return HttpResponse(

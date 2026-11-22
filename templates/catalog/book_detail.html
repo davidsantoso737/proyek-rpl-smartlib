@@ -111,12 +111,14 @@
                                 <p class="truncate text-xs text-slate-500">{{ copy.location }}</p>
                             </div>
                             <div class="flex shrink-0 items-center justify-between gap-3 sm:justify-end sm:gap-4">
-                                {% if copy.status == "TERSEDIA" %}
+                                {% if copy.is_reserved %}
+                                    <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">Dipesan</span>
+                                {% elif copy.status == "TERSEDIA" %}
                                     <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">{{ copy.status }}</span>
                                 {% else %}
                                     <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">{{ copy.status }}</span>
                                 {% endif %}
-                                {% if copy.status == "TERSEDIA" and user.role != "PUSTAKAWAN" %}
+                                {% if copy.status == "TERSEDIA" and not copy.is_reserved and user.role != "PUSTAKAWAN" %}
                                     <form method="post" action="{% url 'circulation:cart_add' copy.pk %}" class="inline">
                                         {% csrf_token %}
                                         <button type="submit" aria-label="Tambah eksemplar {{ copy.copy_code }} ke keranjang"
